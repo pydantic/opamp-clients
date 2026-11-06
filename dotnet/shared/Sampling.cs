@@ -4,10 +4,10 @@
 using System.Diagnostics;
 using System.Globalization;
 using OpenTelemetry.Trace;
-using Pydantic.OpAmp.Client.Sdk;
-using SdkSpanKind = Pydantic.OpAmp.Client.Sdk.SpanKind;
+using Logfire.Fleet.Client.Sdk;
+using SdkSpanKind = Logfire.Fleet.Client.Sdk.SpanKind;
 
-namespace Pydantic.OpAmp.Otel;
+namespace Logfire.Fleet.Otel;
 
 /// <summary>How the rules and the rate decide a span (the layer's <c>SpanSampling.How</c>).</summary>
 internal enum How

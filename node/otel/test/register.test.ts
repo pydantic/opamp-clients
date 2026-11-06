@@ -26,7 +26,7 @@ import {
   ServerToAgentFlags,
   ServerToAgentSchema,
   toBinary,
-} from "@pydantic/opamp-client";
+} from "@pydantic/logfire-fleet-client";
 
 import { FILE, policy } from "./policy.js";
 
@@ -145,7 +145,7 @@ test("the inventory reaches the server: its hash at once, in full when asked, th
   try {
     const r = await run("setTimeout(() => {}, 1500);", s.endpoint, undefined, undefined, {
       OTEL_NODE_ENABLED_INSTRUMENTATIONS: "http,express",
-      OTEL_TRACES_EXPORTER: "zipkin", // NodeSDK's: ungated, and send_traces not carried out
+      OTEL_TRACES_EXPORTER: "zipkin", // NodeSDK builds it; the gate goes in front of it at start
     });
     assert.deepEqual([r.code, r.signal], [0, null], r.out);
     const [first, full] = s.seen.components;
@@ -156,7 +156,7 @@ test("the inventory reaches the server: its hash at once, in full when asked, th
     const c = full.components;
     assert.deepEqual(Object.keys(c).sort(), ["exporters", "instrumentations", "sdk", "settings"]);
     const meta = Object.fromEntries(c.sdk!.metadata.map((kv) => [kv.key, kv.value?.value.value]));
-    assert.equal(meta["integration.name"], "@pydantic/opamp-otel");
+    assert.equal(meta["integration.name"], "@pydantic/logfire-fleet-otel");
     assert.equal(meta["telemetry.sdk.language"], "nodejs");
     assert.match(String(meta["telemetry.sdk.version"]), /^\d+\.\d+\.\d+/);
     // The instrumentations the variables load, under the names deactivate_instrumentations takes.
@@ -166,8 +166,8 @@ test("the inventory reaches the server: its hash at once, in full when asked, th
     }
     const gated = Object.fromEntries(Object.entries(c.exporters!.subComponentMap).map(([signal, d]) =>
       [signal, Object.fromEntries(Object.entries(d.subComponentMap).map(([n, e]) => [n, e.metadata[0]?.value?.value.value]))]));
-    assert.deepEqual(gated, { traces: { zipkin: false } }); // metrics and logs: none
-    assert.equal(c.settings!.subComponentMap.send_traces, undefined);
+    assert.deepEqual(gated, { traces: { "zipkin@localhost:9411": true } }); // metrics and logs: none
+    assert.ok(c.settings!.subComponentMap.send_traces);
     assert.ok(c.settings!.subComponentMap.send_logs);
     // Sent in full once, as asked; unchanged after that, so left out. The capability on every message.
     assert.ok(s.seen.components.length > 2 && s.seen.components.slice(2).every((a) => a === undefined), r.out);
@@ -560,7 +560,7 @@ test("a move nobody answers is FAILED, and the agent carries on where it was wit
  * module would. Removed at the test's end.
  */
 function spoiledCore(t: { after: (fn: () => void) => void }, spoil: (core: string) => void): string {
-  const real = realpathSync(fileURLToPath(new URL("../../node_modules/@pydantic/opamp-client/", import.meta.url)));
+  const real = realpathSync(fileURLToPath(new URL("../../node_modules/@pydantic/logfire-fleet-client/", import.meta.url)));
   const copy = mkdtempSync(join(tmpdir(), "opamp-core-copy-"));
   t.after(() => rmSync(copy, { recursive: true, force: true }));
   for (const part of ["package.json", "dist", "core"]) cpSync(join(real, part), join(copy, part), { recursive: true });
@@ -568,7 +568,7 @@ function spoiledCore(t: { after: (fn: () => void) => void }, spoil: (core: strin
   spoil(join(copy, "core"));
   const at = pathToFileURL(`${copy}/`).href;
   writeFileSync(join(copy, "hooks.mjs"), `
-    const to = { "@pydantic/opamp-client": "dist/src/index.js", "@pydantic/opamp-client/sdk": "dist/src/sdk.js" };
+    const to = { "@pydantic/logfire-fleet-client": "dist/src/index.js", "@pydantic/logfire-fleet-client/sdk": "dist/src/sdk.js" };
     export async function resolve(specifier, context, next) {
       return specifier in to ? { url: new URL(to[specifier], ${JSON.stringify(at)}).href, shortCircuit: true } : next(specifier, context);
     }`);

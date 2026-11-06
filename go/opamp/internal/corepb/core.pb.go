@@ -5528,8 +5528,8 @@ const file_opamp_core_v1_core_proto_rawDesc = "" +
 	"\fSetupUidFrom\x12\x17\n" +
 	"\x13SETUP_UID_FROM_MADE\x10\x00\x12\x18\n" +
 	"\x14SETUP_UID_FROM_SAVED\x10\x01\x12\x18\n" +
-	"\x14SETUP_UID_FROM_GIVEN\x10\x02Bv\n" +
-	"\x17dev.pydantic.opamp.coreB\tCoreProtoZ:github.com/pydantic/opamp-clients/go/opamp/internal/corepb\xaa\x02\x13Pydantic.OpAmp.Coreb\x06proto3"
+	"\x14SETUP_UID_FROM_GIVEN\x10\x02B}\n" +
+	"\x1fdev.pydantic.logfire.fleet.coreB\tCoreProtoZ:github.com/pydantic/opamp-clients/go/opamp/internal/corepb\xaa\x02\x12Logfire.Fleet.Coreb\x06proto3"
 
 var (
 	file_opamp_core_v1_core_proto_rawDescOnce sync.Once

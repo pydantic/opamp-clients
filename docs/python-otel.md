@@ -1,6 +1,6 @@
 # OpenTelemetry auto-instrumentation for Python, under an OpAMP server
 
-`python/otel` is `pydantic-opamp-otel`, a package for `opentelemetry-instrument`. With it
+`python/otel` is `logfire-fleet-otel`, a package for `opentelemetry-instrument`. With it
 installed, the SDK that auto-instrumentation sets up joins an OpAMP server's fleet and takes its
 settings from the server: sampling, what to send, which instrumentations run
 ([sdk-settings.md](sdk-settings.md)). The application needs no code, and the SDK and the
@@ -12,13 +12,10 @@ It plugs in through upstream's extension points, including the SDK's OpAMP hook
 
 ## Use it
 
-Install it next to the instrumentations the application needs. Until it is published, install it
-from a checkout of this repository, after fetching the compiled core the checkout pins:
+Install it next to the instrumentations the application needs:
 
 ```bash
-git clone https://github.com/pydantic/opamp-clients && cd opamp-clients
-scripts/fetch_core.py fetch
-pip install ./python/core ./python ./python/otel opentelemetry-instrumentation-flask
+pip install logfire-fleet-otel opentelemetry-instrumentation-flask
 ```
 
 Then run the application under `opentelemetry-instrument` as usual, with the server's address:
@@ -56,7 +53,7 @@ answered as done ([the host](sdk-settings.md#the-host)). The package logs a warn
 
 ### Is it working?
 
-The package says so on the `pydantic_opamp_otel` logger. When the client first reaches the server it logs,
+The package says so on the `logfire_fleet_otel` logger. When the client first reaches the server it logs,
 at INFO, `OpAMP: connected to https://opamp.example.com/v1/opamp; this SDK is managed as checkout,
 instance <uid>`. That line reaches stderr even with INFO off, unless the application has logging
 handlers of its own, so a working SDK never looks like one that isn't loaded. When it can't, it logs one WARNING per run of failures, with what to check:
@@ -81,9 +78,9 @@ An application that sets its SDK up in code, rather than under `opentelemetry-in
 (Locust, say, whose gevent rules it out), gets the same with one call in place of that setup:
 
 ```python
-import pydantic_opamp_otel
+import logfire_fleet_otel
 
-pydantic_opamp_otel.configure()
+logfire_fleet_otel.configure()
 # then the application's own instrumentors, as before:
 RequestsInstrumentor().instrument()
 ```
@@ -95,7 +92,7 @@ above), set as the global ones, with the live sampler, the gated exporters and t
 above, or from the application, as `configure()`'s own arguments:
 
 ```python
-pydantic_opamp_otel.configure(
+logfire_fleet_otel.configure(
     endpoint="https://opamp.example.com/v1/opamp",
     headers={"Authorization": f"Bearer {settings.opamp_key}"},
 )
@@ -111,7 +108,7 @@ and with neither it is the default:
 | `state_dir` | `OTEL_OPAMP_STATE_DIR` | A directory (`str` or a path), or `"none"` for none, not even the default one. |
 | `heartbeat_interval` | `OTEL_OPAMP_HEARTBEAT_INTERVAL` | Seconds (`0.5`, `30`), a `timedelta`, or a string as the variable (`"30s"`, `"2m"`, `"1500"` for milliseconds). |
 
-A value it can't use is warned about on the `pydantic_opamp_otel` logger and is the default, as a variable
+A value it can't use is warned about on the `logfire_fleet_otel` logger and is the default, as a variable
 it can't read is: an endpoint that isn't a string leaves the SDK unmanaged, headers that aren't
 all strings are none (the warning doesn't show them), a `state_dir` that isn't a path is the
 default one, and an interval that isn't a positive duration (`0`, `-1`, `True`, NaN, `"soon"`) is
@@ -119,11 +116,9 @@ default one, and an interval that isn't a positive duration (`0`, `-1`, `True`, 
 about at start, as one without a scheme is. None of it raises. Its other keyword arguments are
 upstream's configurator's (`sampler`, which a remote rate replaces while one is set,
 `resource_attributes`, `span_processors`, and so on). Span or log record processors given here,
-or added to the providers later, are not the package's: they export past its gates, and the
-`signal_exports` controls do not stop them. So the package no longer carries out that signal's
-gate controls from then on. A policy that overrides one is refused, and in a policy already in
-force each such override is set aside, reported `local` in the effective config
-([the host](sdk-settings.md#the-host)). Call it once, before the application's instrumentors.
+or added to the providers later, get the package's gates in front of their exporters like every
+other exporter ([what the policy governs](#what-the-policy-governs)). Call it once, before the
+application's instrumentors.
 
 [examples/python-otel/in_code.py](../examples/python-otel/in_code.py) is a whole application set
 up this way, the server taken from its own variables; `examples/python-otel/try.py` runs it
@@ -133,18 +128,93 @@ What it cannot carry out: the `instrumentations` control, because it instruments
 application names its instrumentors in code. A policy that overrides it is refused, like every
 other override above that a process cannot carry out.
 
-## The Logfire SDK: `configure_logfire()`
+If the application has set its SDK up already (a `TracerProvider` set as the global one),
+`configure()` builds none: it puts that SDK under the server, as `manage()` below does, and warns
+(its other keyword arguments aren't used). A second SDK couldn't become the global one, and what
+the application sends would go past it.
 
-An application on the [Logfire SDK](https://logfire.pydantic.dev/docs/) calls
-`configure_logfire()` in place of `logfire.configure()`, with the same keyword arguments, and its
-SDK joins the fleet and takes the server's settings. Install the package with its `logfire` extra
-(`pydantic-opamp-otel[logfire]`; `logfire` 5.1 to 5.x).
+## An SDK set up already: `manage()`
+
+An application that sets its SDK up itself, as OpenTelemetry's own docs show, keeps that setup
+and adds one call after it:
+
+```python
+from opentelemetry import trace
+from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
+from opentelemetry.sdk.resources import Resource
+from opentelemetry.sdk.trace import TracerProvider
+from opentelemetry.sdk.trace.export import BatchSpanProcessor
+import logfire_fleet_otel
+
+provider = TracerProvider(resource=Resource.create({"service.name": "checkout"}))
+provider.add_span_processor(BatchSpanProcessor(OTLPSpanExporter()))
+trace.set_tracer_provider(provider)  # the application's setup, as it was
+
+logfire_fleet_otel.manage()  # the server from OTEL_OPAMP_*, or manage(endpoint=..., headers=...)
+```
+
+`manage()` takes the server as `configure()` does (`endpoint`, `headers`, `state_dir`,
+`heartbeat_interval`, else the `OTEL_OPAMP_*` variables); without an endpoint it does nothing. It
+works on whatever set the global providers up: the application's code, another distro's
+configurator, or `logfire.configure()` (whose logs then go through the log controls, as under
+`configure_logfire()`).
+
+- **Governed:** the gates go in front of every exporter on the global providers
+  ([what the policy governs](#what-the-policy-governs)), so `signal_exports`, the log controls,
+  the rate caps, redaction and scrubbing apply to what the application's own exporters send.
+- **Refused:** the sampler is the application's, so `head_sampling`, `sampling_rules`,
+  `trace_rate_limit` and `debug` are, with `instrumentations`. A policy that overrides one is
+  refused (FAILED, naming it), and a warning at start names them. `configure()`,
+  `configure_logfire()` or `opentelemetry-instrument` set up a sampler the server changes.
+- **Its resource:** the instance is described by the tracer provider's resource. The telemetry
+  keeps the application's own `service.instance.id`, which may differ from the OpAMP instance
+  UID.
+
+Call it once, after the application sets its tracer provider. With none set it warns and the SDK
+runs unmanaged.
+
+## The Logfire SDK: `logfire.configure(fleet=True)`
+
+A Logfire SDK that has the `fleet` option joins the fleet from `logfire.configure()` itself.
+Install it with its `fleet` extra, which installs this package:
+
+```bash
+pip install 'logfire[fleet]'
+```
 
 ```python
 import logfire
-import pydantic_opamp_otel
 
-pydantic_opamp_otel.configure_logfire(service_name="checkout", console=False)
+logfire.configure(service_name="checkout", fleet=True)  # or LOGFIRE_FLEET=true
+logfire.instrument_fastapi(app)
+```
+
+`fleet=True` takes the server from the `OTEL_OPAMP_*` variables above;
+`logfire.fleet.FleetOptions(endpoint=..., headers=..., state_dir=..., heartbeat_interval=...)`
+gives it in code. It does what `configure_logfire()` below does (the live sampler as the head
+sampler, the gates on the export to Logfire, above its retries with redaction under them, the
+gates on every other exporter, the instance UID as `service.instance.id`), but the Logfire SDK
+builds its exporters itself and calls this package at each of those points, through
+`logfire_fleet_otel.logfire_fleet()` and the `LogfireFleet` it returns. That contract is
+versioned (`LOGFIRE_FLEET_CONTRACT`): a Logfire SDK that doesn't know the installed version warns
+and runs unmanaged. So does one without the extra, or without an endpoint. It never blocks:
+until the server answers, the settings in force are the last ones saved in the state directory,
+else the Logfire SDK's own. A later `logfire.configure(fleet=...)` builds new providers, which are
+governed under the same client and instance.
+
+## The Logfire SDK: `configure_logfire()`
+
+For a Logfire SDK without the `fleet` option. An application on the
+[Logfire SDK](https://logfire.pydantic.dev/docs/) calls
+`configure_logfire()` in place of `logfire.configure()`, with the same keyword arguments, and its
+SDK joins the fleet and takes the server's settings. Install the package with its `logfire` extra
+(`logfire-fleet-otel[logfire]`; `logfire` 5.1 to 5.x).
+
+```python
+import logfire
+import logfire_fleet_otel
+
+logfire_fleet_otel.configure_logfire(service_name="checkout", console=False)
 logfire.instrument_fastapi(app)  # the Logfire SDK's instrumentations, as before
 ```
 
@@ -166,12 +236,11 @@ What it does differently from `logfire.configure()`:
   arrives when a setting changes ([at once](sdk-settings.md#the-controls)).
 - The instance UID is `service.instance.id`, in place of the random one the Logfire SDK makes.
 
-What exports past the gates is declared, so a policy that overrides a setting it would bypass is
-refused (FAILED, naming the setting), as in [the host](sdk-settings.md#the-host), and a warning
-at start names the settings set aside:
+Everything else the Logfire SDK exports through gets the same gates once it is built, so the
+policy reaches every destination ([what the policy governs](#what-the-policy-governs)):
 
-- the console (on unless `console=False` or `LOGFIRE_CONSOLE=false`): it shows every span and
-  log, so with it on the trace and log gates and redaction are set aside;
+- the console (on unless `console=False` or `LOGFIRE_CONSOLE=false`): a span the policy drops or
+  redacts is dropped or redacted on the console too;
 - span processors (`additional_span_processors`), log record processors
   (`advanced.log_record_processors`) and metric readers (`metrics.additional_readers`) given in the
   arguments;
@@ -191,6 +260,26 @@ variables and `pyproject.toml`), and, as the Logfire SDK does, takes a token or 
 given from its credentials file (`.logfire/logfire_credentials.json`). It builds its
 exporters from the Logfire SDK's modules, which are not public API: it is checked with the
 versions its extra allows.
+
+## What the policy governs
+
+The policy governs every exporter the SDK exports through, not only the ones the package sets
+up: manage in Logfire, send anywhere. Once the SDK is built (at start, under
+`opentelemetry-instrument`, `configure()` or `configure_logfire()`), the package walks the
+global providers and puts its gates in front of the exporter of every SDK export processor and
+every periodic metric reader: the configurator's, processors passed in code, a configuration
+file's, the Logfire SDK's console, and a processor the application adds later. One decision per
+span or record holds for every exporter it reaches: a record the log rate limit admits is
+admitted on the console and in Logfire alike, and the limit is one budget for the process.
+
+What the package can't put a gate in front of is reported, never refused: a processor of the
+application's own that holds an exporter itself, a pulled metric reader (Prometheus), or global
+providers that aren't the OpenTelemetry SDK's. Each is listed in the
+[inventory](available-components.md) with `gated: false` and in export health with the status
+`ungoverned` (healthy all the same), and the package warns once, naming it. The policy is still
+APPLIED and in force on everything governed. Each exporter is named by its kind and, where it
+has one, the host and port it sends to (`otlp@api.honeycomb.io:443`), never its credentials or
+path.
 
 ## What it does
 
@@ -223,10 +312,10 @@ versions its extra allows.
   | Control | How |
   |---|---|
   | `head_sampling` | a sampler in place of the configured one (`OTEL_TRACES_SAMPLER`). A span whose parent was sampled, here or by the caller, is sampled at any ratio, 0 included. Local: the configured sampler. |
-  | `signal_exports.traces`, `signal_exports.logs` | every trace and log exporter the package sets up from `OTEL_TRACES_EXPORTER` and `OTEL_LOGS_EXPORTER`, wrapped in the SDK's export processors. `enabled: false` drops what would be exported. Processors passed to `configure()` or added later are not stopped, so then the control is set aside, not answered as done. |
+  | `signal_exports.traces`, `signal_exports.logs` | every trace and log exporter on the SDK's providers ([what the policy governs](#what-the-policy-governs)). `enabled: false` drops what would be exported. |
   | `log_levels` (`level`) | live, at the same gated log exporters. A record below the level's SeverityNumber is dropped at its next export, and one with no severity (0) is kept. Local: every record goes. |
   | `sampling_rules`, `log_levels` (`scopes`), `attribute_redaction`, `scrubbing`, `trace_rate_limit`, `log_rate_limit`, `debug` | live, in the same sampler and gates. See [the newer settings](#the-newer-settings). |
-  | `signal_exports.metrics` | the OTLP metric exporter, swapped for a gated one (metrics have no export-processor hook). `otlp` in `OTEL_METRICS_EXPORTER` becomes `opamp`, the same exporter the protocol variables pick, which can stop. Only the name `otlp` does this. With no `otlp` among the metric exporters (`otlp_proto_http` named directly, say), nothing can stop them, and a policy that overrides the control is refused ([the host](sdk-settings.md#the-host)). The same holds with `otlp` beside another exporter (`otlp,prometheus`), because only the OTLP one could stop. |
+  | `signal_exports.metrics` | every push metric exporter: the gate goes in front of each periodic reader's exporter (metrics have no export-processor hook), whatever `OTEL_METRICS_EXPORTER` names. A reader that is pulled (Prometheus) can't be gated and is reported ungoverned. |
   | `instrumentations` (`disabled`) | at the next start, added to `OTEL_PYTHON_DISABLED_INSTRUMENTATIONS`. Names are the instrumentations' entry points: `flask`, `requests`, `urllib`, and so on. |
   | `instrumentations` (`all_disabled`) | at the next start, `OTEL_PYTHON_DISABLED_INSTRUMENTATIONS=*`. |
   | `app_settings` | live, to the application. See [the application's own settings](#the-applications-own-settings). |
@@ -236,8 +325,9 @@ versions its extra allows.
 
   With declarative configuration (`OTEL_CONFIG_FILE`), the file builds the SDK. The instance
   joins the fleet (the configurator starts the client, as upstream skips its OpAMP hook) and the
-  `instrumentations` control works. But the sampler and exporters are the file's, so a policy
-  that overrides `head_sampling` or `signal_exports` is refused, and the package warns.
+  `instrumentations` control works, and the gates go in front of the file's exporters. But the
+  sampler is the file's, so a policy that overrides `head_sampling`, `sampling_rules`,
+  `trace_rate_limit` or `debug` is refused, and the package warns.
 - **Doesn't trace itself.** The OpAMP client runs with instrumentation suppressed, so its requests
   (and its goodbye) never show up as the application's spans, whichever HTTP instrumentations are
   installed.
@@ -257,7 +347,7 @@ versions its extra allows.
   keeps the parent's resource, `service.instance.id` included. When the parent stops it removes
   the file, and its children keep the settings in force.
 
-The rules are the SDK settings layer's (`pydantic_opamp_client.sdk`), the same in every language. The
+The rules are the SDK settings layer's (`logfire_fleet_client.sdk`), the same in every language. The
 package only carries them out on the Python SDK.
 
 ## The newer settings
@@ -283,7 +373,7 @@ local.
 ```
 
 No traces of health checks, served or made, every `checkout ...` trace, and a quarter of the
-rest. In the live sampler (`pydantic_opamp_otel.LiveSampler`), for a span with no parent only: the first
+rest. In the live sampler (`logfire_fleet_otel.LiveSampler`), for a span with no parent only: the first
 rule that matches sets the rate, applied by the SDK's `TraceIdRatioBased`; with none,
 `head_sampling`; with neither, the configured sampler (`OTEL_TRACES_SAMPLER`). A span with a
 parent follows it. What a rule sees is what the instrumentation passes when it starts the span:
@@ -399,7 +489,7 @@ The server may send the application settings of its own in the policy's `app_set
 ([app-settings.md](app-settings.md)):
 
 ```python
-from pydantic_opamp_otel import app_settings
+from logfire_fleet_otel import app_settings
 
 if app_settings.get("checkout.new_flow", "off") == "on":
     ...
@@ -419,28 +509,24 @@ No setting: always on. Once the SDK is built, the agent reports what it runs as 
 components, in the shape every language sends
 ([available-components.md](available-components.md#what-the-sdk-integrations-report)):
 
-- `sdk`: `pydantic-opamp-otel` and its version, `python`, and the `opentelemetry-sdk` version.
+- `sdk`: `logfire-fleet-otel` and its version, `python`, and the `opentelemetry-sdk` version.
 - `instrumentations`: every instrumentation `opentelemetry-instrument` can run, switched off or
   not, under its entry point's name (`flask`, `requests`, `aiohttp-client`), which is the name
   `OTEL_PYTHON_DISABLED_INSTRUMENTATIONS`, and so the `instrumentations` control, takes. Each has
   its distribution's version. One whose library isn't installed is left out, as
   `opentelemetry-instrument` skips it. Under `configure()` the list is the same, though nothing
   there reads the switch.
-- `exporters`: read off the SDK's tracer, meter and logger providers, so what was built, however
-  it was. Each is named by its entry point, as `OTEL_*_EXPORTER` names it (`otlp_proto_grpc`,
-  `otlp_proto_http` and the package's gated `opamp` are all `otlp`; `console`, `prometheus`,
-  `zipkin`), or by its type when no entry point names it (`InMemorySpanExporter`). `gated` is
-  whether the package's gate wraps it (the trace and log exporters its configurator built, and the
-  OTLP metric exporter) and the host declares its signal's exports. An exporter another
-  configurator or `OTEL_CONFIG_FILE` built, every trace exporter when a span processor given to
-  `configure()` or added to the provider later exports past the gate (and every log exporter,
-  likewise for a log record processor), and every metric exporter when one beside `otlp` keeps
-  the metrics from stopping: each is `gated: false`, as the settings left undeclared say. An
-  exporter set to `none` is not listed.
+- `exporters`: read off the SDK's tracer, meter and logger providers as the gates go in, so what
+  was built, however it was. Each is named by its entry point, as `OTEL_*_EXPORTER` names it
+  (`otlp_proto_grpc` and `otlp_proto_http` are both `otlp`; `console`, `prometheus`, `zipkin`), or
+  by its type when no entry point names it (`InMemorySpanExporter`), with the host and port it
+  sends to where it has one (`otlp@127.0.0.1:4318`). `gated` is whether the package's gate is in
+  front of it: every exporter of an SDK export processor or periodic reader is; one held by a
+  processor of the application's own, or a pulled reader, is `gated: false`
+  ([what the policy governs](#what-the-policy-governs)). An exporter set to `none` is not listed.
 - `settings`: the settings this process carries out, from the same host its decisions use.
 
-It is sent once, and again only if a processor added to a provider later takes a signal's
-controls out of the package's hands.
+It is sent once, and again when a processor added to a provider later adds an exporter.
 
 ## How it is checked
 
@@ -450,7 +536,8 @@ controls out of the package's hands.
   - the answers, saving and reporting follow the layer;
   - a policy that overrides what another configurator's SDK cannot carry out is refused;
   - `configure()` sets an SDK up from the variables under the server (spans stop when the server
-    says so, the metric exporter is the gated one, one UID), is the SDK's own setup without an
+    says so, the metric exporter is gated, one UID), gates the processors passed to it and those
+    added later with the policy staying APPLIED, is the SDK's own setup without an
     endpoint, and refuses the instrumentation switches;
   - each of `configure()`'s server arguments, given in code, as a variable, both (code wins) or
     neither (the default); the forms each takes; blank as not given; and each value it can't use
@@ -478,9 +565,10 @@ controls out of the package's hands.
     scope levels and keys against the layer's `Evaluate`; and each setting's edge cases from
     sdk-settings.md, live changes and reverting included;
   - the inventory (`tests/test_inventory.py`): the instrumentations are the entry points
-    `opentelemetry-instrument` matches, at their versions, a missing library's left out; the
-    exporters are read off real providers, gated only behind the package's gates, a duplicate
-    ungated one making the name ungated; the settings are the agent's host's; and under
+    `opentelemetry-instrument` matches, at their versions, a missing library's left out; every
+    exporter on real providers gets the gate (once, however often it is looked at) and the policy
+    is in force on it, one the package can't reach is listed ungoverned, each by where it sends;
+    the settings are the agent's host's; and under
     `opentelemetry-instrument` and `configure()`, the components reach a test server in full,
     with their hash. The client's `components` call runs the shared vectors
     (`python/tests/test_sdk_settings.py`).

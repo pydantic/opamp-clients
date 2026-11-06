@@ -22,6 +22,9 @@ depends:
   # systemd-creds and LoadCredentialEncrypted=.
   - systemd (>= 250)
 rpm:
+  # After the old package's %preun on an upgrade, which a %post would run before.
+  scripts:
+    posttrans: posttrans.sh
   # Signed with SIGNING_KEY_FILE when build.sh has it (repo.sh signs the repositories with the same
   # key): dnf checks it. Unset, the rpm isn't signed.
   signature:
@@ -42,6 +45,9 @@ contents:
     file_info: {mode: 0755}
   - src: pydantic-opamp-uninstall
     dst: /usr/sbin/pydantic-opamp-uninstall
+    file_info: {mode: 0755}
+  - src: pydantic-opamp-after-upgrade
+    dst: /usr/lib/pydantic-opamp/pydantic-opamp-after-upgrade
     file_info: {mode: 0755}
   - src: pydantic-otelcol-configure
     dst: /usr/sbin/pydantic-otelcol-configure

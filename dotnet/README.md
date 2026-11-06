@@ -1,4 +1,4 @@
-# Pydantic.OpAmp.Client (.NET)
+# Logfire.Fleet.Client (.NET)
 
 An [OpAMP](https://github.com/open-telemetry/opamp-spec) client for .NET 8 and later, over plain
 HTTP or WebSocket.
@@ -13,11 +13,11 @@ same as every other language's client here. In platform mode the library carries
 requests with `HttpClient` and `ClientWebSocket` instead.
 
 To put automatic instrumentation under a server without writing code, use the plugin next to it,
-`Pydantic.OpAmp.AutoInstrumentation` ([docs/dotnet-otel.md](../docs/dotnet-otel.md)). An SDK set up
+`Logfire.Fleet.AutoInstrumentation` ([docs/dotnet-otel.md](https://github.com/pydantic/opamp-clients/blob/main/docs/dotnet-otel.md)). An SDK set up
 in code takes one call, `services.AddOpenTelemetry().WithOpAmp()`, from
-`Pydantic.OpAmp.Extensions.Hosting` (the same document). To decide
-what an SDK does with the server's settings by hand, `Pydantic.OpAmp.Client.Sdk.SdkSettings`
-runs the shared SDK settings layer ([docs/sdk-settings.md](../docs/sdk-settings.md)).
+`Logfire.Fleet.Extensions.Hosting` (the same document). To decide
+what an SDK does with the server's settings by hand, `Logfire.Fleet.Client.Sdk.SdkSettings`
+runs the shared SDK settings layer ([docs/sdk-settings.md](https://github.com/pydantic/opamp-clients/blob/main/docs/sdk-settings.md)).
 
 ```csharp
 var client = OpAmpClient.Start(
@@ -65,10 +65,10 @@ Set `OPAMP_CORE_TAP=<path>` to record every call into the core (for `opamp-tap`)
 core in the process writes `<path>`, each later one `<path>.<pid>.<n>`. A tap holds the headers
 sent (the enrollment key) and the credentials saved, so a new one is the user's only.
 
-The native core comes in its own package, `Pydantic.OpAmp.Core.Native`, which this one depends
+The native core comes in its own package, `Logfire.Fleet.Core.Native`, which this one depends
 on: the library alone for Linux (glibc and musl, so Alpine too), macOS and Windows, on x64 and
 arm64 (`runtimes/<rid>/native`), about 2 MB each, with no assembly and no source. This package,
-`Pydantic.OpAmp.Client`, holds only the client's assembly.
+`Logfire.Fleet.Client`, holds only the client's assembly.
 
 ## TLS and proxies
 
@@ -196,7 +196,7 @@ network path, and not in backups or images copied anywhere less protected.
 
 ```
 ../scripts/fetch_core.py fetch             # first: the core's release (the native library in target/release, the modules)
-dotnet test --project Pydantic.OpAmp.Client.Tests   # needs the .NET 10 SDK, and the .NET 8 runtime: net8.0 and net10.0
+dotnet test --project Logfire.Fleet.Client.Tests   # needs the .NET 10 SDK, and the .NET 8 runtime: net8.0 and net10.0
 ../scripts/gen_core.py                      # after the core's .proto files change: regenerates the types
 ../scripts/native_dist.py                   # the package, with every platform's native core (CI's native job)
 ```
@@ -206,4 +206,4 @@ The conformance suite runs this client through `conformance/drivers/dotnet-core`
 run core mode over an in-memory network (`MemNet`, with `MemServer` at its far end) as well as
 real sockets.
 
-What the client promises around its callback (when it is called, one at a time and never before `start` returns, what a callback that throws does, which calls are allowed from the callback and from other threads, stop from the callback) is [the SDK contract](../docs/sdk-contract.md), the same for every SDK here. The precise rules, around the core too, are the shell contract, `spec/shell-contract.md` (put in place by `scripts/fetch_core.py fetch`; it lists the breaks known today). The callback model test and the adversary harness in this client's tests check it.
+What the client promises around its callback (when it is called, one at a time and never before `start` returns, what a callback that throws does, which calls are allowed from the callback and from other threads, stop from the callback) is [the SDK contract](https://github.com/pydantic/opamp-clients/blob/main/docs/sdk-contract.md), the same for every SDK here. The precise rules, around the core too, are the shell contract, `spec/shell-contract.md` (put in place by `scripts/fetch_core.py fetch`; it lists the breaks known today). The callback model test and the adversary harness in this client's tests check it.

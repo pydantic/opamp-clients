@@ -88,8 +88,8 @@ import {
   SimpleSpanProcessor,
   type SpanProcessor,
 } from "@opentelemetry/sdk-trace-base";
-import { RemoteConfigStatuses } from "@pydantic/opamp-client";
-import { SdkSettings, type Settings } from "@pydantic/opamp-client/sdk";
+import { RemoteConfigStatuses } from "@pydantic/logfire-fleet-client";
+import { SdkSettings, type Settings } from "@pydantic/logfire-fleet-client/sdk";
 
 import { config as policyConfig, type Overrides, policy } from "./policy.js";
 
@@ -775,7 +775,7 @@ async function run(mode: Mode, seed: number): Promise<Reached> {
     const freshLogging = new LoggerProvider({
       processors: [new BatchLogRecordProcessor({ exporter: fresh.logs(freshLogs as never), maxExportBatchSize: 5, scheduledDelayMillis: 1 })],
     });
-    const d = LAYER.decide(config(final), EMPTY, EMPTY, hostFromEnv({}), BigInt(agent.wall));
+    const d = LAYER.decide(config(final), EMPTY, EMPTY, hostFromEnv(), BigInt(agent.wall));
     assert.equal(d.status?.status, RemoteConfigStatuses.RemoteConfigStatuses_APPLIED, d.status?.errorMessage);
     fresh.apply(d.apply);
 

@@ -25,7 +25,7 @@ from dataclasses import dataclass
 import pytest
 from _servers import MODES, UID, OpampServer, wait_for
 
-from pydantic_opamp_client import Client, Config, Notification, Status, _native, opamp_pb2 as pb
+from logfire_fleet_client import Client, Config, Notification, Status, _native, opamp_pb2 as pb
 
 # Clients started before counting (caches, pools and lazily made objects fill up), then counted.
 WARM = 5

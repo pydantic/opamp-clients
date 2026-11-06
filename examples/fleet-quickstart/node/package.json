@@ -4,7 +4,7 @@
   "type": "module",
   "description": "A shop that takes an order a second, for trying Logfire Fleet",
   "scripts": {
-    "start": "node --import @pydantic/opamp-otel/register app.mjs"
+    "start": "node --import @pydantic/logfire-fleet-otel/register app.mjs"
   },
   "dependencies": {
     "@opentelemetry/api": "1.9.1",

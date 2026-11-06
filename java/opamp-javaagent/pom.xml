@@ -5,7 +5,7 @@
   <modelVersion>4.0.0</modelVersion>
 
   <groupId>dev.pydantic</groupId>
-  <artifactId>opamp-javaagent-extension</artifactId>
+  <artifactId>logfire-fleet-javaagent-extension</artifactId>
   <version>0.1.0-SNAPSHOT</version>
   <name>OpAMP for the OpenTelemetry Java agent</name>
   <description>An extension for the upstream OpenTelemetry Java agent: the agent joins an OpAMP server's
@@ -64,7 +64,7 @@
     <!-- Ours, shaded into the extension. -->
     <dependency>
       <groupId>dev.pydantic</groupId>
-      <artifactId>opamp-client</artifactId>
+      <artifactId>logfire-fleet-client</artifactId>
       <version>0.1.0-SNAPSHOT</version>
     </dependency>
     <!-- The agent provides these. -->
@@ -129,13 +129,13 @@
         <directory>src/main/resources</directory>
         <filtering>true</filtering>
         <includes>
-          <include>dev/pydantic/opamp/javaagent/version.properties</include>
+          <include>dev/pydantic/logfire/fleet/javaagent/version.properties</include>
         </includes>
       </resource>
       <resource>
         <directory>src/main/resources</directory>
         <excludes>
-          <exclude>dev/pydantic/opamp/javaagent/version.properties</exclude>
+          <exclude>dev/pydantic/logfire/fleet/javaagent/version.properties</exclude>
         </excludes>
       </resource>
     </resources>
@@ -153,7 +153,7 @@
         <version>3.5.4</version>
       </plugin>
       <!-- The application's side of its own settings (docs/app-settings.md): a second, small jar,
-           opamp-javaagent-extension-<version>-app-settings.jar, holding dev.pydantic.opamp.AppSettings
+           logfire-fleet-javaagent-extension-<version>-app-settings.jar, holding dev.pydantic.logfire.fleet.AppSettings
            and its listener alone, for the application to compile against and run with. The
            extension fills it through the bootstrap class loader (AppSettingsSink). -->
       <plugin>
@@ -170,9 +170,9 @@
             <configuration>
               <classifier>app-settings</classifier>
               <includes>
-                <include>dev/pydantic/opamp/AppSettings.class</include>
-                <include>dev/pydantic/opamp/AppSettings$*.class</include>
-                <include>dev/pydantic/opamp/AppSettingsListener.class</include>
+                <include>dev/pydantic/logfire/fleet/AppSettings.class</include>
+                <include>dev/pydantic/logfire/fleet/AppSettings$*.class</include>
+                <include>dev/pydantic/logfire/fleet/AppSettingsListener.class</include>
               </includes>
             </configuration>
           </execution>
@@ -198,11 +198,11 @@
               <relocations>
                 <relocation>
                   <pattern>com.google.protobuf</pattern>
-                  <shadedPattern>dev.pydantic.opamp.javaagent.shaded.protobuf</shadedPattern>
+                  <shadedPattern>dev.pydantic.logfire.fleet.javaagent.shaded.protobuf</shadedPattern>
                 </relocation>
                 <relocation>
                   <pattern>com.dylibso.chicory</pattern>
-                  <shadedPattern>dev.pydantic.opamp.javaagent.shaded.chicory</shadedPattern>
+                  <shadedPattern>dev.pydantic.logfire.fleet.javaagent.shaded.chicory</shadedPattern>
                 </relocation>
               </relocations>
               <transformers>

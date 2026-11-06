@@ -25,6 +25,10 @@ capabilities:
   accepts_restart_command: true
   reports_effective_config: true
   reports_health: true
+  # Where the Collector sends its own metrics and logs: the server offers the destination
+  # (own_metrics, own_logs), and without an offer they stay local.
+  reports_own_metrics: true
+  reports_own_logs: true
   reports_available_components: true
   # No packages: a new collector comes with a new image.
 
@@ -34,6 +38,10 @@ agent:
   # container reaches the collector too.
   connection_env:
     logfire/otlp: LOGFIRE_TOKEN
+  # The Collector counts what goes in and out of every receiver, processor and exporter in each
+  # pipeline (otelcol.*.consumed/produced.items), so Fleet can show what each step drops.
+  # Feature gates are command-line only, so this can't come from the server's remote config.
+  args: [--feature-gates=telemetry.newPipelineTelemetry]
 
   # What the server's remote config may do in this container, as the packages' enroll scripts
   # write it with --restricted (packaging/README.md, "What the server can do to this host").

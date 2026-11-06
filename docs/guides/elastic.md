@@ -49,7 +49,7 @@ OTEL_OPAMP_ENDPOINT=https://opamp.example.com/v1/opamp \
 OTEL_OPAMP_HEADERS="Authorization=Bearer%20<key>" \
 OTEL_OPAMP_STATE_DIR=/var/lib/checkout/opamp \
 java -javaagent:elastic-otel-javaagent.jar \
-     -Dotel.javaagent.extensions=opamp-javaagent-extension.jar \
+     -Dotel.javaagent.extensions=logfire-fleet-javaagent-extension.jar \
      -jar checkout.jar
 ```
 
@@ -68,8 +68,9 @@ Every control is carried out, EDOT's own additions included:
 - **EDOT's span logger.** EDOT adds a span logger to every SDK, which writes spans to the agent's
   log once Elastic's central configuration turns debug logging on. With EDOT's OpAMP client off
   nothing can, so the extension leaves it alone. With `ELASTIC_OTEL_OPAMP_ENDPOINT` set, it counts
-  as an exporter past the gate. The trace gate's controls (`signal_exports.traces`,
-  `attribute_redaction`, `scrubbing`) are then set aside, and the agent logs a WARNING naming it.
+  as an exporter past the gates: it is reported to the server as ungoverned
+  (`DebugLogSpanExporter`, `gated` false), and the agent logs a WARNING naming it. Every control
+  is still carried out on the spans the agent's own exporters send.
 
 EDOT's agent writes its own log, and the extension's lines in it, to standard output.
 
@@ -81,13 +82,13 @@ against:
 
 ```xml
 <PackageReference Include="Elastic.OpenTelemetry.AutoInstrumentation" Version="1.6.1" />
-<ProjectReference Include="path/to/dotnet/Pydantic.OpAmp.AutoInstrumentation/Pydantic.OpAmp.AutoInstrumentation.csproj" />
+<PackageReference Include="Logfire.Fleet.AutoInstrumentation" Version="0.2.0" />
 ```
 
 List both plugins, EDOT's first, and start the application with `_instrument.sh`:
 
 ```bash
-OTEL_DOTNET_AUTO_PLUGINS="Elastic.OpenTelemetry.AutoInstrumentationPlugin, Elastic.OpenTelemetry.AutoInstrumentation:Pydantic.OpAmp.AutoInstrumentation.Plugin, Pydantic.OpAmp.AutoInstrumentation" \
+OTEL_DOTNET_AUTO_PLUGINS="Elastic.OpenTelemetry.AutoInstrumentationPlugin, Elastic.OpenTelemetry.AutoInstrumentation:Logfire.Fleet.AutoInstrumentation.Plugin, Logfire.Fleet.AutoInstrumentation" \
 OTEL_SERVICE_NAME=checkout \
 OTEL_OPAMP_ENDPOINT=https://opamp.example.com/v1/opamp \
 OTEL_OPAMP_HEADERS="Authorization=Bearer%20<key>" \
@@ -106,7 +107,7 @@ EDOT Python is a distro and a configurator, and so is this package. Only one of 
 choose this package's, and keep EDOT's instrumentations, sampler and resource detectors.
 
 ```bash
-pip install elastic-opentelemetry ./python ./python/otel
+pip install elastic-opentelemetry logfire-fleet-otel
 edot-bootstrap --action=install     # the instrumentations for what the application uses
 
 OTEL_PYTHON_DISTRO=opamp \
@@ -144,7 +145,7 @@ signal over OTLP/gRPC unless told otherwise.
 ## Node.js
 
 Not yet. `node --import @elastic/opentelemetry-node` starts EDOT's NodeSDK, and
-`node --import @pydantic/opamp-otel/register` starts this package's. A process can run only one:
+`node --import @pydantic/logfire-fleet-otel/register` starts this package's. A process can run only one:
 the second one's providers are refused as the global ones. To manage a Node.js application with a
 Logfire SDK policy, start it with this package's register. It runs the upstream
 auto-instrumentations, which EDOT Node.js also runs, without EDOT's additions.

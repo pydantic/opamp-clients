@@ -198,8 +198,8 @@ The core could call the host instead (WASI or Component Model imports). It doesn
 | Go | [wazero](https://github.com/tetratelabs/wazero) | none |
 | Node.js / TypeScript | built-in `WebAssembly` | none |
 | Java | [Chicory](https://github.com/dylibso/chicory), the module compiled to JVM classes at build time | none |
-| Python | the native library, through `ctypes` | a core wheel per platform, `pydantic-opamp-core` (`python/core`) |
-| .NET | the native library, through `LibraryImport` | a library per platform, in `Pydantic.OpAmp.Core.Native` (`runtimes/<rid>/native`) |
+| Python | the native library, through `ctypes` | a core wheel per platform, `logfire-fleet-core` (`python/core`) |
+| .NET | the native library, through `LibraryImport` | a library per platform, in `Logfire.Fleet.Core.Native` (`runtimes/<rid>/native`) |
 
 Python and .NET would need a native WebAssembly runtime anyway, so they load the core natively:
 smaller, with no JIT, and on every platform their packages build for, Alpine's musl included.

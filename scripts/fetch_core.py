@@ -55,16 +55,16 @@ MODULES = {
     "opamp_core.wasm": [
         "go/opamp/internal/core/opamp_core.wasm",
         "node/opamp/core/opamp_core.wasm",
-        "python/src/pydantic_opamp_client/opamp_core.wasm",
+        "python/src/logfire_fleet_client/opamp_core.wasm",
         "java/opamp/src/main/wasm/opamp_core.wasm",
-        "dotnet/Pydantic.OpAmp.Client/opamp_core.wasm",
+        "dotnet/Logfire.Fleet.Client/opamp_core.wasm",
     ],
     "opamp_sdk_settings.wasm": [
         "go/opamp/sdksettings/opamp_sdk_settings.wasm",
         "node/opamp/core/opamp_sdk_settings.wasm",
-        "python/src/pydantic_opamp_client/opamp_sdk_settings.wasm",
+        "python/src/logfire_fleet_client/opamp_sdk_settings.wasm",
         "java/opamp/src/main/wasm/opamp_sdk_settings.wasm",
-        "dotnet/Pydantic.OpAmp.Client/opamp_sdk_settings.wasm",
+        "dotnet/Logfire.Fleet.Client/opamp_sdk_settings.wasm",
     ],
     # Every SDK's harness test finds it here (or at OPAMP_ADVERSARY_WASM).
     "opamp_core_adversary.wasm": ["testdata/core/opamp_core_adversary.wasm"],
@@ -85,7 +85,7 @@ COOKBOOK, COOKBOOK_COPIES = "testdata/settings-examples/", "examples/settings/"
 # adversary: licenses/core/ covers them in the repository.
 LICENSES = ("licenses/core/LICENSE.txt", "licenses/core/THIRD_PARTY_NOTICES.txt")
 LICENSE_COPIES = ("go/opamp/internal/core", "go/opamp/sdksettings", "node/opamp/core", "java/opamp/src/main/wasm",
-                  "python/core", "dotnet/Pydantic.OpAmp.Core.Native")
+                  "python/core", "dotnet/Logfire.Fleet.Core.Native")
 # The machine's own library goes where the .NET project and Python's build backend look for it
 # (target/release); every platform's, with --all-platforms, where packaging does.
 HOST_LIB_DIR = "target/release"

@@ -65,13 +65,13 @@ from hypothesis import note as _note
 from hypothesis.errors import InvalidArgument
 from hypothesis.stateful import RuleBasedStateMachine, initialize, invariant, precondition, rule, run_state_machine_as_test
 
-import pydantic_opamp_client._client as _client_mod
-import pydantic_opamp_client._core as _core_mod
-import pydantic_opamp_client._executor as _executor
+import logfire_fleet_client._client as _client_mod
+import logfire_fleet_client._core as _core_mod
+import logfire_fleet_client._executor as _executor
 from _sched_loop import SeededLoop
 from _sched_world import CAPABILITY, OFFERS, FakeSession, World
-from pydantic_opamp_client import Client, Config, Notification, Status, anyvalue_pb2, opamp_pb2 as pb
-from pydantic_opamp_client._proto.opamp.core.v1 import core_pb2 as corepb
+from logfire_fleet_client import Client, Config, Notification, Status, anyvalue_pb2, opamp_pb2 as pb
+from logfire_fleet_client._proto.opamp.core.v1 import core_pb2 as corepb
 
 UID = bytes([0x5A] * 16)
 CAPABILITIES = (pb.AgentCapabilities_AcceptsRemoteConfig | pb.AgentCapabilities_ReportsRemoteConfig
@@ -718,7 +718,7 @@ class ScheduleMachine(RuleBasedStateMachine):
             assert not [r for r in world.requests if not r.finished], "RULE-SHELL-07: a request under way after stop"
         else:
             assert not world.network.open(), f"RULE-SHELL-07: {world.network.open()} open after stop"  # type: ignore[union-attr]
-        left = [t for t in asyncio.all_tasks(self.loop) if not t.done() and "pydantic_opamp_client" in t.get_coro().cr_code.co_filename]
+        left = [t for t in asyncio.all_tasks(self.loop) if not t.done() and "logfire_fleet_client" in t.get_coro().cr_code.co_filename]
         assert not left, f"RULE-SHELL-07: the client's tasks are left after stop: {left}"
         # The client's end began at stop(), or earlier if it ended on its own (a callback raised).
         assert self.stop_at is not None

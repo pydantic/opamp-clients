@@ -28,15 +28,15 @@ code signing. `SHA256SUMS` covers the archives. `SHA256SUMS.installers` covers t
 OpAMP:
 
 - the Supervisor (this fork);
-- a collector for it to run, built with ocb from [collector.yaml](collector.yaml), with this
-  repository's opamp extension;
+- a collector for it to run: upstream's OpenTelemetry Collector Contrib (`otelcol-contrib`),
+  unchanged, at `/usr/lib/pydantic-opamp/otelcol` (see [The bundled Collector](#the-bundled-collector));
 - a systemd unit;
 - `pydantic-opamp-enroll`.
 
 Download the deb or rpm for your architecture from the GitHub Release. On Debian or Ubuntu,
-install the local deb with `sudo apt install ./pydantic-opamp-supervisor_0.8.0_amd64.deb`.
+install the local deb with `sudo apt install ./pydantic-opamp-supervisor_0.9.0_amd64.deb`.
 On RHEL or Fedora, install the unsigned local rpm with
-`sudo dnf install --nogpgcheck ./pydantic-opamp-supervisor-0.8.0-1.x86_64.rpm`.
+`sudo dnf install --nogpgcheck ./pydantic-opamp-supervisor-0.9.0-1.x86_64.rpm`.
 The host needs systemd 250 or later. Verify the download against `SHA256SUMS.installers` first.
 
 Once a signed apt and yum repository is published (none is yet, see [Publishing](#publishing)),
@@ -72,7 +72,10 @@ echo "$ENROLLMENT_TOKEN" | sudo pydantic-opamp-enroll --endpoint wss://opamp.exa
   `storage.state_key: systemd-creds` and `agent.automatic_config_rollback` (a remote config the
   Collector fails on is replaced by the last one that ran healthy, and stays FAILED), and
   `agent.collector_crash_log_snippet_kib: 4` (the FAILED status carries the end of the Collector's
-  log, so the server can show why), and limits what the server's remote config may do (see
+  log, so the server can show why), and `agent.args: [--feature-gates=telemetry.newPipelineTelemetry]`
+  (the Collector counts the items each receiver, processor and exporter takes in and passes on, as
+  `otelcol.*.consumed.items` and `otelcol.*.produced.items`; see
+  [Pipeline item counts](#pipeline-item-counts)), and limits what the server's remote config may do (see
   [What the server can do to this host](#what-the-server-can-do-to-this-host)).
 - **Starts the service and waits for it to connect.** It enables and starts
   `pydantic-opamp-supervisor.service`, then waits up to 30 seconds for the Supervisor to connect
@@ -125,6 +128,19 @@ remain available after a service restart.
 Without this option, the helper keeps any existing telemetry token. To rotate
 the telemetry token, run the helper with this option and both credentials again.
 `--token-file` cannot be combined with the two-token input mode.
+
+### The Collector's own metrics and logs
+
+Every enroll script, and the container's configs, declare `reports_own_metrics` and
+`reports_own_logs`. The server can then offer where the Collector sends its own metrics and logs
+(`own_metrics`, `own_logs` in the OpAMP connection settings), with the headers to send them with,
+and the Supervisor adds them to the Collector's `service::telemetry`. The Collector's own
+telemetry carries its instance UID as `service.instance.id`. Without an offer nothing is sent,
+and the Collector's log still goes to its standard output. A remote config's own
+`service::telemetry` settings for a signal take the place of the offer's. With `--restricted`,
+the offered endpoints must be allowed exporter endpoints, like the remote config's.
+
+A package upgrade adds them (see [Upgrades](#upgrades)).
 
 ### Unmanaged
 
@@ -190,12 +206,25 @@ REPO_BUCKET=gs://pydantic-opamp-packages REPO_URL=https://packages.pydantic.dev 
 
 Nothing runs it yet: no repository is hosted, and there is no signing key.
 
+### The bundled Collector
+
+Every package (deb, rpm, `.pkg`, `.msi`, the release archives and the container image) carries
+upstream's [OpenTelemetry Collector Contrib](https://github.com/open-telemetry/opentelemetry-collector-releases)
+release as it is: every component contrib has works in a config the server sends, and the
+Supervisor configures it with contrib's own `opamp` extension. [contrib.json](contrib.json) pins
+the release and each platform's archive by SHA-256; `go run ./internal/fetchcontrib` (from
+`go/opampsupervisor`) downloads one, refuses it unless the hash matches, and extracts
+`otelcol-contrib`, installed as `otelcol`. To move to a new contrib release, set its version and
+the six hashes from the release's `.sha256` files, after checking each archive's
+`.sigstore.json` (signed by the open-telemetry/opentelemetry-collector-releases workflows) with
+`cosign verify-blob`.
+
 ### Releases
 
 [archive.sh](archive.sh) builds one release archive into `packaging/dist/`: `opampsupervisor` and
-`otelcol` (built with ocb from [collector.yaml](collector.yaml)), the licenses and a README, as a
-`.tar.gz` for Linux and macOS and a `.zip` for Windows. Both binaries are cross-built without cgo,
-so any machine builds every target:
+`otelcol` (upstream's `otelcol-contrib`), the licenses and a README, as a `.tar.gz` for Linux and
+macOS and a `.zip` for Windows. The Supervisor is cross-built without cgo and the collector is
+downloaded, so any machine builds every target:
 
 ```sh
 VERSION=0.1.0 GOOS=darwin GOARCH=arm64 go/opampsupervisor/packaging/archive.sh
@@ -223,11 +252,11 @@ Check a download with either:
 ```sh
 sha256sum --check --ignore-missing SHA256SUMS
 sha256sum --check --ignore-missing SHA256SUMS.installers
-gh attestation verify pydantic-opamp-supervisor_0.8.0_linux_amd64.tar.gz --repo pydantic/opamp-clients
-cosign verify-blob --bundle pydantic-opamp-supervisor_0.8.0_linux_amd64.tar.gz.sigstore.json \
+gh attestation verify pydantic-opamp-supervisor_0.9.0_linux_amd64.tar.gz --repo pydantic/opamp-clients
+cosign verify-blob --bundle pydantic-opamp-supervisor_0.9.0_linux_amd64.tar.gz.sigstore.json \
   --certificate-oidc-issuer https://token.actions.githubusercontent.com \
   --certificate-identity-regexp '^https://github\.com/pydantic/opamp-clients/\.github/workflows/release\.yml@' \
-  pydantic-opamp-supervisor_0.8.0_linux_amd64.tar.gz
+  pydantic-opamp-supervisor_0.9.0_linux_amd64.tar.gz
 ```
 
 ## macOS
@@ -240,7 +269,7 @@ The `.pkg` installs everything under `/opt/pydantic-opamp`:
   root and logs to `/opt/pydantic-opamp/var/log/supervisor.log`.
 
 ```sh
-sudo installer -pkg pydantic-opamp-supervisor-0.8.0-darwin-arm64.pkg -target /
+sudo installer -pkg pydantic-opamp-supervisor-0.9.0-darwin-arm64.pkg -target /
 echo "$ENROLLMENT_TOKEN" | sudo /opt/pydantic-opamp/bin/pydantic-opamp-enroll --endpoint wss://opamp.example.com/v1/opamp
 ```
 
@@ -267,7 +296,7 @@ administrator (`/norestart` keeps a quiet install that finds a file in use from 
 Windows on the spot; msiexec exits 3010 to say a restart is due instead):
 
 ```powershell
-msiexec /i pydantic-opamp-supervisor-0.8.0-windows-amd64.msi /qn /norestart
+msiexec /i pydantic-opamp-supervisor-0.9.0-windows-amd64.msi /qn /norestart
 $env:ENROLLMENT_TOKEN | & "$env:ProgramFiles\pydantic-opamp\pydantic-opamp-enroll.ps1" -Endpoint wss://opamp.example.com/v1/opamp
 ```
 
@@ -311,7 +340,7 @@ scripts' `--restricted` policy:
 docker run -d --name opamp-supervisor \
   -e OPAMP_ENDPOINT=wss://opamp.example.com/v1/opamp -e OPAMP_TOKEN="$ENROLLMENT_TOKEN" \
   -v opamp-state:/var/lib/pydantic-opamp -p 4318:4318 \
-  ghcr.io/pydantic/opamp-supervisor:0.8.0
+  ghcr.io/pydantic/opamp-supervisor:0.9.0
 ```
 
 Mount a volume at `/var/lib/pydantic-opamp`. It keeps the agent's instance UID, the credentials
@@ -340,6 +369,25 @@ both (`PUSH=1`, pushed as `IMAGE`):
 VERSION=0.1.0 GOOS=linux GOARCH=amd64 go/opampsupervisor/packaging/archive.sh
 VERSION=0.1.0 ARCHES=amd64 go/opampsupervisor/packaging/container/build.sh
 ```
+
+## Pipeline item counts
+
+Every packaged config starts the Collector with `--feature-gates=telemetry.newPipelineTelemetry`
+(`agent.args`). With it, the Collector's own metrics count the items each component takes in and
+passes on, per pipeline, as `otelcol.receiver.produced.items`, `otelcol.processor.consumed.items`,
+`otelcol.processor.produced.items` and `otelcol.exporter.consumed.items`. The scope attributes
+`otelcol.component.id`, `otelcol.signal` and `otelcol.pipeline.id` name the component. This covers
+processors that report no counts of their own, such as `batch`. The byte counts
+(`otelcol.*.consumed.size`, `otelcol.*.produced.size`) need `service::telemetry::metrics::level: detailed`.
+
+Feature gates can only be set on the Collector's command line, so a remote config can't turn this
+on or off. To turn it off, remove the `args` line from `supervisor.yaml` and restart the service.
+
+The gate is alpha upstream. A config that reads the Collector's own metrics with a Prometheus
+reader, including the default one on `localhost:8888` when `service::telemetry::metrics` names no
+readers, fails every scrape when a processor or exporter is in more than one pipeline: Prometheus
+labels don't carry the scope attributes, so the series collide. OTLP readers, which Logfire's
+policies use, are not affected.
 
 ## What the server can do to this host
 
@@ -516,6 +564,42 @@ checks out.
 
 CI runs them all, on Linux (with a throwaway signing key), macOS and Windows, and keeps the
 packages as artifacts.
+
+## Upgrades
+
+Installing a newer package over the installed one (apt, dnf, the `.pkg` or the `.msi`) upgrades
+in place. The host
+keeps its enrollment, its issued credentials and its instance UID, and needs no new key:
+
+- The enroll script keeps the options it was last run with, never a token, in `enroll.options`
+  beside the config, with the config's SHA-256 in `supervisor.yaml.sha256`.
+- After the upgrade, the package runs `pydantic-opamp-enroll --refresh` (`-Refresh` on Windows).
+  It writes the config again with this version's settings and those options, then starts the
+  Supervisor again, unless it was enrolled with `--no-start`. On Linux, the deb's postinst runs
+  it, and the rpm's posttrans does, through `pydantic-opamp-after-upgrade`. A host running the
+  unmanaged collector (`pydantic-otelcol-configure` ran after the last enrollment) gets that
+  service started again instead, unless it was configured with `--no-start`.
+- A config edited since the script wrote it is kept as it is, and the script says so. Run the
+  enroll script again with its options to write it anew.
+- A host enrolled by a package up to 0.9.0 has no `enroll.options`. Without `--restricted`, its
+  config holds all its options (the endpoint, the CA file, `--plaintext`, `--accept-packages`), so
+  they're read from it, and the config is written again only if the new one has every setting
+  the old one had (its lines but comments), with the old one kept as `supervisor.yaml.old`. One
+  edited by hand (another executable, storage directory or header) stays, and so does a
+  `--restricted` config, which may have been widened or narrowed by hand. Run the enroll script
+  again with its options to add the new settings. Those packages kept no `--no-start` choice,
+  so this upgrade starts the service.
+
+Packages up to 0.9.0 stopped and disabled the Linux services during an upgrade, and a Windows
+upgrade left the service stopped and set to start on demand. These packages start them again,
+including after an upgrade from one of those. Before stopping its services, Linux's `prerm`
+(`%preun`) now checks whether this is a removal; on an upgrade they keep running until the new
+package restarts them. CI installs the released 0.9.0 `.pkg` and `.msi`, enrolls them, and
+upgrades them in place to the package it built.
+
+The Supervisor can't be updated over OpAMP. A server's package offer
+([Collector updates from the server](#collector-updates-from-the-server)) replaces only the
+Collector it runs.
 
 ## Remove the installed Collector
 

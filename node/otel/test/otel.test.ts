@@ -21,8 +21,8 @@ import {
   SimpleSpanProcessor,
   TraceIdRatioBasedSampler,
 } from "@opentelemetry/sdk-trace-base";
-import { type Client, RemoteConfigStatuses } from "@pydantic/opamp-client";
-import { SdkSettings } from "@pydantic/opamp-client/sdk";
+import { type Client, RemoteConfigStatuses } from "@pydantic/logfire-fleet-client";
+import { SdkSettings } from "@pydantic/logfire-fleet-client/sdk";
 import { keepApplied } from "./kept.js";
 import { config as policyConfig, off, overridden, policy } from "./policy.js";
 
@@ -74,18 +74,12 @@ beforeEach(() => {
 
 const LAYER = new SdkSettings();
 const text = (s: string) => new TextEncoder().encode(s);
-const settings = (doc: string) => LAYER.load(text(doc), hostFromEnv({})).settings;
-// Every setting (docs/sdk-settings.md), and those a host built from `env` doesn't declare.
+const settings = (doc: string) => LAYER.load(text(doc), hostFromEnv()).settings;
+// Every setting (docs/sdk-settings.md).
 const SETTINGS = ["debug_sampling_rate", "debug_send_logs_level", "debug_until", "deactivate_all_instrumentations",
   "deactivate_instrumentations", "drop_attributes", "mask_attributes", "sampling_rate",
   "sampling_rules", "sampling_traces_per_second", "scrub_defaults", "scrub_patterns", "send_logs",
   "send_logs_level", "send_logs_level_by_scope", "send_logs_per_second", "send_metrics", "send_traces"];
-const undeclared = (env: NodeJS.ProcessEnv) => {
-  const host = hostFromEnv(env);
-  return SETTINGS.filter((k) => !host.live!.includes(k));
-};
-const LOG_GATE = ["debug_send_logs_level", "drop_attributes", "mask_attributes", "scrub_defaults", "scrub_patterns",
-  "send_logs", "send_logs_level", "send_logs_level_by_scope", "send_logs_per_second"];
 const config = (body: string) => policyConfig(body, body);
 /** The controls the agent's effective config reports overridden. */
 const effective = (a: Agent) => overridden(a.effective);
@@ -284,9 +278,7 @@ test("an empty variable is an unset one, as the SDK reads them", () => {
     /TraceIdRatioBased\{0\}/);
   // An empty per-signal protocol falls through to the general one.
   const grpc = { OTEL_EXPORTER_OTLP_TRACES_PROTOCOL: "", OTEL_EXPORTER_OTLP_PROTOCOL: "grpc" };
-  assert.deepEqual(undeclared(grpc), []);
   assert.equal(exportersFromEnv(grpc).traces?.[0]?.constructor.name, "OTLPTraceExporter");
-  assert.deepEqual(undeclared({ OTEL_EXPORTER_OTLP_LOGS_PROTOCOL: " ", OTEL_LOGS_EXPORTER: "" }), []);
 });
 
 test("exporter lists read as NodeSDK reads them: repeats once, none as it treats none", () => {
@@ -302,7 +294,6 @@ test("exporter lists read as NodeSDK reads them: repeats once, none as it treats
   assert.deepEqual(exporterNames("LOGS", { OTEL_LOGS_EXPORTER: " , " }), ["otlp"]);
   // No logger provider at all for none, as NodeSDK: not an empty one.
   assert.equal(exportersFromEnv({ OTEL_LOGS_EXPORTER: "none" }).logs, undefined);
-  assert.deepEqual(undeclared({ OTEL_LOGS_EXPORTER: "none" }), []);
 });
 
 test("the metric reader and log batching take their variables as NodeSDK does", () => {
@@ -330,7 +321,8 @@ test("resource attributes reach the server typed, lists as lists", () => {
   assert.deepEqual(by.i, { case: "intValue", value: 3n });
   assert.deepEqual(by.d, { case: "doubleValue", value: 1.5 });
   assert.deepEqual(by.b, { case: "boolValue", value: true });
-  assert.equal(by.big?.case, "doubleValue"); // past 2^53 an integer isn't exact
+  // An integer past 2^53 goes as an int, as the OTLP exporter writes it (Number.isInteger).
+  assert.deepEqual(by.big, { case: "intValue", value: 2n ** 60n });
   assert.equal(by.l?.case, "arrayValue");
   assert.deepEqual((by.l?.value as { values: { value: unknown }[] }).values.map((v) => v.value),
     [{ case: "stringValue", value: "x" }, { case: "stringValue", value: "y" }]);
@@ -375,34 +367,19 @@ test("instrumentations are switched at once, reported, and still switched at the
   assert.deepEqual(effective(next), {});
 });
 
-test("a signal whose exporter NodeSDK builds, ungated, isn't carried out: a policy that overrides it is refused", () => {
-  const dir = mkdtempSync(join(tmpdir(), "opamp-otel-"));
-  const { agent } = prepared(dir, { OTEL_TRACES_EXPORTER: "zipkin" });
-  const s = agent.remoteConfig(config(policy({ signal_exports: off("traces", "logs") })));
-  // Refused whole: nothing could stop the traces, so nothing changes.
-  assert.equal(s.status, RemoteConfigStatuses.RemoteConfigStatuses_FAILED);
-  assert.equal(s.errorMessage, "signal_exports.traces: this SDK cannot apply the requested override");
-  assert.equal(agent.controls.sendTraces, true);
-  assert.equal(agent.controls.sendLogs, true);
-  assert.deepEqual(effective(agent), {});
-  assert.equal(agent.remoteConfig(config(policy({ signal_exports: off("logs") }))).status,
-    RemoteConfigStatuses.RemoteConfigStatuses_APPLIED);
-  assert.equal(agent.controls.sendLogs, false);
-  assert.deepEqual(undeclared({}), []);
-  assert.deepEqual(undeclared({ OTEL_METRICS_EXPORTER: "console,none", OTEL_EXPORTER_OTLP_PROTOCOL: "grpc" }), []);
-  // An unknown protocol is http/protobuf, as NodeSDK reads it: built here, so the server can stop it.
-  assert.deepEqual(undeclared({ OTEL_EXPORTER_OTLP_LOGS_PROTOCOL: "carrier-pigeon" }), []);
+test("whatever the variables name, every setting is declared and a policy is APPLIED", () => {
+  // What NodeSDK builds itself gets its gates at start (test/inventory.test.ts), so nothing here
+  // narrows what the package carries out.
+  for (const env of [{ OTEL_TRACES_EXPORTER: "zipkin" }, { OTEL_METRICS_EXPORTER: "otlp,prometheus" },
+    { OTEL_LOGS_EXPORTER: "otlp,custom" }] as Record<string, string>[]) {
+    const { agent } = prepared(mkdtempSync(join(tmpdir(), "opamp-otel-")), env);
+    assert.deepEqual(SETTINGS.filter((k) => !agent.host.live!.includes(k)), [], JSON.stringify(env));
+    const s = agent.remoteConfig(config(policy({ signal_exports: off("traces", "logs"), log_levels: { level: "error" } })));
+    assert.equal(s.status, RemoteConfigStatuses.RemoteConfigStatuses_APPLIED, JSON.stringify(env));
+    assert.equal(agent.controls.sendTraces, false);
+  }
+  // An unknown protocol is http/protobuf, as NodeSDK reads it.
   assert.ok(exportersFromEnv({ OTEL_EXPORTER_OTLP_LOGS_PROTOCOL: "carrier-pigeon" }).logs?.[0] instanceof ProtoLogs);
-  assert.deepEqual(undeclared({ OTEL_METRICS_EXPORTER: "otlp,prometheus" }), ["send_metrics"]);
-  // What the log gate holds is carried out where send_logs is, so none of it is where send_logs isn't.
-  assert.deepEqual(undeclared({ OTEL_LOGS_EXPORTER: "otlp,custom" }), LOG_GATE);
-  assert.deepEqual(undeclared({ OTEL_TRACES_EXPORTER: "zipkin" }), ["drop_attributes", "mask_attributes", "scrub_defaults", "scrub_patterns",
-    "send_traces"]);
-  const ungated = prepared(mkdtempSync(join(tmpdir(), "opamp-otel-")), { OTEL_LOGS_EXPORTER: "custom" }).agent;
-  const level = ungated.remoteConfig(config(policy({ log_levels: { level: "error" } })));
-  assert.equal(level.errorMessage, "log_levels: level: this SDK cannot apply the requested override");
-  assert.equal(ungated.controls.sendLogsMinSeverity, undefined);
-  assert.deepEqual(effective(ungated), {});
 });
 
 test("without a state directory every setting is still carried out: none waits for the next start", () => {

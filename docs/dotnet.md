@@ -1,6 +1,6 @@
 # .NET
 
-`Pydantic.OpAmp.Client` is this repository's OpAMP client for .NET, in
+`Logfire.Fleet.Client` is this repository's OpAMP client for .NET, in
 [`dotnet/`](../dotnet/). It runs the shared core natively, as a library called through
 `LibraryImport` ([how-it-works.md](how-it-works.md)), and speaks plain HTTP or WebSocket, with
 TLS and through HTTP or SOCKS5 proxies. It needs .NET 8 or later, and ships for .NET 8 and .NET 10. Its
@@ -9,31 +9,18 @@ TLS and through HTTP or SOCKS5 proxies. It needs .NET 8 or later, and ships for 
 ## Install
 
 ```bash
-dotnet add package Pydantic.OpAmp.Client
+dotnet add package Logfire.Fleet.Client
 ```
 
-The package is not on NuGet yet ([sdk-registries.md](sdk-registries.md)). It depends on
-`Pydantic.OpAmp.Core.Native`, which holds the core's library for each platform and nothing else.
-Until both are published, reference the project from a checkout:
-
-```bash
-scripts/fetch_core.py fetch   # the core release the lock pins, verified: this machine's library in target/release
-```
-
-```xml
-<ItemGroup>
-  <ProjectReference Include="/path/to/checkout/dotnet/Pydantic.OpAmp.Client/Pydantic.OpAmp.Client.csproj" />
-</ItemGroup>
-```
-
-The build copies this machine's library to your project's output. It carries no other
-platform's.
+It depends on `Logfire.Fleet.Core.Native`, which holds the core's library for each platform
+(Linux glibc and musl, macOS and Windows, on x64 and arm64) and nothing else; the build copies the
+one the application runs on to its output.
 
 ## Start and stop
 
 ```csharp
 using OpAmp.Proto.V1;
-using Pydantic.OpAmp.Client;
+using Logfire.Fleet.Client;
 
 var client = OpAmpClient.Start(
     new OpAmpClientOptions
@@ -79,7 +66,7 @@ alone.) Give the agent's status to `Start`, so the first message reports it in f
 ## Options
 
 `OpAmpClientOptions`, `OpAmpTlsOptions` and `OpAmpStatus` are records with `init` properties, in
-`dotnet/Pydantic.OpAmp.Client/OpAmpClient.cs` and `ClientTransport.cs`.
+`dotnet/Logfire.Fleet.Client/OpAmpClient.cs` and `ClientTransport.cs`.
 
 | What | Option | More |
 |---|---|---|
@@ -87,7 +74,7 @@ alone.) Give the agent's status to `Start`, so the first message reports it in f
 | Headers | `Headers`, sent with every request and WebSocket upgrade | |
 | TLS | `Tls = new OpAmpTlsOptions { ... }`: `CaPem`, `IncludeSystemCas`, `ClientCertPem` and `ClientKeyPem`, `MinVersion`, `MaxVersion` | [README](../dotnet/README.md#tls-and-proxies) |
 | Proxy | `Proxy` (a `Uri`), `ProxyResolveLocally`, or `DirectConnection` for none. Without one, the environment's | [README](../dotnet/README.md#tls-and-proxies) |
-| Who speaks HTTP | `Mode = OpAmpMode.Core` (the default) or `OpAmpMode.Platform` (`HttpClient` and `ClientWebSocket`); setting `HttpClient` selects platform mode | [sdks.md](sdks.md#core-mode-and-platform-mode) |
+| Who speaks HTTP | `Mode = OpAmpMode.Core` (the default) or `OpAmpMode.Platform` (`HttpClient` and `ClientWebSocket`; advanced); `HttpClient` needs platform mode named | [sdks.md](sdks.md#core-mode-and-platform-mode) |
 | State file | `StateFile`: kept across restarts, for the agent's user alone | [state-file.md](state-file.md) |
 | Instance UID | `InstanceUid` (16 bytes), or null for one the core makes; `RequestInstanceUid` to have the server assign it; `client.InstanceUid` is the one in use | [instance-uid.md](instance-uid.md) |
 | Capabilities | `Capabilities` (`AgentCapabilities` bits, as a `ulong`). `ReportsStatus`, `ReportsHeartbeat` and the `Reports*` bit of each status you set are added for you | |
@@ -142,7 +129,7 @@ The callback gets an `OpAmpNotification`, a record with one nested record for ea
 ```bash
 scripts/fetch_core.py fetch   # the core's library, its test files and the adversary module
 cd dotnet
-dotnet test --project Pydantic.OpAmp.Client.Tests
+dotnet test --project Logfire.Fleet.Client.Tests
 ```
 
 The tests need the .NET 10 SDK (`dotnet/global.json`, which also picks its test runner,
@@ -155,8 +142,8 @@ dotnet-core-platform,dotnet-core` ([conformance/README.md](../conformance/README
 ## OpenTelemetry
 
 To put automatic instrumentation under a server without writing code, use the plugin
-`Pydantic.OpAmp.AutoInstrumentation`; for an SDK set up in code, `services.AddOpenTelemetry().WithOpAmp()`
-from `Pydantic.OpAmp.Extensions.Hosting`. Both are in [dotnet-otel.md](dotnet-otel.md). To wire
+`Logfire.Fleet.AutoInstrumentation`; for an SDK set up in code, `services.AddOpenTelemetry().WithOpAmp()`
+from `Logfire.Fleet.Extensions.Hosting`. Both are in [dotnet-otel.md](dotnet-otel.md). To wire
 this client to an SDK by hand, see [sdks.md](sdks.md) and [examples/dotnet](../examples/dotnet/Program.cs).
-`Pydantic.OpAmp.Client.Sdk.SdkSettings` runs the shared SDK settings layer
+`Logfire.Fleet.Client.Sdk.SdkSettings` runs the shared SDK settings layer
 ([sdk-settings.md](sdk-settings.md)).

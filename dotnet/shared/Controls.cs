@@ -3,11 +3,12 @@
 
 using System.Net;
 using System.Reflection;
+using System.Security.Cryptography;
 using OpenTelemetry.Exporter;
 using OpenTelemetry.Trace;
-using Pydantic.OpAmp.Client.Sdk;
+using Logfire.Fleet.Client.Sdk;
 
-namespace Pydantic.OpAmp.Otel;
+namespace Logfire.Fleet.Otel;
 
 /// <summary>A signal an OTLP exporter sends.</summary>
 internal enum Signal
@@ -181,6 +182,9 @@ internal sealed class Controls
 /// <param name="signal">The exporter's signal; null: each request's, by its path (one whose path names none goes as it is).</param>
 internal sealed class GateHandler(Controls controls, Signal? signal = null) : DelegatingHandler
 {
+    // What it decided of exports whose attempt failed, for the exporter's retry of the same bytes.
+    private readonly RetryMemo retries = new();
+
     /// <summary>The signal it was given; null: each request's, by its path.</summary>
     public Signal? Signal => signal;
 
@@ -188,7 +192,7 @@ internal sealed class GateHandler(Controls controls, Signal? signal = null) : De
     protected override HttpResponseMessage Send(HttpRequestMessage request, CancellationToken cancellationToken)
     {
         var s = signal ?? Controls.SignalOf(request.RequestUri);
-        var admitted = this.Admit(request, s);
+        var admitted = this.Guarded(request, s);
         if (!admitted.Send)
         {
             return Dropped(request);
@@ -197,12 +201,12 @@ internal sealed class GateHandler(Controls controls, Signal? signal = null) : De
         try
         {
             var response = base.Send(request, cancellationToken);
-            this.Count(s, request, response, admitted.Items);
+            this.Count(s, request, response, admitted.Items, admitted.Retry);
             return response;
         }
         catch (Exception e)
         {
-            this.Count(s, request, e, admitted.Items);
+            this.Count(s, request, e, admitted.Items, admitted.Retry);
             throw;
         }
     }
@@ -210,7 +214,7 @@ internal sealed class GateHandler(Controls controls, Signal? signal = null) : De
     protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
     {
         var s = signal ?? Controls.SignalOf(request.RequestUri);
-        var admitted = this.Admit(request, s);
+        var admitted = this.Guarded(request, s);
         if (!admitted.Send)
         {
             return Dropped(request);
@@ -226,12 +230,29 @@ internal sealed class GateHandler(Controls controls, Signal? signal = null) : De
                 await response.Content.LoadIntoBufferAsync().ConfigureAwait(false);
             }
 
-            this.Count(s, request, response, admitted.Items);
+            this.Count(s, request, response, admitted.Items, admitted.Retry);
             return response;
         }
         catch (Exception e)
         {
-            this.Count(s, request, e, admitted.Items);
+            this.Count(s, request, e, admitted.Items, admitted.Retry);
+            throw;
+        }
+    }
+
+    /// <summary>
+    /// <see cref="Admit"/>, with an error inside the gate (a body it can't read) counted as a
+    /// failed export, then thrown to the exporter as before: else it fails the export uncounted.
+    /// </summary>
+    private (bool Send, int? Items, RetryMemo.Entry? Retry) Guarded(HttpRequestMessage request, Signal? s)
+    {
+        try
+        {
+            return this.Admit(request, s);
+        }
+        catch (Exception e) when (s is { } sig)
+        {
+            controls.Tally.Failed(sig, 0, $"gate: {e.GetBaseException().Message}");
             throw;
         }
     }
@@ -264,7 +285,7 @@ internal sealed class GateHandler(Controls controls, Signal? signal = null) : De
         return null;
     }
 
-    private void Count(Signal? s, HttpRequestMessage request, HttpResponseMessage response, int? items)
+    private void Count(Signal? s, HttpRequestMessage request, HttpResponseMessage response, int? items, RetryMemo.Entry? retry)
     {
         if (s is not { } sig)
         {
@@ -288,15 +309,17 @@ internal sealed class GateHandler(Controls controls, Signal? signal = null) : De
         else
         {
             controls.Tally.Failed(sig, items ?? ItemsIn(request, sig), error);
+            this.retries.Put(retry);
         }
     }
 
-    private void Count(Signal? s, HttpRequestMessage request, Exception e, int? items)
+    private void Count(Signal? s, HttpRequestMessage request, Exception e, int? items, RetryMemo.Entry? retry)
     {
         if (s is { } sig)
         {
             var error = e is TaskCanceledException or OperationCanceledException ? "timed out" : e.GetBaseException().Message;
             controls.Tally.Failed(sig, items ?? ItemsIn(request, sig), error);
+            this.retries.Put(retry);
         }
     }
 
@@ -332,35 +355,43 @@ internal sealed class GateHandler(Controls controls, Signal? signal = null) : De
     /// nothing is left in it. A body that can't be read as OTLP is sent as it is, unless it was to
     /// be redacted: then it isn't sent at all (fail closed), and counts as a failed export. The
     /// items it carried, when the gate read it; what the levels and the cap dropped counts as
-    /// filtered.
+    /// filtered. The exporter's retry of an attempt that failed (the same bytes) is sent as the
+    /// first attempt was decided: its records aren't charged to the cap or counted filtered again.
     /// </summary>
-    private (bool Send, int? Items) Admit(HttpRequestMessage request, Signal? s)
+    private (bool Send, int? Items, RetryMemo.Entry? Retry) Admit(HttpRequestMessage request, Signal? s)
     {
         if (s is not { } sig)
         {
-            return (true, null);
+            return (true, null, null);
         }
 
         // Read once: whether it is sent and how, as one settings put them.
         var (send, policy) = controls.Held(sig);
         if (!send)
         {
-            return (false, null); // off on purpose: health reports the signal off
+            return (false, null, null); // off on purpose: health reports the signal off
         }
 
         if (!policy.Changes(sig) || request.Content is not { } content)
         {
-            return (true, null);
+            return (true, null, null);
         }
 
         // The exporter's content is its serialized request, in memory: read at once.
         var (body, grpc, encoding) = Read(request, content);
+        var key = RetryMemo.Key(sig, body);
+        if (this.retries.Take(key) is { } again)
+        {
+            Replace(request, content, again.Body);
+            return (true, again.Items, again);
+        }
+
         var rewritten = OtlpRewriter.Rewrite(body, grpc, encoding, sig, policy);
         if (!rewritten.Readable && policy.Redact is not null)
         {
             // Fail closed: what can't be read can't be redacted, so it isn't sent.
             controls.Tally.Failed(sig, 0, "an export the gate can't read (not OTLP protobuf, or an encoding other than gzip) isn't sent while attributes are redacted");
-            return (false, null);
+            return (false, null, null);
         }
 
         if (rewritten.Readable)
@@ -368,12 +399,20 @@ internal sealed class GateHandler(Controls controls, Signal? signal = null) : De
             controls.Tally.Filtered(sig, rewritten.Items - rewritten.Kept);
             if (rewritten.Kept == 0 && rewritten.Items > 0)
             {
-                return (false, null);
+                return (false, null, null);
             }
         }
 
-        // Read once: the request goes on with the bytes read, whatever the content was.
-        var replaced = new ByteArrayContent(rewritten.Body ?? body);
+        var sent = rewritten.Body ?? body;
+        Replace(request, content, sent);
+        int? items = rewritten.Readable ? rewritten.Kept : null;
+        return (true, items, new RetryMemo.Entry(key, sent, items));
+    }
+
+    /// <summary>The request goes on with <paramref name="body"/>, the bytes read or what the gate made of them.</summary>
+    private static void Replace(HttpRequestMessage request, HttpContent content, byte[] body)
+    {
+        var replaced = new ByteArrayContent(body);
         foreach (var (name, values) in content.Headers)
         {
             if (!name.Equals("Content-Length", StringComparison.OrdinalIgnoreCase))
@@ -384,7 +423,59 @@ internal sealed class GateHandler(Controls controls, Signal? signal = null) : De
 
         request.Content = replaced;
         content.Dispose();
-        return (true, rewritten.Readable ? rewritten.Kept : null);
+    }
+}
+
+/// <summary>
+/// What a gate decided of the exports whose attempt failed, by their bytes: the OTLP exporter
+/// retries a failed export with the same bytes in a new request, and only after a failure, so a
+/// retry is sent as first decided. Kept a few minutes, at most <see cref="Most"/>; taken once.
+/// </summary>
+internal sealed class RetryMemo
+{
+    private const int Most = 64;
+    private static readonly TimeSpan Kept = TimeSpan.FromMinutes(5);
+    private readonly Dictionary<string, (Entry Entry, DateTime Until)> entries = [];
+
+    /// <summary>An export as sent: its key (its signal and bytes as the exporter made them), the bytes sent, its items.</summary>
+    internal sealed record Entry(string Key, byte[] Body, int? Items);
+
+    /// <summary>The key of an export of <paramref name="signal"/> whose bytes are <paramref name="body"/>.</summary>
+    public static string Key(Signal signal, byte[] body) =>
+        $"{(int)signal}:{Convert.ToHexString(SHA256.HashData(body))}";
+
+    /// <summary>Keep the decision of an export whose attempt failed, for its retry.</summary>
+    public void Put(Entry? entry)
+    {
+        if (entry is null)
+        {
+            return;
+        }
+
+        lock (this.entries)
+        {
+            var now = DateTime.UtcNow;
+            foreach (var stale in this.entries.Where(e => e.Value.Until < now).Select(e => e.Key).ToList())
+            {
+                this.entries.Remove(stale);
+            }
+
+            if (this.entries.Count >= Most)
+            {
+                this.entries.Remove(this.entries.MinBy(e => e.Value.Until).Key);
+            }
+
+            this.entries[entry.Key] = (entry, now + Kept);
+        }
+    }
+
+    /// <summary>The decision kept for a retry of the export with this key, if any: taken, so a later send decides afresh.</summary>
+    public Entry? Take(string key)
+    {
+        lock (this.entries)
+        {
+            return this.entries.Remove(key, out var kept) && kept.Until >= DateTime.UtcNow ? kept.Entry : null;
+        }
     }
 }
 

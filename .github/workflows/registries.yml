@@ -145,25 +145,25 @@ jobs:
       - name: The wheels, by what each pins
         run: |
           mkdir -p upload/core upload/client upload/otel
-          find sdk -name 'pydantic_opamp_core-*.whl' -exec cp {} upload/core/ \;
-          find sdk -name 'pydantic_opamp_client-*.whl' -exec cp {} upload/client/ \;
-          find sdk -name 'pydantic_opamp_otel-*.whl' -exec cp {} upload/otel/ \;
+          find sdk -name 'logfire_fleet_core-*.whl' -exec cp {} upload/core/ \;
+          find sdk -name 'logfire_fleet_client-*.whl' -exec cp {} upload/client/ \;
+          find sdk -name 'logfire_fleet_otel-*.whl' -exec cp {} upload/otel/ \;
           ls -R upload
           for d in core client otel; do
             [ -n "$(ls upload/$d)" ] || { echo "::error::no $d wheel"; exit 1; }
           done
       # skip-existing: a rerun after a partial upload skips the files PyPI already has.
-      - uses: pypa/gh-action-pypi-publish@a892a5a61159132606e93a2fa6f4358831b04d26 # v1.14.2
+      - uses: pypa/gh-action-pypi-publish@dc37677b2e1c63e2034f94d8a5b11f265b73ba33 # v1.14.2
         if: env.PUBLISH == 'true'
         with:
           packages-dir: upload/core
           skip-existing: true
-      - uses: pypa/gh-action-pypi-publish@a892a5a61159132606e93a2fa6f4358831b04d26 # v1.14.2
+      - uses: pypa/gh-action-pypi-publish@dc37677b2e1c63e2034f94d8a5b11f265b73ba33 # v1.14.2
         if: env.PUBLISH == 'true'
         with:
           packages-dir: upload/client
           skip-existing: true
-      - uses: pypa/gh-action-pypi-publish@a892a5a61159132606e93a2fa6f4358831b04d26 # v1.14.2
+      - uses: pypa/gh-action-pypi-publish@dc37677b2e1c63e2034f94d8a5b11f265b73ba33 # v1.14.2
         if: env.PUBLISH == 'true'
         with:
           packages-dir: upload/otel
@@ -197,14 +197,15 @@ jobs:
           if ! printf '11.5.1\n%s\n' "$(npm --version)" | sort -V -C; then
             echo "::error::npm $(npm --version) can't publish with OIDC: 11.5.1 or later needed"; exit 1
           fi
-          for tgz in sdk/sdk/npm/*-opamp-client-*.tgz sdk/sdk/npm/*-opamp-otel-*.tgz; do
+          for tgz in sdk/sdk/npm/*-fleet-client-*.tgz sdk/sdk/npm/*-fleet-otel-*.tgz; do
             [ -f "$tgz" ] || { echo "::error::no $tgz"; exit 1; }
             spec=$(tar -xzOf "$tgz" package/package.json | python3 -c 'import json, sys; p = json.load(sys.stdin); print(p["name"] + "@" + p["version"])')
-            if [ "$PUBLISH" != true ]; then
-              npm publish --dry-run --access public "$tgz"
-            # A rerun: what npm already has is skipped (npm refuses a version twice).
-            elif [ -n "$(npm view "$spec" version 2>/dev/null)" ]; then
+            # A rerun: what npm already has is skipped (npm refuses a version twice, a dry run too).
+            if [ -n "$(npm view "$spec" version 2>/dev/null)" ]; then
               echo "::notice::$spec is on npm already, skipped"
+            elif [ "$PUBLISH" != true ]; then
+              # A dry run is at 0.0.0, below what npm has, which npm won't tag latest.
+              npm publish --dry-run --tag dry-run --access public "$tgz"
             else
               npm publish --provenance --access public "$tgz"
             fi

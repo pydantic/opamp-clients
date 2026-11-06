@@ -125,7 +125,7 @@ lists. In short:
   publisher on each.
 - Maven Central: the `dev.pydantic` namespace verified, a user token, and a GPG key on a public
   keyserver.
-- NuGet: the `Pydantic.OpAmp` prefix reserved, and a trusted publishing policy.
+- NuGet: the `Logfire.Fleet` prefix reserved, and a trusted publishing policy.
 
 Sessions can't read Actions variables, environments or secrets (403): ask the maintainer what is
 set up rather than assuming.
@@ -145,7 +145,7 @@ twine check --strict dist/native/wheels/*.whl dist/sdk/wheels/*.whl
 python3 scripts/sdk_release.py bundle dist/sdk/maven central-bundle.zip   # Central's layout, .md5/.sha1/.asc
 ```
 Locally, `native_dist.py build` works after `fetch --all-platforms`; `check` then fails with
-`0 Pydantic.OpAmp.Core.Native packages, not 1` until `pack` has run, which needs the .NET SDK
+`0 Logfire.Fleet.Core.Native packages, not 1` until `pack` has run, which needs the .NET SDK
 (refused in the sandbox: CI only). Don't run `stamp` in a working tree you'll commit from: it
 rewrites tracked manifests (and drops npm's `private` flag). Its behavior is covered by the tests.
 `bundle --unsigned` makes the bundle without signatures, as the dry run does.
@@ -173,9 +173,9 @@ python3 -m unittest scripts/test_sdk_release.py scripts/test_collector_release.p
   the Supervisor's release had to be run by hand with `version: 0.1.0`.
 - A release is public at once, notes included. Notes describe this repository's code only.
 - Registries keep every version for good, and a name on a registry can't be taken back: every
-  scope or prefix (`pydantic-opamp-*`, `@pydantic/opamp-*`, `dev.pydantic`, `Pydantic.OpAmp.*`) must
+  scope or prefix (`logfire-fleet-*`, `@pydantic/logfire-fleet-*`, `dev.pydantic`, `Logfire.Fleet.*`) must
   be ours first.
-- The bundled collector reports an empty `version` (`collector.yaml`'s dist has none) and lists the
-  extension as `v0.0.0` (its local replace).
+- The bundled collector is upstream's `otelcol-contrib` (packaging/contrib.json); a new contrib
+  release means new pinned hashes there, checked against its Sigstore bundles.
 - Workflow runs, environments and variables: read-only REST at best; dispatching a workflow is a
   release step that needs the maintainer's in-thread words.

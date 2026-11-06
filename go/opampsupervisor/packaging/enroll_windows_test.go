@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"testing"
 
@@ -55,8 +56,11 @@ func TestWinEnroll(t *testing.T) {
 	assert.Equal(t, "wss://opamp.example.com/v1/opamp", loaded.Server.Endpoint)
 	assert.Equal(t, "Bearer s3cr3t-token", loaded.Server.Headers.Get("Authorization"))
 	assert.Equal(t, "dpapi", loaded.Storage.StateKey)
+	assert.True(t, loaded.Capabilities.ReportsOwnMetrics)
+	assert.True(t, loaded.Capabilities.ReportsOwnLogs)
 	assert.Equal(t, filepath.ToSlash(filepath.Join(root, "var")), loaded.Storage.Directory)
 	assert.True(t, loaded.Agent.AutomaticConfigRollback)
+	assert.Equal(t, []string{"--feature-gates=telemetry.newPipelineTelemetry"}, loaded.Agent.Arguments)
 	// Without -Restricted, any config the server sends runs.
 	assert.False(t, loaded.Agent.RemoteConfigPolicy.Enabled(), "a policy without -Restricted")
 }
@@ -211,4 +215,72 @@ func TestWinEnrollHostLogs(t *testing.T) {
 	body := hostLogsConfig(t, "windows", "C:/ProgramData/pydantic-opamp/var/collector", storage)
 	assertHostLogs(t, p, enroll(), body, `configures receiver "windows_event_log/application"`)
 	require.ErrorContains(t, p.Check("", []byte(`receivers: {windows_event_log: {channel: System, remote: {server: dc1}}}`)), "sets remote")
+}
+
+// -Refresh, which the .msi runs after an upgrade, writes the config again with the last
+// enrollment's options and keeps the token; one edited since it was written is kept.
+func TestWinEnrollRefresh(t *testing.T) {
+	root := filepath.Join(t.TempDir(), "pydantic-opamp")
+	out, err := winEnroll(t, root, "s3cr3t-token\r\n", "-Endpoint", "wss://opamp.example.com/v1/opamp", "-Restricted",
+		"-LogPath", `C:\logs\app`, "-AcceptPackages", "-NoStart")
+	require.NoError(t, err, out)
+	read := func(name string) string {
+		b, err := os.ReadFile(filepath.Join(root, name))
+		require.NoError(t, err)
+		return string(b)
+	}
+	enrolled := read("supervisor.yaml")
+	assert.NotContains(t, read("enroll.options"), "s3cr3t-token")
+	// (The script's lines end as its checkout's do: \r\n on a Windows runner.)
+	older := regexp.MustCompile(`  reports_own_logs: true\r?\n`).ReplaceAllString(enrolled, "")
+	require.NotEqual(t, enrolled, older)
+	require.NoError(t, os.WriteFile(filepath.Join(root, "supervisor.yaml"), []byte(older), 0o600))
+	require.NoError(t, os.WriteFile(filepath.Join(root, "supervisor.yaml.sha256"), []byte(sha256Hex(older)), 0o600))
+
+	out, err = winEnroll(t, root, "", "-Refresh")
+	require.NoError(t, err, out)
+	assert.Contains(t, out, "Refreshed with wss://opamp.example.com/v1/opamp. Start the Supervisor with")
+	assert.Equal(t, enrolled, read("supervisor.yaml"))
+	assert.Equal(t, "s3cr3t-token", read("enroll-token"))
+
+	edited := enrolled + "# by hand\n"
+	require.NoError(t, os.WriteFile(filepath.Join(root, "supervisor.yaml"), []byte(edited), 0o600))
+	out, err = winEnroll(t, root, "", "-Refresh")
+	require.NoError(t, err, out)
+	assert.Contains(t, out, "edited since it was written and is kept")
+	assert.Equal(t, edited, read("supervisor.yaml"))
+
+	// An older package's config, with no options or checksum: one written without -Restricted is
+	// written again only if the new one keeps every setting it had. (The runner has no service to
+	// start, so the restart after it fails.)
+	legacyRoot := filepath.Join(t.TempDir(), "pydantic-opamp")
+	out, err = winEnroll(t, legacyRoot, "s3cr3t-token\r\n", "-Endpoint", "wss://opamp.example.com/v1/opamp", "-AcceptPackages", "-NoStart")
+	require.NoError(t, err, out)
+	legacyRead := func(name string) string {
+		b, err := os.ReadFile(filepath.Join(legacyRoot, name))
+		require.NoError(t, err)
+		return string(b)
+	}
+	legacy := regexp.MustCompile(`  reports_own_logs: true\r?\n`).ReplaceAllString(legacyRead("supervisor.yaml"), "")
+	require.NoError(t, os.Remove(filepath.Join(legacyRoot, "enroll.options")))
+	require.NoError(t, os.Remove(filepath.Join(legacyRoot, "supervisor.yaml.sha256")))
+	handEdited := regexp.MustCompile(`  headers:(\r?\n)`).ReplaceAllString(legacy, "  headers:${1}    X-Team: infra${1}")
+	require.NotEqual(t, legacy, handEdited)
+	require.NoError(t, os.WriteFile(filepath.Join(legacyRoot, "supervisor.yaml"), []byte(handEdited), 0o600))
+	out, _ = winEnroll(t, legacyRoot, "", "-Refresh")
+	assert.Contains(t, out, "or edited, and is kept")
+	assert.Equal(t, handEdited, legacyRead("supervisor.yaml"))
+	_, err = os.Stat(filepath.Join(legacyRoot, "enroll.options"))
+	assert.ErrorIs(t, err, os.ErrNotExist)
+
+	require.NoError(t, os.WriteFile(filepath.Join(legacyRoot, "supervisor.yaml"), []byte(legacy), 0o600))
+	out, _ = winEnroll(t, legacyRoot, "", "-Refresh")
+	assert.Contains(t, out, "the old one is kept as")
+	assert.Equal(t, legacy, legacyRead("supervisor.yaml.old"))
+	assert.Contains(t, legacyRead("supervisor.yaml"), "reports_own_logs: true")
+	assert.Regexp(t, `"AcceptPackages":\s+true`, legacyRead("enroll.options"))
+
+	out, err = winEnroll(t, root, "", "-Refresh", "-Plaintext")
+	require.Error(t, err, out)
+	assert.Contains(t, out, "takes no other options")
 }

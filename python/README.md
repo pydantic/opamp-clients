@@ -1,4 +1,4 @@
-# pydantic-opamp-client
+# logfire-fleet-client
 
 An [OpAMP](https://github.com/open-telemetry/opamp-spec) client for Python (asyncio), over plain
 HTTP or WebSocket, with TLS and through HTTP or SOCKS5 proxies.
@@ -7,10 +7,10 @@ Everything OpAMP (what to send and when, backoff, heartbeats, full reports, inst
 agent_disconnect, and the requests and responses themselves) is the shared core,
 run natively: a native library built from the same source as
 the WebAssembly module the Go, Node.js and Java clients run, and held to it byte for byte
-(`tests/test_native.py`). It comes in its own package, `pydantic-opamp-core` (`core/`: a wheel per
+(`tests/test_native.py`). It comes in its own package, `logfire-fleet-core` (`core/`: a wheel per
 platform holding the library alone, for Linux (glibc and musl), macOS and Windows on x64 and
 arm64), and this package, pure Python, loads it through its C interface with `ctypes`
-(`pydantic_opamp_client._native`), on every CPython from 3.11, free-threaded included. The core ships
+(`logfire_fleet_client._native`), on every CPython from 3.11, free-threaded included. The core ships
 compiled only: there is no source distribution.
 By default the core speaks HTTP and WebSocket itself too ([core mode](#core-mode-and-platform-mode)),
 and Python only moves its bytes, so the bytes on the wire are the same as every other language's
@@ -18,7 +18,7 @@ client here. In platform mode this package carries out the core's requests with
 [aiohttp](https://docs.aiohttp.org) instead.
 
 ```python
-from pydantic_opamp_client import Client, Config, Status, anyvalue_pb2, opamp_pb2
+from logfire_fleet_client import Client, Config, Status, anyvalue_pb2, opamp_pb2
 
 async def main() -> None:
     description = opamp_pb2.AgentDescription(identifying_attributes=[
@@ -70,7 +70,7 @@ whether to follow it (`docs/packages.md`, "Redirects").
 WebSocket and every package download, in both modes.
 
 ```python
-from pydantic_opamp_client import TLS, Proxy
+from logfire_fleet_client import TLS, Proxy
 
 Config(
     endpoint="wss://opamp.internal:4320/v1/opamp",
@@ -221,4 +221,4 @@ checker (`target/release/opamp-tap <tap files...>`, which `fetch_core.py fetch` 
 
 The conformance suite runs this client through `conformance/drivers/python-core`.
 
-What the client promises around its callback (when it is called, one at a time and never before `start` returns, what a callback that throws does, which calls are allowed from the callback and from other threads, stop from the callback) is [the SDK contract](../docs/sdk-contract.md), the same for every SDK here. The precise rules, around the core too, are the shell contract, `spec/shell-contract.md` (put in place by `scripts/fetch_core.py fetch`; it lists the breaks known today). The callback model test and the adversary harness in this client's tests check it, each in platform mode and in core mode.
+What the client promises around its callback (when it is called, one at a time and never before `start` returns, what a callback that throws does, which calls are allowed from the callback and from other threads, stop from the callback) is [the SDK contract](https://github.com/pydantic/opamp-clients/blob/main/docs/sdk-contract.md), the same for every SDK here. The precise rules, around the core too, are the shell contract, `spec/shell-contract.md` (put in place by `scripts/fetch_core.py fetch`; it lists the breaks known today). The callback model test and the adversary harness in this client's tests check it, each in platform mode and in core mode.

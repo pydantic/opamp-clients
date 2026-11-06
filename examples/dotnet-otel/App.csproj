@@ -9,12 +9,17 @@
     <AssemblyName>App</AssemblyName>
   </PropertyGroup>
 
+  <!-- Hosted/ is an application of its own (Hosted.csproj). -->
+  <ItemGroup>
+    <Compile Remove="Hosted/**" />
+  </ItemGroup>
+
   <ItemGroup>
     <!-- ASP.NET Core, for the requests it serves with APP_LISTEN set (sampling_rules' path). -->
     <FrameworkReference Include="Microsoft.AspNetCore.App" />
     <PackageReference Include="Microsoft.Extensions.Logging" Version="8.0.1" />
     <PackageReference Include="OpenTelemetry.AutoInstrumentation" Version="1.17.0" Condition="'$(Edot)' != 'true'" />
-    <ProjectReference Include="../../dotnet/Pydantic.OpAmp.AutoInstrumentation/Pydantic.OpAmp.AutoInstrumentation.csproj" />
+    <ProjectReference Include="../../dotnet/Logfire.Fleet.AutoInstrumentation/Logfire.Fleet.AutoInstrumentation.csproj" />
   </ItemGroup>
 
   <!-- With try.py's edot option: Elastic's distribution (EDOT .NET, on automatic instrumentation

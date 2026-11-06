@@ -6,7 +6,7 @@ using System.Buffers.Binary;
 using System.IO.Compression;
 using System.Text;
 
-namespace Pydantic.OpAmp.Otel;
+namespace Logfire.Fleet.Otel;
 
 /// <summary>What a gate holds one signal's exports to; a part left null does nothing.</summary>
 /// <param name="Levels">Logs: the lowest severity exported, per scope (send_logs_level and send_logs_level_by_scope).</param>

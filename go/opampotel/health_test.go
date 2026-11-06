@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"reflect"
 	"testing"
 	"time"
 
@@ -27,7 +28,8 @@ type healthWant struct {
 	entryWant
 	Signals map[string]struct {
 		entryWant
-		Counters map[string]int64 `json:"counters"`
+		Counters  map[string]int64  `json:"counters"`
+		Exporters map[string]string `json:"exporters"`
 	} `json:"signals"`
 }
 
@@ -79,10 +81,11 @@ func TestTheHealthVectors(t *testing.T) {
 		Cases []struct {
 			Name  string `json:"name"`
 			Steps []struct {
-				Now      uint64          `json:"now_unix_ms"`
-				Settings json.RawMessage `json:"settings"`
-				Counts   json.RawMessage `json:"counts"`
-				Want     healthWant      `json:"want"`
+				Now       uint64                 `json:"now_unix_ms"`
+				Settings  json.RawMessage        `json:"settings"`
+				Exporters []*settingspb.Exporter `json:"exporters"`
+				Counts    json.RawMessage        `json:"counts"`
+				Want      healthWant             `json:"want"`
 			} `json:"steps"`
 		}
 	}
@@ -113,6 +116,7 @@ func TestTheHealthVectors(t *testing.T) {
 				a.mu.Lock()
 				a.controls.Apply(settings)
 				a.settings = settings
+				a.exporters = s.Exporters
 				setCounts(a.controls, counts)
 				a.nextHealth = time.UnixMilli(int64(s.Now)) // due now: the timer goes off
 				a.arm()
@@ -151,6 +155,18 @@ func TestTheHealthVectors(t *testing.T) {
 					for k, n := range sw.Counters {
 						if got := sig.GetAttributes(); attributeInt(got, k) != n {
 							t.Fatalf("step %d: %s %s = %d, want %d", i, name, k, attributeInt(got, k), n)
+						}
+					}
+					if sw.Exporters != nil {
+						got := map[string]string{}
+						for k, c := range sig.GetComponentHealthMap() {
+							got[k] = c.GetStatus()
+							if !c.GetHealthy() {
+								t.Fatalf("step %d: %s %s unhealthy: ungoverned is no failure", i, name, k)
+							}
+						}
+						if !reflect.DeepEqual(got, sw.Exporters) {
+							t.Fatalf("step %d: %s exporters %v, want %v", i, name, got, sw.Exporters)
 						}
 					}
 				}

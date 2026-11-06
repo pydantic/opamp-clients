@@ -496,9 +496,9 @@ jobs:
       fail-fast: false
       matrix:
         project:
-          - Pydantic.OpAmp.Client.Tests
+          - Logfire.Fleet.Client.Tests
           # The SDK set up in code, under an OpAMP server (WithOpAmp).
-          - Pydantic.OpAmp.Extensions.Hosting.Tests
+          - Logfire.Fleet.Extensions.Hosting.Tests
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -694,7 +694,7 @@ jobs:
       - name: .NET automatic instrumentation plugin
         if: matrix.sdk == 'dotnet'
         working-directory: dotnet
-        run: dotnet test --project Pydantic.OpAmp.AutoInstrumentation.Tests
+        run: dotnet test --project Logfire.Fleet.AutoInstrumentation.Tests
       - name: Keep the test reports
         if: (failure() || cancelled()) && matrix.sdk == 'java'
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
@@ -703,6 +703,79 @@ jobs:
           name: integrations-javaagent
           retention-days: 7
           path: java/opamp-javaagent/target/surefire-reports/**
+          if-no-files-found: ignore
+
+  # Each integration end to end: examples/<integration>/try.py, every check, each a run of the
+  # example application against the conformance suite's Go server as the SDK fixture and its sink
+  # (examples/integrations.py, conformance/server/fixture.go). A check waits on its scenario's clock
+  # (one message a second), not on the machine, so a job runs four at once. Java's and .NET's
+  # applications build and run in containers. Like conformance, not on a draft.
+  integrations-e2e:
+    name: ${{ matrix.name }}, end to end
+    if: ${{ github.event.pull_request.draft != true }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { sdk: go-otel, name: Go SDK setup }
+          - { sdk: node-otel, name: Node.js auto-instrumentation }
+          - { sdk: python-otel, name: Python auto-instrumentation }
+          - { sdk: javaagent, name: Java agent extension }
+          - { sdk: dotnet-otel, name: .NET automatic instrumentation }
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: ${{ env.CLIENTS_REPOSITORY }}
+          ref: ${{ env.CLIENTS_REF }}
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: .opamp-core
+          key: opamp-core-${{ hashFiles('opamp-core.lock.json') }}
+      # Every platform's library too: the .NET images take the Linux one (scripts/native_lib.py).
+      - name: The core, fetched and verified against the lock
+        uses: ./.github/actions/core
+        with:
+          all-platforms: "true"
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.13"
+      # The Go server, whatever the integration.
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: "1.26"
+          cache-dependency-path: |
+            conformance/**/go.sum
+            go/go.sum
+            go/opampotel/go.sum
+            examples/go-otel/go.sum
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        if: matrix.sdk == 'node-otel'
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: |
+            node/opamp/package-lock.json
+            node/otel/package-lock.json
+            examples/node-otel/logfire/package-lock.json
+      - uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
+        if: matrix.sdk == 'python-otel'
+      - name: Every check (examples/${{ matrix.sdk }}/try.py)
+        env:
+          SDK: ${{ matrix.sdk }}
+        run: python3 "examples/$SDK/try.py" --jobs 4
+      - name: Keep the runs' event logs
+        if: failure() || cancelled()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        continue-on-error: true
+        with:
+          name: integrations-e2e-${{ matrix.sdk }}
+          retention-days: 7
+          path: |
+            target/integrations/**/*.jsonl
+            target/integrations/**/*.stderr
+            target/integrations/**/*-scenario.json
           if-no-files-found: ignore
 
   # ---------------------------------------------------------------- Native packaging
@@ -958,7 +1031,7 @@ jobs:
         run: |
           go vet -tags=install .
           go test -c -tags=install -o "$RUNNER_TEMP/install.test" .
-          sudo OPAMP_REPO="$OPAMP_REPO" "$RUNNER_TEMP/install.test" -test.run Install -test.v
+          sudo OPAMP_REPO="$OPAMP_REPO" "$RUNNER_TEMP/install.test" -test.run Install -test.v -test.timeout 12m
       - name: The packages, kept
         if: ${{ !cancelled() && steps.packages.outcome == 'success' }}
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
@@ -1007,7 +1080,22 @@ jobs:
         working-directory: go/opampsupervisor/packaging
         run: |
           go test -c -tags=install -o "$RUNNER_TEMP/install.test" .
-          sudo OPAMP_PKG="$PWD/dist/pydantic-opamp-supervisor-0.0.0-darwin-arm64.pkg" "$RUNNER_TEMP/install.test" -test.run Install -test.v
+          sudo OPAMP_PKG="$PWD/dist/pydantic-opamp-supervisor-0.0.0-darwin-arm64.pkg" "$RUNNER_TEMP/install.test" -test.run Install -test.v -test.timeout 12m
+      - name: The released .pkg, enrolled, then upgraded in place to this one
+        # A step limit under the job's, so a hang fails this step and its log is kept (a job
+        # cancelled at its limit loses every step's log).
+        timeout-minutes: 18
+        # The previous step purged what it installed, so this one starts on a clean machine.
+        if: ${{ !cancelled() && steps.pkg.outcome == 'success' }}
+        working-directory: go/opampsupervisor/packaging
+        env:
+          RELEASED: https://github.com/pydantic/opamp-clients/releases/download/go/opampsupervisor/v0.9.0/pydantic-opamp-supervisor-0.9.0-darwin-arm64.pkg
+          RELEASED_SHA256: b07d36bd44d9b340cf8f9c8f85cb294472a118f018e3b205bef44ffa0bb9d218
+        run: |
+          curl -fsSL --retry 3 --max-time 300 -o "$RUNNER_TEMP/released.pkg" "$RELEASED"
+          echo "$RELEASED_SHA256  $RUNNER_TEMP/released.pkg" | shasum -a 256 -c -
+          sudo OPAMP_PKG="$RUNNER_TEMP/released.pkg" OPAMP_UPGRADE="$PWD/dist/pydantic-opamp-supervisor-0.0.0-darwin-arm64.pkg" \
+            "$RUNNER_TEMP/install.test" -test.run Upgrade -test.v -test.timeout 12m
       - name: The .pkg, kept
         if: ${{ !cancelled() && steps.pkg.outcome == 'success' }}
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
@@ -1054,14 +1142,30 @@ jobs:
         shell: pwsh
         run: |
           dotnet tool install --global wix --version 5.0.2
-          go/opampsupervisor/packaging/windows/build.ps1 -Version 0.0.0
+          # Above every release, so the upgrade test can install it over the released one.
+          go/opampsupervisor/packaging/windows/build.ps1 -Version 255.0.0
       - name: The .msi installed, enrolled with a server that issues a token, and restarted
         # It installs a service: the runner is thrown away after the job. (The job runs elevated.)
         if: ${{ !cancelled() && steps.msi.outcome == 'success' }}
         working-directory: go/opampsupervisor/packaging
         run: |
           go test -c -tags=install -o "$RUNNER_TEMP/install.test.exe" .
-          OPAMP_MSI="$(cygpath -w "$PWD/dist/pydantic-opamp-supervisor-0.0.0-windows-amd64.msi")" "$RUNNER_TEMP/install.test.exe" -test.run Install -test.v
+          OPAMP_MSI="$(cygpath -w "$PWD/dist/pydantic-opamp-supervisor-255.0.0-windows-amd64.msi")" "$RUNNER_TEMP/install.test.exe" -test.run Install -test.v -test.timeout 12m
+      - name: The released .msi, enrolled, then upgraded in place to this one
+        # A step limit under the job's, so a hang fails this step and its log is kept (a job
+        # cancelled at its limit loses every step's log).
+        timeout-minutes: 18
+        # The previous step purged what it installed, so this one starts on a clean machine.
+        if: ${{ !cancelled() && steps.msi.outcome == 'success' }}
+        working-directory: go/opampsupervisor/packaging
+        env:
+          RELEASED: https://github.com/pydantic/opamp-clients/releases/download/go/opampsupervisor/v0.9.0/pydantic-opamp-supervisor-0.9.0-windows-amd64.msi
+          RELEASED_SHA256: 2a7181195790180e507fc8edab4833e79f6e6575fd42ce05343b025194f19ad8
+        run: |
+          curl -fsSL --retry 3 --max-time 300 -o "$RUNNER_TEMP/released.msi" "$RELEASED"
+          echo "$RELEASED_SHA256  $RUNNER_TEMP/released.msi" | sha256sum -c -
+          OPAMP_MSI="$(cygpath -w "$RUNNER_TEMP/released.msi")" OPAMP_UPGRADE="$(cygpath -w "$PWD/dist/pydantic-opamp-supervisor-255.0.0-windows-amd64.msi")" \
+            "$RUNNER_TEMP/install.test.exe" -test.run Upgrade -test.v -test.timeout 12m
       - name: The .msi, kept
         if: ${{ !cancelled() && steps.msi.outcome == 'success' }}
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
@@ -1215,6 +1319,7 @@ jobs:
       - dotnet-fuzz
       - redact-mutants
       - integrations
+      - integrations-e2e
       - native-pack
       - native-smoke
       - collector-tests

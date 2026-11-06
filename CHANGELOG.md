@@ -2,7 +2,8 @@
 
 What each release of this repository's packages changes for the people who run them. Every
 release is a tag: `go/opampsupervisor/vX.Y.Z` (the Supervisor and its installers),
-`go/<module>/vX.Y.Z` (the Go modules), and, once the SDKs are on their registries, `sdk/vX.Y.Z`.
+`go/<module>/vX.Y.Z` (the Go modules), and `sdk/vX.Y.Z` (the SDKs on PyPI, npm, Maven Central and
+NuGet).
 The core every package carries is a `core/vX.Y.Z` release of this repository, pinned in
 `opamp-core.lock.json`.
 
@@ -20,13 +21,37 @@ and date. Tests, CI and docs alone don't need a line.
 
 ### Breaking
 
+- Go, Java, .NET: an HTTP client of the application's no longer switches the client to platform
+  mode silently. Platform mode is an advanced option and must be named (`Mode: opamp.ModePlatform`,
+  `mode(OpampClient.Mode.PLATFORM)`, `Mode = OpAmpMode.Platform`); an HTTP client without it is
+  refused at start, saying what to set (#109).
 - Go: the `go/logfirepolicyprocessor` module is gone; its last release is v0.2.0 (#80).
 - Go, Python, Node.js, Java, .NET: an OpAMP endpoint without a scheme (`opamp.example.com/v1/opamp`)
   is refused. OpAMP stays off, the SDK runs unmanaged, and the core's warning names the setting.
   Add `https://` or `wss://`. On core 0.12.0, which the clients now pin (#92).
+- Go, Python, Node.js, Java, .NET: the SDK policy governs every exporter the SDK exports through,
+  not just the ones the integration builds: the console, a processor added later, another
+  plugin's OTLP exporter, the Logfire SDK's console and OTLP exporters. A policy that was FAILED or
+  set aside because another exporter was there is now APPLIED and in force on all of them, and one
+  decision per span or log record holds for every exporter it reaches (one rate cap budget per
+  process). What the gates can't reach (a processor that holds its own exporter, a pulled metric
+  reader, a global provider of the application's own, a non-OTLP exporter in .NET) is reported
+  ungoverned instead of narrowing what the SDK declares: `gated: false` in the inventory and the
+  status `ungoverned`, healthy, in export health. Only another sampler in place of the SDK's still
+  leaves the sampler's controls undeclared.
+- Go, Python, Node.js, Java, .NET: an exporter's inventory key is its identity, its name and
+  `@host:port` where it sends somewhere known (`otlp@api.honeycomb.io:443`), with the metadata
+  `destination` (`scheme://host:port`, never a path or credentials); a server that read `otlp`
+  reads `otlp@...`. Export health lists every exporter under its signal, `governed` or
+  `ungoverned`. Needs core 0.15.0.
 
 ### Added
 
+- Supervisor installers and container image: the Collector runs with
+  `--feature-gates=telemetry.newPipelineTelemetry`, so its own metrics count the items every
+  receiver, processor (`batch` too) and exporter takes in and passes on. A Prometheus reader of
+  those metrics fails when a component is in more than one pipeline (packaging/README.md,
+  "Pipeline item counts") (#120).
 - .NET: `Pydantic.OpAmp.Client`, `Pydantic.OpAmp.Extensions.Hosting` and the automatic
   instrumentation plugin ship for .NET 10 as well as .NET 8 (`net8.0` and `net10.0`), and their
   tests run on both. Building from source needs the .NET 10 SDK (#86).
@@ -43,6 +68,18 @@ and date. Tests, CI and docs alone don't need a line.
 
 ### Changed
 
+- Go, Python, Node.js, Java, .NET, the Supervisor: on core 0.16.0, which the clients now pin. Core
+  0.15.0 decides which exporters the SDK policy governs and how each is named (#109); 0.16.0 names
+  the generated Java and .NET types after Logfire Fleet (#126).
+- Go, Python, Node.js, Java, .NET: the name each exporter is listed under, where it sends, and the
+  warning for each ungoverned one are decided by the core's new `Exporters` call, the same in every
+  language. An OTLP exporter built from the variables now lists its signal's path under HTTP
+  (`http://localhost:4318/v1/traces`); the identity (`otlp@localhost:4318`) is unchanged. The
+  warnings read the same in every SDK. On core 0.15.0 (#109).
+- Supervisor installers: the Collector the packages ship (deb, rpm, `.pkg`, `.msi`, the release
+  archives and the container image) is upstream's OpenTelemetry Collector Contrib (`otelcol-contrib`
+  v0.164.0) as released, pinned by SHA-256, in place of our own build of about 20 components. A
+  config the server sends can use any contrib component. The packages are about 100 MB larger.
 - Supervisor: `pydantic-opamp-enroll` ends with a full sentence (`Enrolled with ... The Supervisor is
   running and connected (...)`), and `status` says `Remote config  none received yet`, so a host that
   just connected and is about to get its config doesn't read as broken (#113).
@@ -54,16 +91,28 @@ and date. Tests, CI and docs alone don't need a line.
 
 ### Fixed
 
+- Supervisor: stopping the Collector no longer races a restart. When the Collector exited just
+  as the stop's kill deadline passed, the deadline's goroutine read the command a restart was
+  replacing, and could have killed the new Collector. It now signals the process it was stopping
+  (#124).
+- Supervisor installers: an upgrade in place (apt, dnf, the `.pkg`, the `.msi`) keeps the host
+  running. Before, the Linux packages stopped and disabled the Supervisor during an upgrade, and the
+  `.msi` left it stopped and set to start on demand. After an upgrade the package runs the new
+  `pydantic-opamp-enroll --refresh` (`-Refresh` on Windows). It writes the config again with this
+  version's settings, such as the Collector's own logs, and the last enrollment's options, keeping
+  the issued credentials, and starts the Supervisor again. A config edited by hand is kept, and so
+  is a `--restricted` one written by 0.9.0 or earlier.
+- Supervisor: the Collector's own telemetry settings (from a server's `own_metrics`, `own_logs` and
+  `own_traces` offers) are in the current declarative config format, so the Collector no longer
+  warns on every start that they use the deprecated v0.2.0 format.
+- Supervisor installers: the bundled Collector reports its version (its contrib release, 0.164.0)
+  as `service.version` on its own telemetry; it was empty.
 - .NET: the application's health set while the OpAMP client was starting (a health check that
   runs at once) is reported. It was lost, and not reported again until the health changed (#112).
 - .NET, platform mode: a WebSocket connection cancelled just as the server accepted it is closed.
   It could stay open (no reader, no close) until the garbage collector finalized it (#112).
 - .NET, core mode: no download file is made or written after stop returns. A file's write that
   started late on a busy machine (after stop had stopped waiting for it) could still make it (#112).
-- Supervisor Linux installers: `pydantic-opamp-enroll --ca-file` copies the bundle to
-  `/etc/pydantic-opamp/ca.pem` and points the config there. Before, a bundle under `/tmp` (which
-  the service can't see: it has a private `/tmp`) or in a home directory kept the Supervisor
-  from starting, and enrolling only said it hadn't reported its status (#111).
 - Go, Python, Node.js, Java, .NET, the Supervisor: on core 0.14.0, which the clients now pin.
   A WebSocket connection given up after the server said nothing for two heartbeat intervals now
   says goodbye first (`agent_disconnect`), as every other close the client makes does; before, the
@@ -130,6 +179,121 @@ and date. Tests, CI and docs alone don't need a line.
   (the Go example, the conformance server), aiohttp 3.14.5 and OpenTelemetry Python 1.45.1
   (Python), ip-address 10.7.4 (Node.js), jackson-databind 2.22.3 (Java tests). Every lockfile is
   now checked against OSV on every change and nightly (`scripts/deps_scan.py`).
+
+## SDKs 0.2.1 (2026-11-06)
+
+`sdk/v0.2.1`, on core 0.16.0, for Python, Node.js, Java and .NET. Only Python and Node.js change.
+
+### Added
+
+- Python, Node.js: `logfire_fleet()` / `logfireFleet()` and `LogfireFleet`, what the Logfire
+  SDK's own `fleet` option calls (`logfire.configure(fleet=True)` with `logfire[fleet]`;
+  `configure({ fleet: true })` in `@pydantic/logfire-node` with this package beside it). The
+  Logfire SDK builds its own SDK and hands this package its head sampler, its resource and (in
+  Python) its export to Logfire at the points `configure_logfire()` uses, so nothing reads the
+  Logfire SDK's private modules and, unlike `manage()`, the sampling controls are carried out. A
+  versioned contract (`LOGFIRE_FLEET_CONTRACT`); a second `configure()` is governed under the same
+  client, and in Node.js the server is told of the exporters it has then (#127).
+
+## SDKs 0.2.0 (2026-11-05)
+
+`sdk/v0.2.0`, on core 0.16.0, for Python, Node.js, Java and .NET.
+
+### Breaking
+
+- Python, Node.js, Java, .NET: the packages take Logfire Fleet's names. The 0.1.x names get no new
+  versions; install the new ones and change the imports:
+
+  | Was (0.1.x) | Now |
+  | --- | --- |
+  | PyPI `pydantic-opamp-otel`, `pydantic-opamp-client`, `pydantic-opamp-core` | `logfire-fleet-otel`, `logfire-fleet-client`, `logfire-fleet-core` |
+  | `import pydantic_opamp_otel`, `pydantic_opamp_client` | `import logfire_fleet_otel`, `logfire_fleet_client` |
+  | npm `@pydantic/opamp-otel`, `@pydantic/opamp-client` | `@pydantic/logfire-fleet-otel`, `@pydantic/logfire-fleet-client` |
+  | Maven `dev.pydantic:opamp-client`, `dev.pydantic:opamp-javaagent-extension` | `dev.pydantic:logfire-fleet-client`, `dev.pydantic:logfire-fleet-javaagent-extension` |
+  | Java packages `dev.pydantic.opamp.*` | `dev.pydantic.logfire.fleet.*` |
+  | NuGet and namespaces `Pydantic.OpAmp.*` | `Logfire.Fleet.*` |
+  | .NET `AddPydanticOpAmp()` | `AddLogfireFleet()` |
+  | `OTEL_DOTNET_AUTO_PLUGINS="Pydantic.OpAmp.AutoInstrumentation.Plugin, Pydantic.OpAmp.AutoInstrumentation"` | `"Logfire.Fleet.AutoInstrumentation.Plugin, Logfire.Fleet.AutoInstrumentation"` |
+
+  The Python entry points keep their names (`OTEL_PYTHON_DISTRO=opamp`,
+  `OTEL_PYTHON_CONFIGURATOR=opamp`), and the Go modules keep their paths.
+
+These entries in **Unreleased** above are in 0.2.0. They stay there because they also apply to
+Go or the Supervisor, which have not had a release with them:
+
+- The SDK policy governs every exporter the SDK exports through (**Breaking**). The first
+  redaction or log policy no longer fails because the Logfire SDK's console or .NET's
+  `AddConsoleExporter` is there. What the gates can't reach is reported ungoverned (#109).
+- An exporter's inventory key is its identity (`otlp@host:port`) (**Breaking**), and the core
+  names each exporter and its warning, the same in every language (#109).
+- Java, .NET: an HTTP client of the application's no longer switches to platform mode silently
+  (**Breaking**) (#109).
+- On core 0.16.0.
+
+### Added
+
+- Python, Node.js: `manage()` puts an SDK the application has already set up under the server, as
+  it is: one built in code (contrib's way), the application's own NodeSDK, or the Logfire SDK's
+  (`logfire.configure()`, in Node.js too). Call it after that setup. The policy governs that SDK's
+  exporters; its sampler stays the application's, so the sampling controls, debug mode and the
+  instrumentation switches are refused. In Node.js the Logfire SDK's logs (spans of
+  `logfire.span_type` `log`) go through the log controls. Needs core 0.15.0 (#114).
+
+### Changed
+
+- Python: `configure()` called once the application has set its SDK up already puts that SDK
+  under the server, as `manage()` does, and warns. Before, it built a second SDK that couldn't
+  become the global one: the server heard APPLIED while the application's spans went past every
+  gate, and the instance was described as `unknown_service` (#114).
+- Python, Node.js, Java, .NET: every package page and guide installs from its registry (`pip
+  install logfire-fleet-otel`, `npm install @pydantic/logfire-fleet-otel`, Maven Central, `dotnet add
+  package`) in place of building from a checkout, and the READMEs PyPI and npm show link to the
+  docs on GitHub. The NuGet packages carry their README, Pydantic as author, the project URL and
+  tags (#124).
+
+## Supervisor 0.9.0 (2026-11-04)
+
+`go/opampsupervisor/v0.9.0`, on core 0.14.0. The Go modules are not released with it.
+
+### Changed
+
+- Supervisor installers (Linux, macOS, Windows, container image): the Supervisor declares
+  ReportsOwnMetrics and ReportsOwnLogs, so a server's `own_metrics` and `own_logs` offers send the
+  Collector's own metrics and logs where it says. A host enrolled before keeps its config until
+  the enroll script runs again (#116).
+- Supervisor: forked from contrib v0.164.1, was v0.163.0; takes upstream's
+  `agent::stop_grace_period` (#105).
+
+### Fixed
+
+- Supervisor Linux installers: `pydantic-opamp-enroll --ca-file` copies the bundle to
+  `/etc/pydantic-opamp/ca.pem` and points the config there. Before, a bundle under `/tmp` (which
+  the service can't see: it has a private `/tmp`) or in a home directory kept the Supervisor
+  from starting, and enrolling only said it hadn't reported its status (#111).
+- Supervisor: on core 0.14.0 (was 0.12.0). Over WebSocket, a connection the server has said
+  nothing on for two heartbeat intervals is given up (saying goodbye first) and made again, so a
+  host behind a proxy that lost its upstream no longer stays on a dead link for hours (#104, #106).
+
+The core and contrib entries in **Unreleased** stay there because they also apply to packages
+that have not had a release with them.
+
+## SDKs 0.1.1 (2026-11-04)
+
+The first release of the SDKs on their registries, from the tag `sdk/v0.1.1`, on core 0.14.0.
+
+- Python on PyPI: `pydantic-opamp-core`, `pydantic-opamp-client` and `pydantic-opamp-otel`.
+- Node.js on npm: `@pydantic/opamp-client` and `@pydantic/opamp-otel`, with provenance. The npm
+  packages also have a 0.1.0. It has the same contents, was published by hand, and has no
+  provenance. Use 0.1.1.
+- Java on Maven Central: `dev.pydantic:opamp-client` and `dev.pydantic:opamp-javaagent-extension`
+  (with its `app-settings` jar).
+- .NET on NuGet: `Pydantic.OpAmp.Client`, `Pydantic.OpAmp.Core.Native`,
+  `Pydantic.OpAmp.AutoInstrumentation` and `Pydantic.OpAmp.Extensions.Hosting`.
+
+This is the first release of these packages, so it lists no changes. Some entries in the
+**Unreleased** section above also apply to the SDKs. Version 0.1.1 already includes those
+changes. The entries stay in **Unreleased** because they also apply to Go or the Supervisor, which
+have not had a release with them.
 
 ## Supervisor 0.8.0 (2026-10-29)
 

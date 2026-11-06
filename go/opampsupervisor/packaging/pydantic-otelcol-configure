@@ -83,6 +83,12 @@ if getent group pydantic-opamp >/dev/null 2>&1 && [ "$(id -u)" = 0 ]; then
 	chgrp pydantic-opamp "$etc" "$etc/otelcol.yaml"
 fi
 
+# A package upgrade starts the collector again unless it was configured with --no-start.
+if [ -n "$start" ]; then
+	rm -f "$etc/otelcol.no-start"
+else
+	: >"$etc/otelcol.no-start"
+fi
 if [ -n "$start" ]; then
 	# The two conflict: disabled, the Supervisor doesn't come back at boot.
 	"$systemctl" disable --now "$supervisor"

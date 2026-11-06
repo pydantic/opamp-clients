@@ -5,6 +5,7 @@ the names and the host the rest of it uses, and that the client sends it."""
 
 from __future__ import annotations
 
+import io
 import os
 import subprocess
 import sys
@@ -14,8 +15,8 @@ from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
-from pydantic_opamp_client import opamp_pb2
-from pydantic_opamp_client.sdk import SdkSettings, settings_pb2
+from logfire_fleet_client import opamp_pb2
+from logfire_fleet_client.sdk import SdkSettings, settings_pb2
 from opentelemetry.sdk._logs import LoggerProvider
 from opentelemetry.sdk._logs.export import BatchLogRecordProcessor, ConsoleLogRecordExporter, SimpleLogRecordProcessor
 from opentelemetry.sdk.metrics import MeterProvider
@@ -26,9 +27,10 @@ from opentelemetry.sdk.trace.export import BatchSpanProcessor, ConsoleSpanExport
 from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
 from opentelemetry.util._importlib_metadata import entry_points
 
-import pydantic_opamp_otel
+import logfire_fleet_otel
+from _globals import sdk_globals
 from _policy import config_map, policy
-from pydantic_opamp_otel import Agent, Controls
+from logfire_fleet_otel import Agent, Controls
 
 LAYER = SdkSettings()
 #: 2026-10-14T12:00:00Z.
@@ -74,23 +76,23 @@ def instrumentors() -> dict[str, str]:
 def test_the_sdk_entry_is_this_package_and_the_python_sdk_it_runs():
     from opentelemetry.sdk.version import __version__
 
-    inv = pydantic_opamp_otel.inventory(None, TracerProvider(), MeterProvider(), LoggerProvider())
-    assert (inv.integration, inv.integration_version) == ("pydantic-opamp-otel", version("pydantic-opamp-otel"))
+    inv = logfire_fleet_otel.inventory([])
+    assert (inv.integration, inv.integration_version) == ("logfire-fleet-otel", version("logfire-fleet-otel"))
     assert (inv.sdk_language, inv.sdk_version) == ("python", __version__)
     assert parts(LAYER.components(inv))["sdk"] == {
-        "integration.name": "pydantic-opamp-otel", "integration.version": version("pydantic-opamp-otel"),
+        "integration.name": "logfire-fleet-otel", "integration.version": version("logfire-fleet-otel"),
         "telemetry.sdk.language": "python", "telemetry.sdk.version": __version__}
 
 
 def test_the_instrumentations_are_the_names_opentelemetry_instrument_matches_at_their_versions():
-    got = {i.name: i.version for i in pydantic_opamp_otel.instrumentations()}
+    got = {i.name: i.version for i in logfire_fleet_otel.instrumentations()}
     assert got == instrumentors() and "aiohttp-client" in got  # the dev group's
     assert got["aiohttp-client"] == version("opentelemetry-instrumentation-aiohttp-client")
     # Each is a name the switch takes: it lands in the variable opentelemetry-instrument reads.
     local = policy().encode()
     s = LAYER.decide(_config(policy(instrumentations={"disabled": ["aiohttp-client"]})), local, local,
-                     pydantic_opamp_otel.sdk_host(["otlp"]), save=lambda doc: None).apply
-    assert pydantic_opamp_otel.disabled_instrumentations(s, "") == "aiohttp-client"
+                     logfire_fleet_otel.sdk_host(), save=lambda doc: None).apply
+    assert logfire_fleet_otel.disabled_instrumentations(s, "") == "aiohttp-client"
 
 
 def _ep(name: str, dist) -> SimpleNamespace:
@@ -107,20 +109,20 @@ def test_an_instrumentation_whose_library_is_missing_is_left_out_and_one_without
     monkeypatch.setattr(metadata, "entry_points", lambda group: eps if group == "opentelemetry_instrumentor" else [])
     # django's library isn't installed: opentelemetry-instrument would skip it, so it can't run.
     monkeypatch.setattr(deps, "get_dist_dependency_conflicts", lambda d: "missing" if d is django else None)
-    got = pydantic_opamp_otel.instrumentations()
+    got = logfire_fleet_otel.instrumentations()
     assert [(i.name, i.version) for i in got] == [("flask", "0.56b0"), ("bare", ""), ("nodist", "")]
     assert parts(LAYER.components(settings_pb2.Inventory(instrumentations=got)))["instrumentations"] == {
         "bare": None, "flask": "0.56b0", "nodist": None}
     # A requirement it can't read: listed, as opentelemetry-instrument would still try it.
     monkeypatch.setattr(deps, "get_dist_dependency_conflicts", lambda d: 1 / 0)
-    assert [i.name for i in pydantic_opamp_otel.instrumentations()] == ["flask", "django", "bare", "nodist"]
+    assert [i.name for i in logfire_fleet_otel.instrumentations()] == ["flask", "django", "bare", "nodist"]
 
 
 def test_no_instrumentation_installed_is_an_empty_list(monkeypatch):
     import opentelemetry.util._importlib_metadata as metadata
 
     monkeypatch.setattr(metadata, "entry_points", lambda group: [])
-    inv = pydantic_opamp_otel.inventory(None, TracerProvider(), MeterProvider(), LoggerProvider())
+    inv = logfire_fleet_otel.inventory([])
     assert list(inv.instrumentations) == []
     got = parts(LAYER.components(inv))
     assert got["instrumentations"] == {} and got["exporters"] == {}
@@ -130,63 +132,80 @@ class _NotAnExporter(SpanProcessor):
     """A span processor with no exporter behind it (a baggage or attribute processor, say)."""
 
 
-def test_the_exporters_are_read_off_the_providers_gated_where_the_packages_gates_wrap_them():
+class _Holding(SpanProcessor):
+    """A span processor of the application's own that exports itself: the package can't wrap it."""
+
+    def __init__(self, exporter) -> None:
+        self.exporter = exporter
+
+
+def _span(name: str = "s"):
+    from opentelemetry.sdk.trace import ReadableSpan
+
+    return ReadableSpan(name=name)
+
+
+def test_every_exporter_on_the_sdks_providers_is_gated_and_what_cant_be_is_reported_ungoverned():
     from opentelemetry.exporter.otlp.proto.grpc._log_exporter import OTLPLogExporter
     from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter
     from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter as HttpSpanExporter
 
     c = Controls()
     traces = TracerProvider()
-    # As the package's Configurator builds them: behind the export processor, gated.
-    traces.add_span_processor(BatchSpanProcessor(c.spans(OTLPSpanExporter(endpoint="http://127.0.0.1:9"))))
+    # As the package's Configurator builds them, given to configure(), or added by the
+    # application: wherever an export processor holds it, the exporter gets the gate.
+    traces.add_span_processor(BatchSpanProcessor(OTLPSpanExporter(endpoint="http://127.0.0.1:9")))
     traces.add_span_processor(BatchSpanProcessor(c.spans(ConsoleSpanExporter())))
-    # Given to configure() or added by the application: nothing stops them.
-    traces.add_span_processor(SimpleSpanProcessor(HttpSpanExporter(endpoint="http://127.0.0.1:9")))
-    traces.add_span_processor(SimpleSpanProcessor(InMemorySpanExporter()))
+    traces.add_span_processor(SimpleSpanProcessor(HttpSpanExporter(endpoint="https://user:key@api.example.com/v1/traces")))
+    memory = InMemorySpanExporter()
+    traces.add_span_processor(SimpleSpanProcessor(memory))
     traces.add_span_processor(_NotAnExporter())
-    gated_otlp = pydantic_opamp_otel.GatedOtlpMetricExporter(endpoint="http://127.0.0.1:9")
+    # A processor of its own holding one: past the package's reach, so reported.
+    traces.add_span_processor(_Holding(InMemorySpanExporter()))
     meters = MeterProvider(metric_readers=[
-        PeriodicExportingMetricReader(gated_otlp, export_interval_millis=3_600_000),
         PeriodicExportingMetricReader(ConsoleMetricExporter(), export_interval_millis=3_600_000),
         InMemoryMetricReader()])
     logs = LoggerProvider()
-    logs.add_log_record_processor(BatchLogRecordProcessor(c.logs(OTLPLogExporter(endpoint="http://127.0.0.1:9"))))
-    logs.add_log_record_processor(SimpleLogRecordProcessor(ConsoleLogRecordExporter()))
+    logs.add_log_record_processor(BatchLogRecordProcessor(OTLPLogExporter(endpoint="http://127.0.0.1:9")))
+    shown = io.StringIO()
+    logs.add_log_record_processor(SimpleLogRecordProcessor(ConsoleLogRecordExporter(out=shown)))
     try:
-        got = pydantic_opamp_otel.exporters(traces, meters, logs)
+        got = logfire_fleet_otel.govern(c, traces, meters, logs)
+        # Again: nothing is gated twice.
+        again = logfire_fleet_otel.govern(c, traces, meters, logs)
+        assert listed(again.exporters) == listed(got.exporters)
+        assert type(memory) is InMemorySpanExporter and traces._active_span_processor._span_processors[3].span_exporter._to is memory
+        # The gate is in force on what was added past the package: send_traces stops it.
+        c.apply(SdkSettings().decide(_config(policy(signal_exports={"traces": {"enabled": False}})),
+                                     b"{}", b"{}", logfire_fleet_otel.sdk_host(), save=lambda doc: None).apply)
+        traces._active_span_processor._span_processors[3].on_end(_span())
+        assert memory.get_finished_spans() == ()
+        c.apply(SdkSettings().decide(_config(policy(signal_exports={"logs": {"enabled": False}})),
+                                     b"{}", b"{}", logfire_fleet_otel.sdk_host(), save=lambda doc: None).apply)
+        logs.get_logger("t").emit(body="dropped")
+        assert shown.getvalue() == ""
     finally:
         meters.shutdown()
         traces.shutdown()
         logs.shutdown()
-    assert listed(got) == [
-        ("logs", "console", False), ("logs", "otlp", True),
-        ("metrics", "InMemoryMetricReader", False), ("metrics", "console", False), ("metrics", "otlp", True),
-        ("traces", "InMemorySpanExporter", False), ("traces", "console", True), ("traces", "otlp", False),
-        ("traces", "otlp", True)]
-    # The OTLP trace exporter twice, once ungated: the layer says what's behind it can't be stopped.
-    assert parts(LAYER.components(settings_pb2.Inventory(exporters=got)))["exporters"] == {
-        "traces": {"otlp": False, "console": True, "InMemorySpanExporter": False},
-        "metrics": {"otlp": True, "console": False, "InMemoryMetricReader": False},
-        "logs": {"otlp": True, "console": False}}
-
-
-def test_a_gated_exporter_whose_send_setting_the_host_cant_carry_out_is_ungated():
-    gated_otlp = pydantic_opamp_otel.GatedOtlpMetricExporter(endpoint="http://127.0.0.1:9")
-    meters = MeterProvider(metric_readers=[PeriodicExportingMetricReader(gated_otlp, export_interval_millis=3_600_000)])
-    traces = TracerProvider()
-    traces.add_span_processor(SimpleSpanProcessor(Controls().spans(ConsoleSpanExporter())))
-    try:
-        def gated(host):
-            return listed(pydantic_opamp_otel.inventory(host, traces, meters, LoggerProvider()).exporters)
-
-        assert gated(pydantic_opamp_otel.sdk_host(["otlp"])) == [("metrics", "otlp", True), ("traces", "console", True)]
-        # Beside a console exporter, send_metrics is ignored; under another configurator, send_traces.
-        assert gated(pydantic_opamp_otel.sdk_host(["otlp", "console"])) == [
-            ("metrics", "otlp", False), ("traces", "console", True)]
-        assert gated(pydantic_opamp_otel.sdk_host(["otlp"], configured=False)) == [
-            ("metrics", "otlp", True), ("traces", "console", False)]
-    finally:
-        meters.shutdown()
+    assert got.sdk == {"traces": True, "metrics": True, "logs": True}
+    assert listed(got.exporters) == [
+        ("logs", "console", True), ("logs", "otlp", True),
+        ("metrics", "InMemoryMetricReader", False), ("metrics", "console", True),
+        ("traces", "InMemorySpanExporter", False), ("traces", "InMemorySpanExporter", True),
+        ("traces", "console", True), ("traces", "otlp", True), ("traces", "otlp", True)]
+    # Each exporter by where it sends, its credentials and path left out.
+    assert parts(LAYER.components(settings_pb2.Inventory(exporters=got.exporters)))["exporters"] == {
+        "traces": {"otlp@127.0.0.1:9": True, "otlp@api.example.com:443": True, "console": True,
+                   "InMemorySpanExporter": False},
+        "metrics": {"console": True, "InMemoryMetricReader": False},
+        "logs": {"otlp@127.0.0.1:9": True, "console": True}}
+    # The core's words, one per ungoverned exporter, as every SDK says them.
+    assert got.warnings == [
+        "the traces exporter InMemorySpanExporter sends past the policy's gates, and Fleet lists it ungoverned: "
+        "add it to the SDK's providers for the policy to govern it",
+        "the metrics exporter InMemoryMetricReader sends past the policy's gates, and Fleet lists it ungoverned: "
+        "add it to the SDK's providers for the policy to govern it"]
 
 
 def test_providers_that_arent_the_sdks_have_no_exporters():
@@ -194,8 +213,10 @@ def test_providers_that_arent_the_sdks_have_no_exporters():
     from opentelemetry.metrics import NoOpMeterProvider
     from opentelemetry.trace import NoOpTracerProvider
 
-    assert pydantic_opamp_otel.exporters(NoOpTracerProvider(), NoOpMeterProvider(), NoOpLoggerProvider()) == []
-    assert pydantic_opamp_otel.exporters(TracerProvider(), MeterProvider(), LoggerProvider()) == []
+    none = logfire_fleet_otel.govern(Controls(), NoOpTracerProvider(), NoOpMeterProvider(), NoOpLoggerProvider())
+    assert none.exporters == [] and none.sdk == {"traces": False, "metrics": False, "logs": False}
+    empty = logfire_fleet_otel.govern(Controls(), TracerProvider(), MeterProvider(), LoggerProvider())
+    assert empty.exporters == [] and empty.sdk == {"traces": True, "metrics": True, "logs": True}
 
 
 def test_an_exporter_type_no_entry_point_names_is_named_by_its_type_and_none_is_imported_to_find_out():
@@ -205,7 +226,8 @@ def test_an_exporter_type_no_entry_point_names_is_named_by_its_type_and_none_is_
     traces = TracerProvider()
     traces.add_span_processor(SimpleSpanProcessor(MySpanExporter()))
     before = set(sys.modules)
-    assert listed(pydantic_opamp_otel.exporters(traces, None, None)) == [("traces", "MySpanExporter", False)]
+    found = logfire_fleet_otel.govern(Controls(), traces, None, None)
+    assert listed(found.exporters) == [("traces", "MySpanExporter", True)]
     assert set(sys.modules) == before
 
 
@@ -243,7 +265,8 @@ def _started(server, tmp_path, configured: bool, **env) -> Agent:
     return agent
 
 
-def test_the_settings_listed_are_those_the_agents_host_carries_out_and_the_server_gets_them(tmp_path):
+def test_the_settings_listed_are_those_the_agents_host_carries_out_and_the_server_gets_them(tmp_path, monkeypatch):
+    sdk_globals(monkeypatch)
     server = _asking()
     try:
         ours = _started(server, tmp_path / "ours", configured=True)
@@ -255,15 +278,18 @@ def test_the_settings_listed_are_those_the_agents_host_carries_out_and_the_serve
     finally:
         server.close()
     for agent in (ours, theirs):
-        assert agent.components == LAYER.components(pydantic_opamp_otel.inventory(agent.host), agent.host, NOW)
+        assert agent.components == LAYER.components(logfire_fleet_otel.inventory(agent.exporters), agent.host, NOW)
     settings = parts(ours.components)["settings"]
     assert settings["sampling_rules"] == settings["send_metrics"] == "at once"
     assert settings["deactivate_instrumentations"] == "next start"
-    # Another configurator built the SDK: its sampler and trace and log exporters aren't ours, the
-    # newer settings aren't declared, and with a console metric exporter nothing stops metrics.
-    # The application's own settings are handed on whoever built the SDK.
-    assert set(parts(theirs.components)["settings"]) == {
-        "custom", "deactivate_all_instrumentations", "deactivate_instrumentations"}
+    # Another configurator built the SDK: its sampler isn't ours, so neither the sampling settings
+    # nor debug mode are declared; the gates are, on whatever SDK the global providers are. The
+    # application's own settings are handed on whoever built the SDK.
+    declared = set(parts(theirs.components)["settings"])
+    assert "custom" in declared and "deactivate_instrumentations" in declared
+    assert not declared & {*logfire_fleet_otel.SAMPLER, *logfire_fleet_otel.DEBUG}
+    assert declared >= {"send_traces", "send_metrics", "send_logs", "mask_attributes"}
+    assert declared == {*theirs.host.live, *theirs.host.next_start}
     # The first message of each carries them in full, its hash set by the client.
     sent = [m.available_components for m in server.got if m.HasField("available_components")]
     full = _full(server)
@@ -286,7 +312,7 @@ def _without_hash(c: opamp_pb2.AvailableComponents) -> opamp_pb2.AvailableCompon
 def test_an_inventory_that_cant_be_listed_leaves_the_instance_managed(tmp_path, monkeypatch, caplog):
     import test_opamp_otel
 
-    monkeypatch.setattr(pydantic_opamp_otel, "inventory", lambda host: 1 / 0)
+    monkeypatch.setattr(logfire_fleet_otel, "inventory", lambda exporters: 1 / 0)
     server = test_opamp_otel._Server()
     try:
         agent = _started(server, tmp_path, configured=True, OTEL_OPAMP_HEARTBEAT_INTERVAL="100ms")
@@ -336,18 +362,19 @@ def test_under_opentelemetry_instrument_the_inventory_is_what_it_built(tmp_path)
     finally:
         server.close()
     got = parts(sent)
-    assert got["sdk"] == {"integration.name": "pydantic-opamp-otel",
-                          "integration.version": version("pydantic-opamp-otel"),
+    assert got["sdk"] == {"integration.name": "logfire-fleet-otel",
+                          "integration.version": version("logfire-fleet-otel"),
                           "telemetry.sdk.language": "python", "telemetry.sdk.version": __version__}
     # Switched off, still listed: it can run.
     assert got["instrumentations"] == instrumentors()
-    # The OTLP metric exporter is the gated one; none for logs: no logs entry.
-    assert got["exporters"] == {"traces": {"otlp": True, "console": True}, "metrics": {"otlp": True}}
+    # Every exporter it built is gated, each OTLP one by where it sends; none for logs: no logs entry.
+    assert got["exporters"] == {"traces": {"otlp@127.0.0.1:9": True, "console": True},
+                                "metrics": {"otlp@127.0.0.1:9": True}}
     assert got["settings"]["send_metrics"] == "at once"
     assert got["settings"]["deactivate_instrumentations"] == "next start"
 
 
-def test_a_metric_exporter_beside_otlp_is_ungated_and_send_metrics_is_not_listed(tmp_path):
+def test_a_metric_exporter_beside_otlp_is_gated_too_and_send_metrics_is_listed(tmp_path):
     server = _asking()
     try:
         # Named twice, and beside one the package can't stop.
@@ -356,18 +383,18 @@ def test_a_metric_exporter_beside_otlp_is_ungated_and_send_metrics_is_not_listed
     finally:
         server.close()
     got = parts(sent)
-    # The OTLP one is behind the gate, but send_metrics is ignored: nothing reaches either.
-    assert got["exporters"] == {"metrics": {"otlp": False, "console": False}, "logs": {"console": True}}
-    assert "send_metrics" not in got["settings"] and got["settings"]["send_traces"] == "at once"
+    # Each behind the gate, the console's too: send_metrics stops both.
+    assert got["exporters"] == {"metrics": {"otlp@127.0.0.1:9": True, "console": True}, "logs": {"console": True}}
+    assert got["settings"]["send_metrics"] == got["settings"]["send_traces"] == "at once"
 
 
-def test_configure_lists_a_span_processor_it_was_given_as_ungated_and_no_instrumentation_switch(tmp_path):
+def test_configure_gates_a_span_processor_it_was_given_and_lists_no_instrumentation_switch(tmp_path):
     server = _asking()
     child = textwrap.dedent(f"""
-        import time, pydantic_opamp_otel
+        import time, logfire_fleet_otel
         from opentelemetry.sdk.trace.export import SimpleSpanProcessor
         from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
-        pydantic_opamp_otel.configure(endpoint={server.endpoint!r},
+        logfire_fleet_otel.configure(endpoint={server.endpoint!r},
                              span_processors=[SimpleSpanProcessor(InMemorySpanExporter())])
         time.sleep(0.5)
     """)
@@ -380,11 +407,50 @@ def test_configure_lists_a_span_processor_it_was_given_as_ungated_and_no_instrum
     assert run.returncode == 0, run.stderr
     [sent] = {c.SerializeToString(): c for c in _full(server)}.values()
     got = parts(sent)
-    # The span processor exports past the gate, so send_traces isn't declared: nothing stops the
-    # console exporter either, and it is ungated too.
-    assert got["exporters"] == {"traces": {"console": False, "InMemorySpanExporter": False}}
-    assert "send_traces" not in got["settings"]
+    # The span processor's exporter gets the gate as the console's does: send_traces stops both.
+    assert got["exporters"] == {"traces": {"console": True, "InMemorySpanExporter": True}}
+    assert got["settings"]["send_traces"] == "at once"
     # It instruments nothing, so nothing reads the switch; the instrumentations are still those
     # installed, under the names opentelemetry-instrument would take.
     assert "deactivate_instrumentations" not in got["settings"]
     assert got["instrumentations"] == instrumentors()
+
+
+class _FailingLayer:
+    """A layer whose Exporters call fails, as a trapped core would."""
+
+    def exporters(self, *args, **kwargs):
+        raise RuntimeError("the core trapped")
+
+
+def test_a_failing_exporters_call_leaves_the_gates_in_place_and_raises_nothing(caplog):
+    # Reporting only: the gates are in front of every exporter all the same, each exporter is
+    # listed as it was found, and the application never sees the error.
+    c = Controls()
+    traces = TracerProvider()
+    memory = InMemorySpanExporter()
+    traces.add_span_processor(SimpleSpanProcessor(memory))
+    try:
+        got = logfire_fleet_otel.govern(c, traces, MeterProvider(), LoggerProvider(), layer=_FailingLayer())
+    finally:
+        traces.shutdown()
+    assert got.exporters == [settings_pb2.Exporter(signal="traces", name="InMemorySpanExporter", gated=True)]
+    assert traces._active_span_processor._span_processors[0].span_exporter._to is memory
+    assert "can't list the exporters" in caplog.text
+
+
+def test_a_failing_exporters_call_keeps_the_names_last_decided():
+    # Identities in Fleet stay put: an exporter listed before keeps its name, one new since is
+    # listed as it was found.
+    otlp = settings_pb2.FoundExporter(signal="traces", kind="otlp_proto_grpc", gated=True, endpoint="col:4317")
+    listed_as: dict = {}
+    first = logfire_fleet_otel.Governed()
+    first.found = [otlp]
+    assert [e.name for e in first.decide(LAYER, {}, listed_as).exporters] == ["otlp"]
+    later = logfire_fleet_otel.Governed()
+    # Regression: one listed as found carried its raw endpoint, credentials and all, into the
+    # inventory. Only the core makes a destination of an endpoint: none is listed without it.
+    secret = "https://user:hunter2@col:4318/v1/traces?token=t"
+    later.found = [otlp, settings_pb2.FoundExporter(signal="traces", kind="Mine", gated=False, endpoint=secret)]
+    got = later.decide(_FailingLayer(), {}, listed_as).exporters
+    assert [(e.name, e.gated, e.destination) for e in got] == [("otlp", True, "col:4317"), ("Mine", False, "")]

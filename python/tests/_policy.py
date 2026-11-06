@@ -6,14 +6,14 @@ from __future__ import annotations
 
 import json
 
-from pydantic_opamp_client import opamp_pb2
+from logfire_fleet_client import opamp_pb2
 
 FILE = "logfire-sdk-policy.json"
 V1 = "logfire-sdk-policy/v1"
 SIGNALS = ("traces", "metrics", "logs")
 # The controls a policy may leave out (as local).
 MORE_CONTROLS = ("sampling_rules", "trace_rate_limit", "log_levels", "log_rate_limit", "attribute_redaction", "debug",
-               "app_settings", "instrumentations", "scrubbing")
+               "app_settings", "instrumentations", "scrubbing", "self_monitoring")
 
 
 def policy(every: bool | None = None, **overrides: dict) -> bytes:

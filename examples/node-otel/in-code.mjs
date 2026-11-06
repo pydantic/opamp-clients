@@ -11,7 +11,7 @@
 
 import { createRequire } from "node:module";
 
-import { register } from "@pydantic/opamp-otel";
+import { register } from "@pydantic/logfire-fleet-otel";
 
 const { shutdown } = register({
   endpoint: process.env.APP_OPAMP_URL,

@@ -3,7 +3,7 @@
 
 // Logfire SDK policies for the tests, as a server sends them (docs/sdk-settings.md).
 
-import { type AgentRemoteConfig, AgentRemoteConfigSchema, create, type EffectiveConfig } from "@pydantic/opamp-client";
+import { type AgentRemoteConfig, AgentRemoteConfigSchema, create, type EffectiveConfig } from "@pydantic/logfire-fleet-client";
 
 export const FILE = "logfire-sdk-policy.json";
 export const V1 = "logfire-sdk-policy/v1";
@@ -19,6 +19,7 @@ const MORE_CONTROLS = [
   "app_settings",
   "instrumentations",
   "scrubbing",
+  "self_monitoring",
 ] as const;
 
 type Fields = Record<string, unknown>;
@@ -36,6 +37,7 @@ export interface Overrides {
   app_settings?: Fields;
   instrumentations?: Fields;
   scrubbing?: Fields;
+  self_monitoring?: Fields;
 }
 
 /**

@@ -798,10 +798,10 @@ func TestBadOptions(t *testing.T) {
 		if cfg.Endpoint == "" {
 			cfg.Endpoint = "http://127.0.0.1:1"
 		}
-		// In each mode that takes the option: an HTTPClient is platform mode's (and selects it).
+		// In each mode that takes the option: an HTTPClient is platform mode's alone.
 		modes := []Mode{ModePlatform, ModeCore}
 		if cfg.HTTPClient != nil {
-			modes = []Mode{"", ModePlatform}
+			modes = []Mode{ModePlatform}
 		}
 		for _, mode := range modes {
 			cfg.Mode = mode
@@ -811,8 +811,8 @@ func TestBadOptions(t *testing.T) {
 			}
 		}
 	}
-	// A wrapped RoundTripper is fine over plain HTTP (the HTTPClient selects platform mode).
-	c, err := Start(context.Background(), Config{Endpoint: "http://127.0.0.1:1", HTTPClient: wrapped}, Status{}, nil)
+	// A wrapped RoundTripper is fine over plain HTTP in platform mode.
+	c, err := Start(context.Background(), Config{Endpoint: "http://127.0.0.1:1", Mode: ModePlatform, HTTPClient: wrapped}, Status{}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}

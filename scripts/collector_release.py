@@ -49,6 +49,9 @@ PINNING = ["go/**/go.mod", "go/**/*.yaml", "go/**/*.sh", "go/**/*.ps1", ".github
 MODULE = re.compile(r"(go\.opentelemetry\.io/collector[\w./-]*|github\.com/open-telemetry/opentelemetry-collector-contrib"
                     r"[\w./-]*)(?: |@)(v\d+\.\d+\.\d+)\b")
 TAG = re.compile(r"refs/tags/(v0\.\d+\.\d+)$")
+# An ocb manifest's dist.version: the version the built collector reports (its service.version),
+# which names the contrib release it is built from.
+DIST_VERSION = re.compile(r"^  version: \"?(\d+\.\d+\.\d+)\"?\s*(?:#.*)?$")
 # Each fork: upstream's directory, this repository's, and the Go module paths that differ.
 FORKS = {
     "cmd/opampsupervisor": ("go/opampsupervisor", "github.com/open-telemetry/opentelemetry-collector-contrib/cmd/opampsupervisor",
@@ -80,7 +83,11 @@ def pins(root: Path) -> dict[str, dict[str, list[str]]]:
     found: dict[str, dict[str, list[str]]] = {"contrib": {}, "0.x": {}, "1.x": {}}
     paths = sorted({path for pattern in PINNING for path in root.glob(pattern) if path.is_file()})
     for path in paths:
-        for number, line in enumerate(path.read_text(errors="replace").splitlines(), start=1):
+        text = path.read_text(errors="replace")
+        manifest = path.suffix == ".yaml" and re.search(r"^dist:", text, re.M) is not None
+        for number, line in enumerate(text.splitlines(), start=1):
+            if manifest and (match := DIST_VERSION.match(line)):
+                found["contrib"].setdefault("v" + match.group(1), []).append(f"{path.relative_to(root)}:{number}")
             for match in MODULE.finditer(line):
                 tag = match.group(2)
                 if "opentelemetry-collector-contrib" in match.group(1):

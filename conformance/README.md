@@ -12,7 +12,11 @@ which checks the server as well: the runner builds what comes from them there an
   agent as if it had restarted. It logs every frame and connection event as JSON lines. A
   scenario's times (`at_s`, `window_s`, a hold's `from_s`) count from the driver's first request
   (`first_contact` in the log), not from the server's start: a driver in a container that starts
-  seconds late meets the faults at the same point of its run as one in process.
+  seconds late meets the faults at the same point of its run as one in process. With
+  `"sdk_fixture": true` in a scenario's `server` it is the SDK integrations' fixture instead
+  (`server/fixture.go`, run by `examples/integrations.py`): offers stay in force until the agent
+  has them, an `enrollment_key` hands out and rotates keys, and a sink of its own records the
+  example applications' telemetry.
 - The Rust reference server, built from the core's sources (`OPAMP_CORE_ROOT`). It takes the Go
   server's flags and writes the same log, plus a `core` event for each decision it
   makes. It injects no faults: it is here to be tested, not to test.

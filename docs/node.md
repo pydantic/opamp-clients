@@ -1,6 +1,6 @@
 # Node.js
 
-`@pydantic/opamp-client` is this repository's OpAMP client for Node.js, in
+`@pydantic/logfire-fleet-client` is this repository's OpAMP client for Node.js, in
 [`node/opamp/`](../node/opamp/). It runs the shared core in Node's own WebAssembly engine:
 nothing native to install ([how-it-works.md](how-it-works.md)). It speaks plain HTTP or
 WebSocket, with TLS and through HTTP or SOCKS5 proxies, and is written in TypeScript, with
@@ -10,19 +10,10 @@ protobuf-es types for OpAMP's messages. It needs Node.js 22 or later. Its
 ## Install
 
 ```bash
-npm install @pydantic/opamp-client
+npm install @pydantic/logfire-fleet-client
 ```
 
-The package is not on npm yet ([sdk-registries.md](sdk-registries.md)). Until it is, build it in a
-checkout and install it from there:
-
-```bash
-cd node/opamp
-npm ci
-npm run build                          # compiles to dist/
-cd /path/to/your/app
-npm install /path/to/checkout/node/opamp
-```
+The core is a WebAssembly module inside the package: nothing native to install.
 
 ## Start and stop
 
@@ -35,7 +26,7 @@ import {
   RemoteConfigStatusSchema,
   RemoteConfigStatuses,
   create,
-} from "@pydantic/opamp-client";
+} from "@pydantic/logfire-fleet-client";
 
 const client = Client.start(
   {
@@ -150,7 +141,7 @@ node-core-platform,node-core` ([conformance/README.md](../conformance/README.md)
 
 ## OpenTelemetry
 
-To put the OpenTelemetry SDK under a server without writing code, use `@pydantic/opamp-otel`:
+To put the OpenTelemetry SDK under a server without writing code, use `@pydantic/logfire-fleet-otel`:
 [node-otel.md](node-otel.md). To wire this client to an SDK by hand, see [sdks.md](sdks.md) and
-[examples/node](../examples/node/example.mjs). `@pydantic/opamp-client/sdk` runs the shared SDK
+[examples/node](../examples/node/example.mjs). `@pydantic/logfire-fleet-client/sdk` runs the shared SDK
 settings layer ([sdk-settings.md](sdk-settings.md)).

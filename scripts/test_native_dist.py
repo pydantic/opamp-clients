@@ -24,9 +24,9 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import native_dist as nd  # noqa: E402
 
 nd.TARGETS_ALL = list(nd.TARGETS)  # (OPAMP_NATIVE_TARGETS unset)
-CLIENT = "wheels/pydantic_opamp_client-0.1.0-py3-none-any.whl"
-HOSTING_DLL = "lib/net8.0/Pydantic.OpAmp.Extensions.Hosting.dll"
-HOSTING_DLL_10 = "lib/net10.0/Pydantic.OpAmp.Extensions.Hosting.dll"
+CLIENT = "wheels/logfire_fleet_client-0.1.0-py3-none-any.whl"
+HOSTING_DLL = "lib/net8.0/Logfire.Fleet.Extensions.Hosting.dll"
+HOSTING_DLL_10 = "lib/net10.0/Logfire.Fleet.Extensions.Hosting.dll"
 
 
 class CompiledOnly(unittest.TestCase):
@@ -37,7 +37,7 @@ class CompiledOnly(unittest.TestCase):
         self._saved = nd.DIST, nd.TARGETS, nd.file_says
         nd.DIST, nd.TARGETS = self.dist, []
         nd.file_says = lambda path: "ELF 64-bit LSB shared object, x86-64"
-        self.archive(CLIENT, "pydantic_opamp_client/__init__.py", "pydantic_opamp_client/_native.py")
+        self.archive(CLIENT, "logfire_fleet_client/__init__.py", "logfire_fleet_client/_native.py")
 
     def tearDown(self) -> None:
         nd.DIST, nd.TARGETS, nd.file_says = self._saved
@@ -69,21 +69,22 @@ class CompiledOnly(unittest.TestCase):
     def packages(self, *client_extra: str, core: tuple[str, ...] = ("runtimes/linux-x64/native/libopamp_native.so",
                                                                      *nd.CORE_LICENSE),
                  core_license: str = '<license type="file">LICENSE.txt</license>', depends: str | None = None,
-                 assembly: tuple[str, ...] = ("lib/net8.0/Pydantic.OpAmp.Client.dll", "lib/net10.0/Pydantic.OpAmp.Client.dll"),
-                 hosting: tuple[str, ...] = (HOSTING_DLL, "lib/net8.0/Pydantic.OpAmp.Extensions.Hosting.xml", HOSTING_DLL_10,
-                                             "lib/net10.0/Pydantic.OpAmp.Extensions.Hosting.xml"),
-                 hosting_depends: str = "Pydantic.OpAmp.Client") -> None:
-        nuspec = f'<dependency id="Pydantic.OpAmp.Core.Native" version="{depends or f"[{nd.core_version()}]"}" />'
-        with zipfile.ZipFile(self.dist / "nuget" / "Pydantic.OpAmp.Client.0.1.0.nupkg", "w") as z:
-            z.writestr("Pydantic.OpAmp.Client.nuspec", nuspec)
+                 assembly: tuple[str, ...] = ("lib/net8.0/Logfire.Fleet.Client.dll", "lib/net10.0/Logfire.Fleet.Client.dll"),
+                 hosting: tuple[str, ...] = (HOSTING_DLL, "lib/net8.0/Logfire.Fleet.Extensions.Hosting.xml", HOSTING_DLL_10,
+                                             "lib/net10.0/Logfire.Fleet.Extensions.Hosting.xml"),
+                 hosting_depends: str = "Logfire.Fleet.Client", hosting_readme: str = "") -> None:
+        nuspec = f'<dependency id="Logfire.Fleet.Core.Native" version="{depends or f"[{nd.core_version()}]"}" />'
+        with zipfile.ZipFile(self.dist / "nuget" / "Logfire.Fleet.Client.0.1.0.nupkg", "w") as z:
+            z.writestr("Logfire.Fleet.Client.nuspec", nuspec)
             for m in (*assembly, *client_extra):
                 z.writestr(m, "")
-        with zipfile.ZipFile(self.dist / "nuget" / "Pydantic.OpAmp.Extensions.Hosting.0.1.0.nupkg", "w") as z:
-            z.writestr("Pydantic.OpAmp.Extensions.Hosting.nuspec", f'<dependency id="{hosting_depends}" version="0.1.0" />')
+        with zipfile.ZipFile(self.dist / "nuget" / "Logfire.Fleet.Extensions.Hosting.0.1.0.nupkg", "w") as z:
+            z.writestr("Logfire.Fleet.Extensions.Hosting.nuspec",
+                       f'{hosting_readme}<dependency id="{hosting_depends}" version="0.1.0" />')
             for m in hosting:
                 z.writestr(m, "")
-        with zipfile.ZipFile(self.dist / "nuget" / "Pydantic.OpAmp.Core.Native.0.1.0.nupkg", "w") as z:
-            z.writestr("Pydantic.OpAmp.Core.Native.nuspec", core_license)
+        with zipfile.ZipFile(self.dist / "nuget" / "Logfire.Fleet.Core.Native.0.1.0.nupkg", "w") as z:
+            z.writestr("Logfire.Fleet.Core.Native.nuspec", core_license)
             for m in ("[Content_Types].xml", "_rels/.rels", "package/services/metadata/core-properties/x.psmdcp", *core):
                 z.writestr(m, "")
 
@@ -95,25 +96,25 @@ class CompiledOnly(unittest.TestCase):
     def test_the_library_in_the_client_package_fails(self) -> None:
         self.core_wheel()
         self.packages("runtimes/linux-x64/native/libopamp_native.so")
-        self.assertIn("Pydantic.OpAmp.Client.0.1.0.nupkg: ships runtimes/linux-x64/native/libopamp_native.so",
+        self.assertIn("Logfire.Fleet.Client.0.1.0.nupkg: ships runtimes/linux-x64/native/libopamp_native.so",
                       self.problems())
 
     def test_a_client_package_without_its_assembly_fails(self) -> None:
         self.core_wheel()
-        self.packages(assembly=("lib/net8.0/Other.dll", "lib/net10.0/Pydantic.OpAmp.Client.dll"))
-        self.assertIn("Pydantic.OpAmp.Client.0.1.0.nupkg: lacks lib/net8.0/Pydantic.OpAmp.Client.dll", self.problems())
+        self.packages(assembly=("lib/net8.0/Other.dll", "lib/net10.0/Logfire.Fleet.Client.dll"))
+        self.assertIn("Logfire.Fleet.Client.0.1.0.nupkg: lacks lib/net8.0/Logfire.Fleet.Client.dll", self.problems())
 
     # Packed on an SDK older than 10, the packages hold net8.0 alone.
     def test_a_package_without_its_net10_assembly_fails(self) -> None:
         self.core_wheel()
-        self.packages(assembly=("lib/net8.0/Pydantic.OpAmp.Client.dll",), hosting=(HOSTING_DLL,))
+        self.packages(assembly=("lib/net8.0/Logfire.Fleet.Client.dll",), hosting=(HOSTING_DLL,))
         problems = self.problems()
-        self.assertIn("Pydantic.OpAmp.Client.0.1.0.nupkg: lacks lib/net10.0/Pydantic.OpAmp.Client.dll", problems)
-        self.assertIn(f"Pydantic.OpAmp.Extensions.Hosting.0.1.0.nupkg: lacks {HOSTING_DLL_10}", problems)
+        self.assertIn("Logfire.Fleet.Client.0.1.0.nupkg: lacks lib/net10.0/Logfire.Fleet.Client.dll", problems)
+        self.assertIn(f"Logfire.Fleet.Extensions.Hosting.0.1.0.nupkg: lacks {HOSTING_DLL_10}", problems)
 
     def test_a_missing_package_fails(self) -> None:
         self.core_wheel()
-        for name in ("Pydantic.OpAmp.Core.Native", "Pydantic.OpAmp.Client", "Pydantic.OpAmp.Extensions.Hosting"):
+        for name in ("Logfire.Fleet.Core.Native", "Logfire.Fleet.Client", "Logfire.Fleet.Extensions.Hosting"):
             self.packages()
             (self.dist / "nuget" / f"{name}.0.1.0.nupkg").unlink()
             self.assertIn(f"0 {name} packages, not 1", self.problems())
@@ -121,14 +122,14 @@ class CompiledOnly(unittest.TestCase):
     def test_a_client_package_not_on_the_core_package_fails(self) -> None:
         self.core_wheel()
         self.packages(depends=nd.core_version())
-        self.assertIn(f"doesn't depend on Pydantic.OpAmp.Core.Native {nd.core_version()} exactly", self.problems())
+        self.assertIn(f"doesn't depend on Logfire.Fleet.Core.Native {nd.core_version()} exactly", self.problems())
 
     def test_a_core_package_missing_a_library_or_holding_anything_else_fails(self) -> None:
         self.core_wheel()
         lib = "runtimes/linux-x64/native/libopamp_native.so"
         for core in ((), (lib, "lib/net8.0/x.dll"), (lib, "content/x.txt"), (lib, "x.txt"), (lib, "contentFiles/any/any/x.rs")):
             self.packages(core=(*core, *nd.CORE_LICENSE))
-            self.assertIn("Pydantic.OpAmp.Core.Native.0.1.0.nupkg: holds", self.problems())
+            self.assertIn("Logfire.Fleet.Core.Native.0.1.0.nupkg: holds", self.problems())
 
     # The core goes nowhere without its license and the notices beside it.
     def test_a_core_package_without_the_cores_license_fails(self) -> None:
@@ -136,9 +137,9 @@ class CompiledOnly(unittest.TestCase):
         lib = "runtimes/linux-x64/native/libopamp_native.so"
         for core in ((lib,), (lib, "LICENSE.txt"), (lib, "THIRD_PARTY_NOTICES.txt")):
             self.packages(core=core)
-            self.assertIn("Pydantic.OpAmp.Core.Native.0.1.0.nupkg: holds", self.problems())
+            self.assertIn("Logfire.Fleet.Core.Native.0.1.0.nupkg: holds", self.problems())
         self.packages(core_license="<license type=\"expression\">MIT</license>")
-        self.assertIn("Pydantic.OpAmp.Core.Native.0.1.0.nupkg: its license isn't LICENSE.txt", self.problems())
+        self.assertIn("Logfire.Fleet.Core.Native.0.1.0.nupkg: its license isn't LICENSE.txt", self.problems())
 
     def test_a_core_wheel_without_the_cores_license_fails(self) -> None:
         self.packages()
@@ -146,35 +147,46 @@ class CompiledOnly(unittest.TestCase):
         lib.parent.mkdir(parents=True)
         lib.write_bytes(b"\x7fELF")
         nd.TARGETS = [t for t in nd.TARGETS_ALL if t.rid == "linux-x64"]
-        name = f"pydantic_opamp_core-0.1.0-py3-none-{nd.TARGETS[0].plat}.whl"
-        self.archive(f"wheels/{name}", "pydantic_opamp_core/libopamp_native.so",
-                     "pydantic_opamp_core-0.1.0.dist-info/licenses/LICENSE.txt")
+        name = f"logfire_fleet_core-0.1.0-py3-none-{nd.TARGETS[0].plat}.whl"
+        self.archive(f"wheels/{name}", "logfire_fleet_core/libopamp_native.so",
+                     "logfire_fleet_core-0.1.0.dist-info/licenses/LICENSE.txt")
         self.assertIn(f"{name}: lacks .dist-info/licenses/THIRD_PARTY_NOTICES.txt", self.problems())
 
     def test_the_hosting_package_is_its_assembly_on_the_client_package(self) -> None:
         self.core_wheel()
-        hosting = "Pydantic.OpAmp.Extensions.Hosting.0.1.0.nupkg"
+        hosting = "Logfire.Fleet.Extensions.Hosting.0.1.0.nupkg"
         # The client's assembly, a library, or the shared sources would be shipped twice, or as source.
-        for extra in ("lib/net8.0/Pydantic.OpAmp.Client.dll", "runtimes/linux-x64/native/libopamp_native.so",
+        for extra in ("lib/net8.0/Logfire.Fleet.Client.dll", "runtimes/linux-x64/native/libopamp_native.so",
                       "contentFiles/cs/any/shared/Controls.cs"):
             self.packages(hosting=(HOSTING_DLL, HOSTING_DLL_10, extra))
             self.assertIn(f"{hosting}: ships {extra}", self.problems())
         self.packages(hosting=("lib/net8.0/Other.dll", HOSTING_DLL_10))
         self.assertIn(f"{hosting}: lacks {HOSTING_DLL}", self.problems())
-        self.packages(hosting_depends="Pydantic.OpAmp.Core.Native")
-        self.assertIn(f"{hosting}: doesn't depend on Pydantic.OpAmp.Client", self.problems())
+        self.packages(hosting_depends="Logfire.Fleet.Core.Native")
+        self.assertIn(f"{hosting}: doesn't depend on Logfire.Fleet.Client", self.problems())
+
+    # NuGet's page shows the README the nuspec names: that one file, and no other, may ride along.
+    def test_the_hosting_package_may_carry_the_readme_its_nuspec_names(self) -> None:
+        self.core_wheel()
+        hosting = "Logfire.Fleet.Extensions.Hosting.0.1.0.nupkg"
+        self.packages(hosting=(HOSTING_DLL, HOSTING_DLL_10, "README.md"), hosting_readme="<readme>README.md</readme>")
+        self.assertEqual(self.problems(), "")
+        self.packages(hosting=(HOSTING_DLL, HOSTING_DLL_10, "README.md"))
+        self.assertIn(f"{hosting}: ships README.md", self.problems())
+        self.packages(hosting=(HOSTING_DLL, HOSTING_DLL_10, "NOTES.md"), hosting_readme="<readme>README.md</readme>")
+        self.assertIn(f"{hosting}: ships NOTES.md", self.problems())
 
     def test_a_binary_in_the_client_fails(self) -> None:
-        self.archive(CLIENT, "pydantic_opamp_client/__init__.py", "pydantic_opamp_client/_native.abi3.so")
-        self.assertIn("ships pydantic_opamp_client/_native.abi3.so", self.problems())
+        self.archive(CLIENT, "logfire_fleet_client/__init__.py", "logfire_fleet_client/_native.abi3.so")
+        self.assertIn("ships logfire_fleet_client/_native.abi3.so", self.problems())
 
     def test_python_in_the_core_wheel_fails(self) -> None:
-        self.core_wheel("pydantic_opamp_core/__init__.py")
-        self.assertIn("not pydantic_opamp_core/libopamp_native.so alone", self.problems())
+        self.core_wheel("logfire_fleet_core/__init__.py")
+        self.assertIn("not logfire_fleet_core/libopamp_native.so alone", self.problems())
 
     def test_a_target_without_its_core_wheel_fails(self) -> None:
         self.core_wheel()
-        (next((self.dist / "wheels").glob("pydantic_opamp_core-*.whl"))).unlink()
+        (next((self.dist / "wheels").glob("logfire_fleet_core-*.whl"))).unlink()
         self.assertIn("0 core wheels", self.problems())
 
     def test_a_source_distribution_fails(self) -> None:
@@ -182,11 +194,11 @@ class CompiledOnly(unittest.TestCase):
         self.assertIn("a source distribution", self.problems())
 
     def test_rust_sources_in_a_wheel_fail(self) -> None:
-        self.archive(CLIENT, "pydantic_opamp_client/__init__.py", "src/lib.rs")
+        self.archive(CLIENT, "logfire_fleet_client/__init__.py", "src/lib.rs")
         self.assertIn("ships src/lib.rs", self.problems())
 
     def test_a_crate_manifest_in_the_package_fails(self) -> None:
-        self.archive("nuget/Pydantic.OpAmp.Core.Native.0.1.0.nupkg", "Pydantic.OpAmp.Core.Native.nuspec",
+        self.archive("nuget/Logfire.Fleet.Core.Native.0.1.0.nupkg", "Logfire.Fleet.Core.Native.nuspec",
                      "runtimes/linux-x64/native/libopamp_native.so", "core/Cargo.toml")
         self.assertIn("ships core/Cargo.toml", self.problems())
 
@@ -196,10 +208,10 @@ class CoreWheel(unittest.TestCase):
         d = Path(tempfile.mkdtemp())
         (d / "libopamp_native.so").write_bytes(b"compiled")
         path = nd.build_backend.wheel(d / "libopamp_native.so", "musllinux_1_2_aarch64", d / "out")
-        self.assertEqual(path.name, "pydantic_opamp_core-0.1.0-py3-none-musllinux_1_2_aarch64.whl")
+        self.assertEqual(path.name, "logfire_fleet_core-0.1.0-py3-none-musllinux_1_2_aarch64.whl")
         with zipfile.ZipFile(path) as z:
             names = z.namelist()
-            self.assertEqual(z.read("pydantic_opamp_core/libopamp_native.so"), b"compiled")
+            self.assertEqual(z.read("logfire_fleet_core/libopamp_native.so"), b"compiled")
             self.assertIn("Tag: py3-none-musllinux_1_2_aarch64", z.read(names[2]).decode())
             self.assertIn("Root-Is-Purelib: false", z.read(names[2]).decode())
             for line in z.read(names[-1]).decode().splitlines()[:-1]:
@@ -207,12 +219,12 @@ class CoreWheel(unittest.TestCase):
                 data = z.read(name)
                 want = base64.urlsafe_b64encode(hashlib.sha256(data).digest()).rstrip(b"=").decode()
                 self.assertEqual((digest, int(size)), (f"sha256={want}", len(data)), name)
-        self.assertEqual(names, ["pydantic_opamp_core/libopamp_native.so", *(f"pydantic_opamp_core-0.1.0.dist-info/{f}"
+        self.assertEqual(names, ["logfire_fleet_core/libopamp_native.so", *(f"logfire_fleet_core-0.1.0.dist-info/{f}"
                                                                      for f in ("METADATA", "WHEEL", "licenses/LICENSE.txt",
                                                                                "licenses/THIRD_PARTY_NOTICES.txt", "RECORD"))])
         with zipfile.ZipFile(path) as z:
             for f in nd.CORE_LICENSE:
-                self.assertEqual(z.read(f"pydantic_opamp_core-0.1.0.dist-info/licenses/{f}"),
+                self.assertEqual(z.read(f"logfire_fleet_core-0.1.0.dist-info/licenses/{f}"),
                                  (nd.build_backend.HERE / f).read_bytes())
 
     # PEP 639: the expression, and each license file the wheel holds, named in its metadata.
@@ -221,7 +233,7 @@ class CoreWheel(unittest.TestCase):
         (d / "libopamp_native.so").write_bytes(b"compiled")
         path = nd.build_backend.wheel(d / "libopamp_native.so", "musllinux_1_2_aarch64", d / "out")
         with zipfile.ZipFile(path) as z:
-            head = z.read("pydantic_opamp_core-0.1.0.dist-info/METADATA").decode().partition("\n\n")[0].splitlines()
+            head = z.read("logfire_fleet_core-0.1.0.dist-info/METADATA").decode().partition("\n\n")[0].splitlines()
         self.assertIn("License-Expression: MIT AND LicenseRef-Pydantic-OpAMP-Core-Binary", head)
         self.assertEqual([h for h in head if h.startswith("License-File:")],
                          ["License-File: LICENSE.txt", "License-File: THIRD_PARTY_NOTICES.txt"])
@@ -232,7 +244,7 @@ class CoreWheel(unittest.TestCase):
         (d / "libopamp_native.so").write_bytes(b"compiled")
         path = nd.build_backend.wheel(d / "libopamp_native.so", "musllinux_1_2_aarch64", d / "out")
         with zipfile.ZipFile(path) as z:
-            head, _, body = z.read("pydantic_opamp_core-0.1.0.dist-info/METADATA").decode().partition("\n\n")
+            head, _, body = z.read("logfire_fleet_core-0.1.0.dist-info/METADATA").decode().partition("\n\n")
         self.assertIn("Description-Content-Type: text/markdown", head.splitlines())
         self.assertEqual(body, (nd.build_backend.HERE / "README.md").read_text())
 

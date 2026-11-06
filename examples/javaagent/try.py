@@ -34,9 +34,9 @@ health again once the exports fail (after the exporter's retries), and again onc
 Then check_truth (examples/integrations.py), once for each setup Setups.java makes, a second
 agent extension built here and given to the agent only when EXAMPLE_SETUP names a setup:
 extension-processor (a span processor, a log record processor and a metric reader of its own,
-exporting to the same sink) and extension-sampler (a sampler of its own). Each setting the server
-offers must show in the telemetry or be named as set aside, and the set-aside settings must be
-exactly what the setup takes from the extension's control.
+exporting to a second sink) and extension-sampler (a sampler of its own). Each setting the server
+offers must show in the telemetry or be named as set aside; only the extension's sampler sets any
+aside (its settings), and the extension's own exporters are reported ungoverned.
 
 Then check_app_settings (examples/integrations.py, its own runs 7 and 8): App.java reads the
 feature flag example.feature (AppSettings.get), which the server turns on and off, and is told of
@@ -60,7 +60,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from integrations import (  # noqa: E402
-    MARGIN, ROOT, check, check_app_settings, check_setup, check_rotation, check_signals, check_truth, ended, main, offer, pings, run, sent_before, statuses,
+    MARGIN, ROOT, check, check_app_settings, check_setup, check_rotation, check_outage, check_signals, check_truth, ended, main, offer, pings, run, sent_before, statuses,
     stop_container, stop_group, target, opamp_url,
 )
 
@@ -156,8 +156,8 @@ def copy_jars() -> None:
     """The extension, and the application's side of its own settings (AppSettings), which the
     program compiles against and runs with (docs/app-settings.md)."""
     built = ROOT / "java/opamp-javaagent/target"
-    shutil.copy(built / "opamp-javaagent-extension-0.1.0-SNAPSHOT.jar", TARGET / "opamp-javaagent-extension.jar")
-    shutil.copy(built / "opamp-javaagent-extension-0.1.0-SNAPSHOT-app-settings.jar", TARGET / APP_SETTINGS)
+    shutil.copy(built / "logfire-fleet-javaagent-extension-0.1.0-SNAPSHOT.jar", TARGET / "logfire-fleet-javaagent-extension.jar")
+    shutil.copy(built / "logfire-fleet-javaagent-extension-0.1.0-SNAPSHOT-app-settings.jar", TARGET / APP_SETTINGS)
 
 
 HOST = "127.0.0.1" if LOCAL else "host.docker.internal"
@@ -178,7 +178,7 @@ def launch(port: str, telemetry_port: str, state: Path, name: str, extra: dict[s
         "OTEL_BSP_SCHEDULE_DELAY": "500",
     } | extra
     agent = TARGET if LOCAL else Path("/agent")
-    extensions = f"{agent}/opamp-javaagent-extension.jar"
+    extensions = f"{agent}/logfire-fleet-javaagent-extension.jar"
     if env.get("EXAMPLE_SETUP"):  # check_truth's setups: a second extension (Setups.java)
         extensions += f",{agent}/{SETUPS}"
     java = ["java", f"-javaagent:{agent}/{AGENT_JAR}", f"-Dotel.javaagent.extensions={extensions}",
@@ -459,9 +459,8 @@ def check_matching_settings(launch_, target_: Path, listen: str) -> bool:
 
 
 #: What another extension's span processor, log record processor and metric reader (Setups.java)
-#: take from the extension's control: their signals' gates, set aside. The sampler stays its own.
-EXTENSION_PROCESSOR = {"send_traces", "send_metrics", "send_logs", "send_logs_level", "send_logs_level_by_scope",
-                       "send_logs_per_second", "mask_attributes", "drop_attributes"}
+#: export through, beside the agent's: an exporter of each signal past the gates, reported ungoverned.
+EXTENSION_PROCESSOR = frozenset({"traces", "metrics", "logs"})
 #: What another extension's sampler (Setups.java) takes: the settings the extension's sampler holds.
 EXTENSION_SAMPLER = {"sampling_rate", "sampling_rules", "sampling_traces_per_second"}
 
@@ -471,12 +470,13 @@ CHECKS = {
     "signals": lambda: check_signals(launch, TARGET, listen=LISTEN),
     "setup": lambda: check_setup(launch, TARGET, listen=LISTEN),
     "rotation": lambda: check_rotation(launch, TARGET, listen=LISTEN, host=HOST),
+    "outage": lambda: check_outage(launch, TARGET, listen=LISTEN),
     "matching": lambda: check_matching_settings(launch, TARGET, listen=LISTEN),
     "app": lambda: check_app_settings(launch, TARGET, listen=LISTEN),
-    "truth-extension-processor": lambda: check_truth(launch, TARGET, "extension-processor", EXTENSION_PROCESSOR,
-                                                     listen=LISTEN),
+    "truth-extension-processor": lambda: check_truth(launch, TARGET, "extension-processor", set(), listen=LISTEN,
+                                                     ungoverned=EXTENSION_PROCESSOR, host=HOST),
     "truth-extension-sampler": lambda: check_truth(launch, TARGET, "extension-sampler", EXTENSION_SAMPLER,
-                                                   listen=LISTEN),
+                                                   listen=LISTEN, host=HOST),
 }
 
 if __name__ == "__main__":

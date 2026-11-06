@@ -3,10 +3,10 @@
 
 // The setups check_truth runs app.cjs and app.mjs under (examples/integrations.py): what an
 // application does beside the SDK the register built, named in EXAMPLE_SETUP (comma-separated).
-// Each builds a provider of its own, exporting over OTLP to the same place as the SDK's, and
-// registers it as the global one in place of the register's (the API refuses a second one until
-// the first is disabled). What the application then sends through the API goes past the
-// package's sampler and gates.
+// Each builds a provider of its own, exporting over OTLP to a second sink (EXAMPLE_SECOND_SINK),
+// and registers it as the global one in place of the register's (the API refuses a second one
+// until the first is disabled). What the application then sends through the API goes past the
+// package's sampler and gates: the package reports that signal's ungoverned app_provider.
 //
 // - `own-tracer-provider`: a tracer provider; the application traces each request with it too,
 //   in a span that carries the request's URL.
@@ -23,12 +23,15 @@ const { detectResources, envDetector } = require("@opentelemetry/resources");
 // The application's own resource: OTEL_SERVICE_NAME and OTEL_RESOURCE_ATTRIBUTES, as the SDK's.
 const resource = detectResources({ detectors: [envDetector] });
 
+// The second sink's endpoint for a signal.
+const secondSink = (signal) => ({ url: `${process.env.EXAMPLE_SECOND_SINK}/v1/${signal}` });
+
 function ownTracerProvider() {
   const { NodeTracerProvider } = require("@opentelemetry/sdk-trace-node");
   const { BatchSpanProcessor } = require("@opentelemetry/sdk-trace-base");
   const { OTLPTraceExporter } = require("@opentelemetry/exporter-trace-otlp-proto");
   api.trace.disable();
-  new NodeTracerProvider({ resource, spanProcessors: [new BatchSpanProcessor(new OTLPTraceExporter())] }).register();
+  new NodeTracerProvider({ resource, spanProcessors: [new BatchSpanProcessor(new OTLPTraceExporter(secondSink("traces")))] }).register();
   const tracer = api.trace.getTracer("checkout");
   // Beside the request, not around it: the http instrumentation's span isn't its child.
   return (url) => tracer.startSpan("GET", { kind: api.SpanKind.CLIENT, attributes: { "url.full": url } }).end();
@@ -40,7 +43,7 @@ function ownLoggerProvider() {
   logs.disable();
   logs.setGlobalLoggerProvider(new LoggerProvider({
     resource,
-    processors: [new BatchLogRecordProcessor({ exporter: new OTLPLogExporter() })],
+    processors: [new BatchLogRecordProcessor({ exporter: new OTLPLogExporter(secondSink("logs")) })],
   }));
 }
 
@@ -51,7 +54,7 @@ function ownMeterProvider() {
   api.metrics.setGlobalMeterProvider(new MeterProvider({
     resource,
     readers: [new PeriodicExportingMetricReader({
-      exporter: new OTLPMetricExporter(), exportIntervalMillis: Number(process.env.OTEL_METRIC_EXPORT_INTERVAL || 60000),
+      exporter: new OTLPMetricExporter(secondSink("metrics")), exportIntervalMillis: Number(process.env.OTEL_METRIC_EXPORT_INTERVAL || 60000),
     })],
   }));
   const requests = api.metrics.getMeter("checkout").createCounter("checkout.requests");

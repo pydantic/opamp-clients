@@ -1,7 +1,7 @@
 // Copyright (c) 2026 Pydantic Services Inc.
 // SPDX-License-Identifier: MIT
 
-// `node --import @pydantic/opamp-otel/register app.js`: upstream's auto-instrumentation register,
+// `node --import @pydantic/logfire-fleet-otel/register app.js`: upstream's auto-instrumentation register,
 // under the OpAMP server named by OTEL_OPAMP_ENDPOINT (docs/node-otel.md).
 
 import { createRequire, register as registerHooks } from "node:module";

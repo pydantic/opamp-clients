@@ -20,6 +20,7 @@ usage() {
 usage: pydantic-opamp-enroll --endpoint URL [--token-file PATH] [--ca-file PATH] [--plaintext]
                              [--restricted [--exporter-endpoint URL]... [--log-path PATH]... [--host-logs]]
                              [--accept-packages] [--no-start]
+       pydantic-opamp-enroll --refresh
 
   --endpoint URL           the OpAMP server: wss:// or https:// (ws:// and http:// need --plaintext)
   --telemetry-token-stdin  read the enrollment token, then the telemetry token, on two input lines
@@ -37,6 +38,9 @@ usage: pydantic-opamp-enroll --endpoint URL [--token-file PATH] [--ca-file PATH]
   --accept-packages        install the collector the server offers, if this repository's release
                            workflow signed it (default: only the installed collector runs)
   --no-start               write the config and the token, but don't start the Supervisor
+  --refresh                write the config again with the last enrollment's options and token, and
+                           start the Supervisor again unless it was enrolled with --no-start (a
+                           package upgrade runs this; a config edited by hand is kept)
 USAGE
 	exit 2
 }
@@ -77,6 +81,48 @@ storage=$root/opt/pydantic-opamp/var
 etc=$root/opt/pydantic-opamp/etc
 label=dev.pydantic.opamp-supervisor
 plist=/Library/LaunchDaemons/$label.plist
+# The last enrollment's options (one a line, no credentials) and its config's SHA-256, for --refresh.
+options=$etc/enroll.options
+written=$etc/supervisor.yaml.sha256
+# An older package's enrollment options, read from its config until the new one replaces it.
+migrated=$etc/enroll.options.migrated
+saved_options=$options
+
+# migrate_options writes the options of an enrollment by a package older than --refresh, which
+# kept none, from its config: only one this script wrote without --restricted, where the endpoint,
+# --ca-file, --plaintext and --accept-packages are all it could say. It replaces the old config only
+# if every setting in it is in the new one (keep_or_replace). A --restricted policy may have been widened or narrowed by hand: it stays.
+migrate_options() {
+	head -n 1 "$etc/supervisor.yaml" | grep -qx '# Written by pydantic-opamp-enroll.*' || return 1
+	! grep -q '^  remote_config_policy:' "$etc/supervisor.yaml" || return 1
+	old_endpoint=$(sed -n 's/^  endpoint: "\(.*\)"$/\1/p' "$etc/supervisor.yaml")
+	[ -n "$old_endpoint" ] || return 1
+	old_ca=$(sed -n 's/^    ca_file: "\(.*\)"$/\1/p' "$etc/supervisor.yaml")
+	{
+		printf -- '--endpoint\n%s\n' "$old_endpoint"
+		[ -z "$old_ca" ] || printf -- '--ca-file\n%s\n' "$old_ca"
+		case $old_endpoint in
+		ws://* | http://*) printf -- '--plaintext\n' ;;
+		esac
+		! grep -qx '  accepts_packages: true' "$etc/supervisor.yaml" || printf -- '--accept-packages\n'
+	} >"$migrated"
+	chmod 0600 "$migrated"
+}
+
+# keep_legacy keeps a config an older package wrote, and starts the Supervisor again with it.
+keep_legacy() {
+	rm -f "$migrated" "$etc/supervisor.yaml.tmp" "$etc/settings.tmp"
+	echo "pydantic-opamp-enroll: $etc/supervisor.yaml was written by an older package with --restricted, or edited, and is kept; run pydantic-opamp-enroll again with its options to add this version's settings" >&2
+	"$launchctl" bootout "system/$label" 2>/dev/null || true
+	"$launchctl" bootstrap system "$plist"
+	echo "restarted the Supervisor ($label)"
+	exit 0
+}
+
+# settings prints a config's settings: its lines but comments and blank ones, sorted.
+settings() {
+	grep -v -e '^[[:space:]]*#' -e '^[[:space:]]*$' "$1" | LC_ALL=C sort -u
+}
 
 endpoint=
 exporter_endpoints=
@@ -89,7 +135,28 @@ host_logs=
 restricted=
 start=yes
 telemetry_stdin=
+refresh=
+saved=
+if [ "${1:-}" = --refresh ]; then
+	[ $# -eq 1 ] || fail "--refresh takes no other options: it uses the last enrollment's"
+	[ -n "$root" ] || [ "$(id -u)" = 0 ] || fail "run it as root"
+	[ -f "$etc/supervisor.yaml" ] || fail "this Mac isn't enrolled: run pydantic-opamp-enroll --endpoint URL first"
+	refresh=yes
+	if [ ! -f "$options" ]; then
+		migrate_options || keep_legacy
+		saved_options=$migrated
+	fi
+	set --
+	while IFS= read -r line; do
+		set -- "$@" "$line"
+	done <"$saved_options"
+fi
 while [ $# -gt 0 ]; do
+	# The options --refresh can use again: everything but where the tokens come from.
+	case $1 in
+	--endpoint | --ca-file | --exporter-endpoint | --log-path) [ $# -ge 2 ] && saved="$saved$1$nl$2$nl" ;;
+	--plaintext | --host-logs | --restricted | --accept-packages | --no-start) saved="$saved$1$nl" ;;
+	esac
 	case $1 in
 	--endpoint) [ $# -ge 2 ] || usage; endpoint=$2; shift 2 ;;
 	--token-file) [ $# -ge 2 ] || usage; token_file=$2; shift 2 ;;
@@ -113,7 +180,7 @@ ws://* | http://*) [ -n "$plaintext" ] || fail "$endpoint isn't encrypted; pass 
 *) fail "the endpoint must be a wss://, https://, ws:// or http:// URL" ;;
 esac
 case $endpoint in
-*'"'* | *'\'* | *' '*) fail "the endpoint can't contain quotes, backslashes or spaces" ;;
+*'"'* | *'\'* | *' '* | *"$nl"*) fail "the endpoint can't contain quotes, backslashes, spaces or newlines" ;;
 esac
 authority=${endpoint#*://}
 authority=${authority%%/*}
@@ -125,7 +192,7 @@ esac
 if [ -n "$ca_file" ]; then
 	[ -r "$ca_file" ] || fail "can't read $ca_file"
 	case $ca_file in
-	*'"'* | *'\'*) fail "--ca-file can't contain quotes or backslashes" ;;
+	*'"'* | *'\'* | *"$nl"*) fail "--ca-file can't contain quotes, backslashes or newlines" ;;
 	/*) ;;
 	*) fail "--ca-file needs an absolute path" ;;
 	esac
@@ -174,7 +241,11 @@ if [ -n "$host_logs" ]; then
 fi
 
 telemetry_token=
-if [ -n "$telemetry_stdin" ]; then
+token=
+if [ -n "$refresh" ]; then
+	# The tokens stay as they are.
+	[ -f "$etc/enroll-token" ] || fail "$etc/enroll-token is missing: run pydantic-opamp-enroll again with its options and the enrollment token"
+elif [ -n "$telemetry_stdin" ]; then
 	[ "$token_file" = - ] || fail "--telemetry-token-stdin cannot be combined with --token-file"
 	IFS= read -r token || fail "provide an enrollment token on the first input line"
 	IFS= read -r telemetry_token || fail "provide a telemetry token on the second input line"
@@ -189,18 +260,22 @@ elif [ "$token_file" = - ]; then
 else
 	token=$(cat -- "$token_file")
 fi
-# The token goes into an HTTP header: one line, no surrounding space.
-token=$(printf '%s' "$token" | tr -d '\r\n')
-[ -n "$token" ] || fail "the enrollment token is empty"
-case $token in
-*[!A-Za-z0-9._~+/=-]*) fail "the enrollment token has characters a bearer token can't" ;;
-esac
+if [ -z "$refresh" ]; then
+	# The token goes into an HTTP header: one line, no surrounding space.
+	token=$(printf '%s' "$token" | tr -d '\r\n')
+	[ -n "$token" ] || fail "the enrollment token is empty"
+	case $token in
+	*[!A-Za-z0-9._~+/=-]*) fail "the enrollment token has characters a bearer token can't" ;;
+	esac
+fi
 
 umask 077
 mkdir -p "$etc"
 chmod 0700 "$etc"
-printf '%s' "$token" >"$etc/enroll-token.tmp"
-mv -f "$etc/enroll-token.tmp" "$etc/enroll-token"
+if [ -z "$refresh" ]; then
+	printf '%s' "$token" >"$etc/enroll-token.tmp"
+	mv -f "$etc/enroll-token.tmp" "$etc/enroll-token"
+fi
 
 if [ -n "$telemetry_stdin" ]; then
 	printf '%s' "$telemetry_token" >"$etc/telemetry-token.tmp"
@@ -264,7 +339,14 @@ if [ -n "$restricted" ]; then
     # What its filelog receivers may read: these files, and what is under these directories.
     allowed_log_paths: $(yaml_list "$log_paths")"
 fi
-cat >"$etc/supervisor.yaml.tmp" <<CONFIG
+# --refresh keeps a config edited since it was written.
+edited=
+if [ -n "$refresh" ] && [ -f "$written" ] &&
+	[ "$(shasum -a 256 <"$etc/supervisor.yaml" | cut -d ' ' -f 1)" != "$(cat "$written")" ]; then
+	edited=yes
+	echo "pydantic-opamp-enroll: $etc/supervisor.yaml was edited since it was written and is kept; run pydantic-opamp-enroll again with its options to rewrite it with this version's settings" >&2
+fi
+[ -n "$edited" ] || cat >"$etc/supervisor.yaml.tmp" <<CONFIG
 # Written by pydantic-opamp-enroll. Run it again to enroll with another server or token.
 server:
   endpoint: "$endpoint"
@@ -280,6 +362,10 @@ capabilities:
   accepts_restart_command: true
   reports_effective_config: true
   reports_health: true
+  # Where the Collector sends its own metrics and logs: the server offers the destination
+  # (own_metrics, own_logs), and without an offer they stay local.
+  reports_own_metrics: true
+  reports_own_logs: true
   reports_available_components: true$accepts_packages
 
 agent:
@@ -290,6 +376,10 @@ agent:
   automatic_config_rollback: true
   # The Collector's last 4 KiB of log goes with a FAILED config's status, so the server shows why.
   collector_crash_log_snippet_kib: 4
+  # The Collector counts what goes in and out of every receiver, processor and exporter in each
+  # pipeline (otelcol.*.consumed/produced.items), so Fleet can show what each step drops.
+  # Feature gates are command-line only, so this can't come from the server's remote config.
+  args: [--feature-gates=telemetry.newPipelineTelemetry]
 $agent_env
 
 $policy$package
@@ -299,7 +389,20 @@ storage:
   # The issued credentials, sealed with a key the Supervisor keeps in the System Keychain.
   state_key: keychain
 CONFIG
-mv -f "$etc/supervisor.yaml.tmp" "$etc/supervisor.yaml"
+# A config an older package wrote is replaced only if the new one has every setting it had: one
+# edited by hand (another executable, storage directory or header) is kept.
+if [ "$saved_options" = "$migrated" ]; then
+	settings "$etc/supervisor.yaml.tmp" >"$etc/settings.tmp"
+	[ -z "$(settings "$etc/supervisor.yaml" | LC_ALL=C comm -23 - "$etc/settings.tmp")" ] || keep_legacy
+	rm -f "$etc/settings.tmp" "$migrated"
+	cp -p "$etc/supervisor.yaml" "$etc/supervisor.yaml.old"
+	echo "pydantic-opamp-enroll: rewriting the config an older package wrote; the old one is kept as $etc/supervisor.yaml.old" >&2
+fi
+if [ -z "$edited" ]; then
+	mv -f "$etc/supervisor.yaml.tmp" "$etc/supervisor.yaml"
+	shasum -a 256 <"$etc/supervisor.yaml" | cut -d ' ' -f 1 >"$written"
+	printf '%s' "$saved" >"$options"
+fi
 
 # wait_connected waits up to 30 seconds for the Supervisor started at $1 (Unix seconds) to connect.
 # An install that can't reach its server (an untrusted certificate, a refused key) fails here,
@@ -312,13 +415,15 @@ wait_connected() {
 	exit 1
 }
 
+done=Enrolled
+[ -z "$refresh" ] || done=Refreshed
 if [ -n "$start" ]; then
 	# Loaded already (enrolling again): unload it first, so it reads the new config.
 	"$launchctl" bootout "system/$label" 2>/dev/null || true
 	started=$(date +%s)
 	"$launchctl" bootstrap system "$plist"
 	wait_connected "$started"
-	echo "Enrolled with $endpoint. The Supervisor is running and connected ($label)."
+	echo "$done with $endpoint. The Supervisor is running and connected ($label)."
 else
-	echo "Enrolled with $endpoint. Start the Supervisor with: sudo launchctl bootstrap system $plist"
+	echo "$done with $endpoint. Start the Supervisor with: sudo launchctl bootstrap system $plist"
 fi

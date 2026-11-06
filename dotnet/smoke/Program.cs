@@ -2,8 +2,8 @@
 // SPDX-License-Identifier: MIT
 
 using System.Runtime.InteropServices;
-using Pydantic.OpAmp.Client;
-using Pydantic.OpAmp.Client.Sdk;
+using Logfire.Fleet.Client;
+using Logfire.Fleet.Client.Sdk;
 
 // The SDK settings layer and a client both load the native core from the package's runtimes/<rid>.
 using var settings = new SdkSettings();

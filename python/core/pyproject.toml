@@ -1,11 +1,11 @@
 # The shared OpAMP client core, compiled: the native library alone, no Python code
-# and no source. The client (pydantic-opamp-client, ..) loads it through its C interface. One
+# and no source. The client (logfire-fleet-client, ..) loads it through its C interface. One
 # wheel per platform serves every Python; CI builds them (scripts/native_dist.py), and uv builds
 # one for this machine from the repository (build_backend.py: the fetched library).
 [project]
-name = "pydantic-opamp-core"
+name = "logfire-fleet-core"
 version = "0.1.0"
-description = "The shared OpAMP client core for pydantic-opamp-client, compiled"
+description = "The shared OpAMP client core for logfire-fleet-client, compiled"
 readme = "README.md"
 # The library is the core, under its own license (LICENSE.txt, with THIRD_PARTY_NOTICES.txt: both
 # copied here by scripts/fetch_core.py fetch, which check holds to the lock).

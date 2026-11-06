@@ -1,6 +1,6 @@
 # Copyright (c) 2026 Pydantic Services Inc.
 # SPDX-License-Identifier: MIT
-"""opentelemetry-instrument with pydantic-opamp-otel, against the reference server.
+"""opentelemetry-instrument with logfire-fleet-otel, against the reference server.
 
     python3 examples/python-otel/try.py
     python3 examples/python-otel/try.py --edot   # the same checks with Elastic's distribution installed too
@@ -13,7 +13,7 @@ configurator, stays off.
 
 app.py has no OpenTelemetry code: the urllib instrumentation traces its requests. The checks are
 every integration's (examples/integrations.py), run for app.py and again for in_code.py, the same
-program with its SDK set up in code (pydantic_opamp_otel.configure()) and the server given there, with no
+program with its SDK set up in code (logfire_fleet_otel.configure()) and the server given there, with no
 OTEL_OPAMP_* variable set. It instruments itself, so it refuses the instrumentation switch. For
 app.py, then check_next: the newer controls, one policy after another in one run against the same
 server and sink (docs/python-otel.md#the-newer-settings):
@@ -27,8 +27,13 @@ server and sink (docs/python-otel.md#the-newer-settings):
      no word from the server;
 and export health throughout: the metrics go to a port nothing listens on, so a health report
 follows the first one, when the timer finds the metric exports failing. Then check_app_settings:
-app.py reads the feature flag example.feature (pydantic_opamp_otel.app_settings), which the server turns on
+app.py reads the feature flag example.feature (logfire_fleet_otel.app_settings), which the server turns on
 and off (docs/app-settings.md).
+
+check_outage (examples/integrations.py) runs for app.py, and twice for logfire_app.py, the same
+requests from an application on the Logfire SDK, its spans sent where the Logfire SDK sends them
+(LOGFIRE_TOKEN, and its base URL the sink): set up with configure_logfire() (outage-logfire), and
+with logfire.configure() left as it is and manage() called after it (outage-manage).
 """
 from __future__ import annotations
 
@@ -42,7 +47,7 @@ from collections.abc import Callable
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-from integrations import (DRIFT, MARGIN, ROOT, check, check_app_settings, check_setup, check_rotation,  # noqa: E402
+from integrations import (DRIFT, MARGIN, ROOT, check, check_app_settings, check_setup, check_rotation, check_outage,  # noqa: E402
                           key_in_code, offer,
                           check_signals, check_truth, main, pings, run, signal as exports, spans, statuses, stop_group, target, opamp_url)
 
@@ -55,13 +60,16 @@ UV = ["uv", "run", "--quiet", "--no-project", "--python", "3.13",
       "--with", str(ROOT / "python"), "--with", str(ROOT / "python/otel"),
       # aiohttp-client too: the OpAMP client is aiohttp, and its own requests must not be traced.
       "--with", "opentelemetry-instrumentation-urllib", "--with", "opentelemetry-instrumentation-aiohttp-client",
+      # logfire_app.py's: the Logfire SDK, at the versions configure_logfire is checked with.
+      "--with", f"{ROOT / 'python/otel'}[logfire]",
       *(["--with", f"elastic-opentelemetry=={EDOT_VERSION}"] if EDOT else [])]
 #: With --edot: this package's distro and configurator, EDOT's sampler and resource detectors.
 EDOT_ENV = {"OTEL_PYTHON_DISTRO": "opamp", "OTEL_PYTHON_CONFIGURATOR": "opamp",
             "OTEL_TRACES_SAMPLER": "experimental_composite_parentbased_traceidratio",
             "OTEL_EXPERIMENTAL_RESOURCE_DETECTORS": "process_runtime,os,telemetry_distro,otel"} if EDOT else {}
 APPS = {"app.py": ["opentelemetry-instrument", "python", str(HERE / "app.py")],
-        "in_code.py": ["python", str(HERE / "in_code.py")]}
+        "in_code.py": ["python", str(HERE / "in_code.py")],
+        "logfire_app.py": ["python", str(HERE / "logfire_app.py")]}
 APP = "app.py"
 
 
@@ -75,7 +83,13 @@ def launch(port: str, telemetry_port: str, state: Path, name: str, extra: dict[s
                OTEL_BSP_SCHEDULE_DELAY="500",
                OTEL_PYTHON_LOGGING_AUTO_INSTRUMENTATION_ENABLED="true")
     env.update(EDOT_ENV)
-    if APP == "app.py":
+    if APP == "logfire_app.py":  # the Logfire SDK's own settings: its spans to the sink
+        env.update(OTEL_OPAMP_ENDPOINT=opamp_url(port),
+                   OTEL_OPAMP_HEADERS="Authorization=Bearer%20example",
+                   OTEL_OPAMP_STATE_DIR=str(state),
+                   OTEL_OPAMP_HEARTBEAT_INTERVAL="1s",
+                   LOGFIRE_TOKEN="pylf_v1_us_test", LOGFIRE_BASE_URL=telemetry, LOGFIRE_SEND_TO_LOGFIRE="true")
+    elif APP == "app.py":
         env.update(OTEL_SERVICE_NAME="checkout",
                    OTEL_OPAMP_ENDPOINT=opamp_url(port),
                    OTEL_OPAMP_HEADERS="Authorization=Bearer%20example",
@@ -198,10 +212,10 @@ def check_next(launch, target_: Path, seconds: float = 200) -> bool:
     return ok
 
 
-#: What a span and a log record processor the application adds once the SDK is built (setups.py)
-#: take from the package's control: their gates' settings, set aside. The sampler stays its own.
-LATE_PROCESSOR = {"send_traces", "send_logs", "send_logs_level", "send_logs_level_by_scope", "send_logs_per_second",
-                  "mask_attributes", "drop_attributes"}
+#: What the processors the application adds once the SDK is built (setups.py) export through past
+#: the gates: the span exporter its own kind of processor holds, reported ungoverned. The batch
+#: processors beside it are gated, so nothing is set aside.
+LATE_PROCESSOR = frozenset({"traces"})
 
 
 def of(app: str, run_check: Callable[[Path], bool]) -> Callable[[], bool]:
@@ -225,9 +239,13 @@ CHECKS = {
     # With the logging handler installed, the agent's warnings are log records, not stderr.
     "setup": of("app.py", lambda d: check_setup(launch, d, env={"OTEL_PYTHON_LOGGING_AUTO_INSTRUMENTATION_ENABLED": "false"})),
     "rotation": of("app.py", lambda d: check_rotation(launch, d, env={"OTEL_PYTHON_LOGGING_AUTO_INSTRUMENTATION_ENABLED": "false"})),
+    "outage": of("app.py", lambda d: check_outage(launch, d)),
+    "outage-logfire": of("logfire_app.py", lambda d: check_outage(launch, d, name="outage-logfire")),
+    "outage-manage": of("logfire_app.py", lambda d: check_outage(launch, d, env={"EXAMPLE_SETUP": "manage"}, name="outage-manage")),
     "next": of("app.py", lambda d: check_next(launch, d)),
     "app": of("app.py", lambda d: check_app_settings(launch, d)),
-    "truth-late-processor": of("app.py", lambda d: check_truth(launch, d, "late-processor", LATE_PROCESSOR)),
+    "truth-late-processor": of("app.py", lambda d: check_truth(launch, d, "late-processor", set(),
+                                                                         ungoverned=LATE_PROCESSOR)),
     "first-in-code": of("in_code.py", lambda d: check(launch, "urllib", d, switches=False)),
     "setup-in-code": of("in_code.py", lambda d: check_setup(
         launch, d, env={"OTEL_PYTHON_LOGGING_AUTO_INSTRUMENTATION_ENABLED": "false"},
@@ -236,5 +254,5 @@ CHECKS = {
 
 if __name__ == "__main__":
     # Resolve the environment once, so the runs don't spend their time installing.
-    sys.exit(main(CHECKS, lambda: subprocess.run([*UV, "python", "-c", "import pydantic_opamp_otel"], check=True),
+    sys.exit(main(CHECKS, lambda: subprocess.run([*UV, "python", "-c", "import logfire_fleet_otel"], check=True),
                  options=("--edot",)))

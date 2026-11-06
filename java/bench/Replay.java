@@ -13,7 +13,7 @@ import com.dylibso.chicory.runtime.ExportFunction;
 import com.dylibso.chicory.runtime.Instance;
 import com.dylibso.chicory.runtime.Memory;
 import com.dylibso.chicory.wasm.Parser;
-import dev.pydantic.opamp.core.CoreModule;
+import dev.pydantic.logfire.fleet.core.CoreModule;
 import java.io.BufferedInputStream;
 import java.io.DataInputStream;
 import java.io.EOFException;

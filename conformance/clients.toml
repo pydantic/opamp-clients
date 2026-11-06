@@ -146,7 +146,7 @@ run = ["docker", "run", "--rm", "--add-host=host.docker.internal:host-gateway", 
        "-cp", "/src/target/driver:/src/target/classes:/src/target/lib/*", "Driver"]
 
 [dotnet-core-platform]
-# Ours: dotnet/Pydantic.OpAmp.Client, the shared core (natively, the native library) behind a .NET
+# Ours: dotnet/Logfire.Fleet.Client, the shared core (natively, the native library) behind a .NET
 # client, in platform mode (HttpClient; the driver asks for it by name, OPAMP_DOTNET_MODE=platform:
 # the SDK's default is core mode).
 upstream = false
@@ -169,7 +169,7 @@ run = ["docker", "run", "--rm", "--add-host=host.docker.internal:host-gateway", 
 
 
 [dotnet-core]
-# Ours: dotnet/Pydantic.OpAmp.Client in core mode (the SDK's default; the driver asks for it by
+# Ours: dotnet/Logfire.Fleet.Client in core mode (the SDK's default; the driver asks for it by
 # name): the core speaks HTTP/1.1, WebSocket, CONNECT and
 # SOCKS5 itself, over .NET's sockets and SslStream (the core's shell), and decides download redirects.
 upstream = false

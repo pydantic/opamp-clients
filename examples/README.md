@@ -5,9 +5,11 @@ Node.js and Go that you connect to Logfire Fleet and change from a policy while 
 of this page covers the integration checks.
 
 The OpenTelemetry SDK integrations run against a reference OpAMP server that plays each check's
-scenario, with a telemetry sink that receives the exported spans, metrics and logs. This
-repository does not build that server: `OPAMP_EXAMPLES_SERVER` names its binary, and without one
-the checks stop and say so. The Go conformance server is not part of these integration examples.
+scenario, with a telemetry sink that receives the exported spans, metrics and logs: the
+conformance suite's Go server ([conformance/server](../conformance/server)) as the SDK fixture
+(`fixture.go`), which the checks build with `go build` the first time they need it.
+`OPAMP_EXAMPLES_SERVER` names another binary to use in its place, one that takes the same flags,
+scenarios and log.
 
 Run one integration:
 
@@ -94,6 +96,27 @@ starts it once more with the first endpoint still configured:
 | moves the agent to another port, with a third key | the agent takes it there, refusing no request, opens no connection to the first port after it, and is traced throughout |
 | (the next start) | the agent goes straight to the second port on the key it was given there, takes no new key, and none of its requests is refused |
 
+Then `check_outage` (the check `outage`) takes the OpAMP server away and starts the application
+while it is away. The telemetry goes to a sink that stays up throughout; the OpAMP servers come and
+go at one endpoint:
+
+| What happens | What the run checks |
+|---|---|
+| server A offers a policy that masks the URL | APPLIED; spans arrive with each URL `[REDACTED]` |
+| server A stops, and nothing listens for 15 s | the application goes on making requests, and its spans still arrive masked |
+| server B, a new server that knows nothing of the agent, comes up at the same endpoint | the agent comes back with the same UID, sends its whole state (its description) before any offer, and reports the masking policy it kept as its effective config |
+| server B offers a policy that drops the URL | APPLIED; spans arrive with no URL |
+| the next start, with nothing at the endpoint | the application starts and makes its requests, its spans without a URL from the first: it runs on the policy it saved, with no word from a server |
+| server C comes up there | the agent reports the same UID, and the dropping policy as its effective config |
+
+The Python integration also runs it on the Logfire SDK (`outage-logfire`: `logfire_app.py`, set up
+with `configure_logfire()`, its spans sent where the Logfire SDK sends them) and on an SDK the
+application set up itself (`outage-manage`: `logfire.configure()` then `manage()`), and Node.js on
+its own NodeSDK then `manage()` (`outage-manage`: `manage.mjs`) and on the Logfire JS SDK
+(`outage-logfire`: `logfire/logfire-js.mjs`, `logfire.configure()` then `manage()`, its spans sent
+where the Logfire SDK sends them). The .NET integration also runs it on an SDK set up in code with
+`WithOpAmp()` (`outage-hosted`: `dotnet-otel/Hosted/`, no automatic instrumentation).
+
 Each check is independent of the others (its own server, state directory and logs), so one can
 run alone, by name, or several side by side. A check waits on its scenario's clock (one message a
 second), not on the machine, so with `--jobs` they take about as long as the longest of them:
@@ -112,9 +135,9 @@ for that reason).
 A new check goes into its integration's `try.py`, in `CHECKS`, under a name of its own. Each run
 prints how long each check took.
 
-CI does not run these checks: they need the reference server's binary. It runs the checks' own
-tests (`examples/test_integrations.py`, `examples/test_settings_cookbook.py`) and each
-integration's unit tests.
+CI runs every check of each integration on every pull request that is not a draft (the job
+"…, end to end"), four at once, besides the checks' own tests (`examples/test_integrations.py`,
+`examples/test_settings_cookbook.py`) and each integration's unit tests.
 
 Every integration lets the application read its own settings ([docs/app-settings.md](../docs/app-settings.md)),
 checked by `check_app_settings` (the check `app`): its example application reads the flag
@@ -124,30 +147,33 @@ checked by `check_app_settings` (the check `app`): its example application reads
 |---|---|
 | `app_settings` | none of `/feature` before the first policy (the default); `/feature` once the flag is `on`, still after a policy with a bad value is FAILED naming `app_settings`, none once `app_settings` is local, again once it is `on` again; `/changed` three times (on, off, on), not for the FAILED policy or the same values sent again; after a restart with no offer, `/feature` from the start |
 
-`check_truth` (the checks `truth-<setup>`) runs an integration under a setup where a setting may
-not reach the telemetry: something the application does to the SDK beside the integration, named
-in `EXAMPLE_SETUP`. The server offers one setting a document, each beside `sampling_rate` 1 and left
+`check_truth` (the checks `truth-<setup>`) runs an integration under a setup that adds telemetry
+paths of its own: something the application does to the SDK beside the integration, named in
+`EXAMPLE_SETUP`. The server offers one setting a document, each beside `sampling_rate` 1 and left
 out again by the next: `send_traces`, `send_metrics`, `send_logs`, `sampling_rate` 0,
 `send_logs_level`, `send_logs_level_by_scope`, `sampling_rules`, `mask_attributes`,
 `drop_attributes` and both rate caps (and `deactivate_all_instrumentations` where it is live). Each
 must either show at the sink, measured as `check_signals` measures it, or be named as set aside in
-the effective config the agent reports. An APPLIED setting that is neither fails. So does a setup
-whose settings set aside differ from the ones its try.py expects: more is control given up, fewer
-is a table out of date.
+the effective config the agent reports. An APPLIED setting that is neither fails. The policy
+governs every exporter the integration's gates are in front of, so only a sampler of another's
+sets settings aside, and they must be the ones its try.py expects. What the setup exports past the
+gates goes to a second sink (`EXAMPLE_SECOND_SINK`): it must arrive there, and the inventory and
+export health must report it ungoverned, and nothing else. Where a signal's every exporter is past
+the gates, its settings need only be APPLIED and in force.
 
-| Integration | Setup | What the application does | Set aside |
-|---|---|---|---|
-| Python | `late-processor` | adds a span and a log record processor of its own, exporting over OTLP, once the SDK is built | the trace and log gates' settings and redaction; the sampler's stay |
-| Go | `global-tracer` | sets a tracer provider of its own as the global one after `Setup` | the sampler's settings, `send_traces`, redaction and the instrumentation switches |
-| Go | `global-meter` | sets a meter provider of its own as the global one after `Setup` | `send_metrics` |
-| Go | `global-logger` | sets a logger provider of its own as the global one after `Setup` | the log settings and redaction |
-| Node.js | `own-tracer-provider` | disables the SDK's global tracer provider and registers one of its own | the sampler's settings, `send_traces` and redaction |
-| Node.js | `own-logger-provider` | the same for the logger provider | the log settings and redaction |
-| Node.js | `own-meter-provider` | the same for the meter provider | `send_metrics` |
-| Java agent | `extension-processor` | a second agent extension (`Setups.java`) adds a span processor, a log record processor and a metric reader | the trace, metric and log gates' settings and redaction; the sampler's stay |
-| Java agent | `extension-sampler` | a second agent extension sets a sampler of its own in place of the extension's | the sampler's settings |
-| .NET plugin | `plugin-exporters` | a plugin of the application's own, listed after the integration's, adds an OTLP span exporter and a log record processor | the trace and log gates' settings and redaction; the sampler's stay |
-| .NET plugin | `own-sdk` | sets `OTEL_DOTNET_AUTO_SETUP_SDK=false` and builds its own tracer and meter providers | `send_traces`, `send_metrics`, the sampler's settings and redaction; the logs' stay |
+| Integration | Setup | What the application does | Past the gates (second sink) | Set aside |
+|---|---|---|---|---|
+| Python | `late-processor` | once the SDK is built, adds a span and a log record batch processor (gated, to the first sink) and a span processor of its own kind that exports each span itself | that processor's traces | nothing |
+| Go | `global-tracer` | sets a tracer provider of its own as the global one after `Setup` | every span (`app_provider`) | nothing |
+| Go | `global-meter` | sets a meter provider of its own as the global one after `Setup` | every metric (`app_provider`) | nothing |
+| Go | `global-logger` | sets a logger provider of its own as the global one after `Setup` | every log record (`app_provider`) | nothing |
+| Node.js | `own-tracer-provider` | disables the SDK's global tracer provider and registers one of its own, tracing each request with it too | its own spans (`app_provider`); the http instrumentation's stay governed | nothing |
+| Node.js | `own-logger-provider` | the same for the logger provider | every log record (`app_provider`) | nothing |
+| Node.js | `own-meter-provider` | the same for the meter provider, counting each request with it | its own metrics (`app_provider`) | nothing |
+| Java agent | `extension-processor` | a second agent extension (`Setups.java`) adds a span processor, a log record processor and a metric reader | all three | nothing |
+| Java agent | `extension-sampler` | a second agent extension sets a sampler of its own in place of the extension's | nothing | the sampler's settings |
+| .NET plugin | `plugin-exporters` | a plugin of the application's own, listed after the integration's, adds an OTLP span exporter and a log record processor | both | nothing |
+| .NET plugin | `own-sdk` | sets `OTEL_DOTNET_AUTO_SETUP_SDK=false` and builds its own tracer and meter providers | every span and metric (`app_provider`); the logs stay governed | the sampler's settings |
 
 Logs and scenario files are saved under `target/integrations/<integration>/`.
 The OpAMP and telemetry listeners use independent ports. Each run stops its server and app.

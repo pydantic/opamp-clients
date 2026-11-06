@@ -1,6 +1,6 @@
 # Java
 
-`dev.pydantic:opamp-client` is this repository's OpAMP client for Java, in
+`dev.pydantic:logfire-fleet-client` is this repository's OpAMP client for Java, in
 [`java/opamp/`](../java/opamp/). It runs the shared core with [Chicory](https://chicory.dev), the
 module compiled to JVM classes at build time: plain Java, nothing native
 ([how-it-works.md](how-it-works.md)). It speaks plain HTTP or WebSocket, with TLS and through
@@ -12,26 +12,19 @@ or later. Its [README](../java/opamp/README.md) has the full reference.
 ```xml
 <dependency>
   <groupId>dev.pydantic</groupId>
-  <artifactId>opamp-client</artifactId>
-  <version>0.1.0-SNAPSHOT</version>
+  <artifactId>logfire-fleet-client</artifactId>
+  <version>0.2.0</version>
 </dependency>
 ```
 
-The artifact is not on Maven Central yet ([sdk-registries.md](sdk-registries.md)). Until it is,
-install it into your local Maven repository from a checkout, and depend on it as above:
-
-```bash
-cd java/opamp
-mvn install -DskipTests
-```
-
-Gradle finds it there with `mavenLocal()` in its repositories.
+Gradle: `implementation("dev.pydantic:logfire-fleet-client:0.2.0")`. The latest version is on
+[Maven Central](https://central.sonatype.com/artifact/dev.pydantic/logfire-fleet-client).
 
 ## Start and stop
 
 ```java
-import dev.pydantic.opamp.Notification;
-import dev.pydantic.opamp.OpampClient;
+import dev.pydantic.logfire.fleet.Notification;
+import dev.pydantic.logfire.fleet.OpampClient;
 import java.util.concurrent.CompletableFuture;
 import opamp.proto.v1.Anyvalue;
 import opamp.proto.v1.Opamp;
@@ -80,7 +73,7 @@ agent's status to `start`, so the first message reports it in full.
 
 `OpampClient.Config.builder(endpoint)` (or `builder(endpoint, instanceUid)`) returns a builder;
 `build()` checks the settings. `OpampClient.Status` is a record. Both are in
-`java/opamp/src/main/java/dev/pydantic/opamp/OpampClient.java`.
+`java/opamp/src/main/java/dev/pydantic/logfire/fleet/OpampClient.java`.
 
 | What | Option | More |
 |---|---|---|
@@ -88,7 +81,7 @@ agent's status to `start`, so the first message reports it in full.
 | Headers | `header(name, value)`, sent with every request and WebSocket upgrade | |
 | TLS | `tls(Tls.builder()...build())`: `trustedCa`, `includeSystemCas`, `clientCertificate`, `minVersion`, `maxVersion` | [README](../java/opamp/README.md#tls-and-proxies) |
 | Proxy | `proxy(url)`, `proxyResolveLocally(true)`, or `directConnection()` for none. Without one, the environment's | [README](../java/opamp/README.md#tls-and-proxies) |
-| Who speaks HTTP | `mode(OpampClient.Mode.CORE)` (the default) or `mode(OpampClient.Mode.PLATFORM)` (`java.net.http.HttpClient`); `httpClient(...)` selects platform mode | [sdks.md](sdks.md#core-mode-and-platform-mode) |
+| Who speaks HTTP | `mode(OpampClient.Mode.CORE)` (the default) or `mode(OpampClient.Mode.PLATFORM)` (`java.net.http.HttpClient`; advanced); `httpClient(...)` needs platform mode named | [sdks.md](sdks.md#core-mode-and-platform-mode) |
 | State file | `stateFile(Path)`: kept across restarts, for the agent's user alone | [state-file.md](state-file.md) |
 | Instance UID | `builder(endpoint, instanceUid)` (16 bytes), or `builder(endpoint)` for one the core makes; `requestInstanceUid(true)` to have the server assign it; `client.instanceUid()` is the one in use | [instance-uid.md](instance-uid.md) |
 | Capabilities | `capabilities(long)` (`AgentCapabilities` bits). `ReportsStatus`, `ReportsHeartbeat` and the `Reports*` bit of each status you set are added for you | |
@@ -170,5 +163,5 @@ client in both modes: `python3 conformance/runner/run.py --client java-core-plat
 To put an application under a server without writing code, use the extension for the
 OpenTelemetry Java agent: [javaagent.md](javaagent.md). To wire this client to an SDK by hand, see
 [sdks.md](sdks.md) and [examples/java](../examples/java/src/main/java/Example.java).
-`dev.pydantic.opamp.sdk.SdkSettings` runs the shared SDK settings layer
+`dev.pydantic.logfire.fleet.sdk.SdkSettings` runs the shared SDK settings layer
 ([sdk-settings.md](sdk-settings.md)).

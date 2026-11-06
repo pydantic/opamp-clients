@@ -33,7 +33,9 @@ import platform
 import stat
 import subprocess
 import sys
+import time
 import tomllib
+import urllib.error
 import urllib.request
 from pathlib import Path
 
@@ -82,14 +84,33 @@ def problems(config: dict, today: dt.date) -> list[str]:
     return out
 
 
+def fetch(url: str, attempts: int = 4, wait: float = 5.0) -> bytes:
+    """url's body. A 5xx or a dropped connection (GitHub's release downloads answer 504 now and
+    then) is tried again, waiting `wait`, then twice that, and so on; a 4xx is not."""
+    for attempt in range(1, attempts + 1):
+        try:
+            with urllib.request.urlopen(url, timeout=120) as r:
+                return r.read()
+        except urllib.error.HTTPError as e:
+            if e.code < 500 or attempt == attempts:
+                raise
+            err: Exception = e
+        except (urllib.error.URLError, TimeoutError, ConnectionError) as e:
+            if attempt == attempts:
+                raise
+            err = e
+        print(f"{url}: {err}; trying again", flush=True)
+        time.sleep(attempt * wait)
+    raise AssertionError("unreachable")
+
+
 def binary() -> Path:
     name = asset(platform.system(), platform.machine())
     path = CACHE / f"osv-scanner-{VERSION}-{name}"
     if not path.is_file() or hashlib.sha256(path.read_bytes()).hexdigest() != SHA256[name]:
         url = f"https://github.com/google/osv-scanner/releases/download/v{VERSION}/osv-scanner_{name}"
         print(f"fetching {url}", flush=True)
-        with urllib.request.urlopen(url, timeout=120) as r:
-            data = r.read()
+        data = fetch(url)
         if (got := hashlib.sha256(data).hexdigest()) != SHA256[name]:
             raise SystemExit(f"{url}: sha256 {got}, pinned {SHA256[name]}")
         CACHE.mkdir(parents=True, exist_ok=True)
@@ -111,7 +132,7 @@ def main() -> int:
         return 0
     # -r: every lockfile below the root; files git ignores (node_modules/, target/, the fetched core) are skipped.
     # --no-resolve: a pom.xml's dependencies as it names them, not resolved through Maven: the
-    # resolver can't find this repository's own unpublished modules (dev.pydantic:opamp-client
+    # resolver can't find this repository's own unpublished modules (dev.pydantic:logfire-fleet-client
     # 0.1.0-SNAPSHOT), and an extraction error fails the whole scan. The other ecosystems are
     # lockfiles, which list every transitive version anyway.
     cmd = [str(binary()), "scan", "source", "-r", "--no-resolve", "--config", str(CONFIG)]

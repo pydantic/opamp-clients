@@ -2,9 +2,9 @@
 // SPDX-License-Identifier: MIT
 
 using System.Reflection;
-using Pydantic.OpAmp.Client.Sdk;
+using Logfire.Fleet.Client.Sdk;
 
-namespace Pydantic.OpAmp.Otel;
+namespace Logfire.Fleet.Otel;
 
 /// <summary>
 /// The inventory (docs/available-components.md): what the integration lists of itself and the SDK,
@@ -26,10 +26,6 @@ internal static class Inventories
         Instrumentations = { instrumentations },
         Exporters = { exporters },
     };
-
-    /// <summary>An exporter of <paramref name="signal"/>, as the layer takes it.</summary>
-    public static Exporter Exporter(Signal signal, string name, bool gated) =>
-        new() { Signal = signal.ToString().ToLowerInvariant(), Name = name, Gated = gated };
 
     /// <summary>
     /// An assembly's version as its package's: the informational version without its build metadata

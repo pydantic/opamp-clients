@@ -122,9 +122,9 @@ WithEndpoint`. The endpoint is logged without user info, a query string or a fra
   carries out (`logfire.opamp.supported_controls`).
 - **Takes settings** from the Logfire SDK policy, the remote config's only file
   (`logfire-sdk-policy.json`). Each control is `{"mode": "local"}`, the SDK's own value, or an
-  override. **Every control takes effect at once**, for the SDK `Setup` builds. An application
-  that keeps its own SDK setup is not managed. One that sets a global provider of its own after
-  `Setup` has that signal's controls set aside
+  override. **Every control takes effect at once**, for the SDK `Setup` builds, on every exporter
+  its gates reach. An application that keeps its own SDK setup is not managed. What the gates
+  can't reach is reported to the server as ungoverned, never a reason to refuse a policy
   ([below](#where-the-server-cant-reach)):
 
   | Control | How |
@@ -132,7 +132,7 @@ WithEndpoint`. The endpoint is logged without user info, a query string or a fra
   | `head_sampling` | a sampler in place of the configured one. A span whose parent was sampled, here or by the caller, is sampled at any ratio, 0 included. Local: the configured sampler. `OTEL_TRACES_SAMPLER=jaeger_remote` or `xray` is not built. Those are the default sampler. |
   | `sampling_rules` | the same sampler. For a new trace, the first rule its root span matches decides the rate, before `head_sampling` ([below](#sampling-rules)). |
   | `trace_rate_limit` | the same sampler, last. It is a token bucket on the traces started or joined ([below](#rate-caps)). |
-  | `signal_exports` (`traces`, `metrics`, `logs`) | each signal's exporter, gated. `enabled: false` drops what would be exported. A Prometheus reader, or any reader while `OTEL_METRICS_PRODUCERS` is set, is not gated ([below](#where-the-server-cant-reach)). |
+  | `signal_exports` (`traces`, `metrics`, `logs`) | each signal's exporter, gated. `enabled: false` drops what would be exported. A Prometheus reader, or any reader while `OTEL_METRICS_PRODUCERS` is set, is not gated: it is reported ungoverned ([below](#where-the-server-cant-reach)). |
   | `log_levels` (`level`) | the log exporter's gate again. From the next export, a record below that severity is dropped, and one with no severity (0) is kept. Local: every severity. |
   | `log_levels` (`scopes`) | the same gate, a level per scope. The scope is the name given to the log bridge ([below](#log-levels-per-scope)). |
   | `log_rate_limit` | the same gate, after the levels. It is a token bucket on the records exported ([below](#rate-caps)). |
@@ -182,37 +182,29 @@ the application's own too. To keep the application's own spans, list the instrum
 
 ### Where the server can't reach
 
+What the package's gates can't reach is reported to the server as ungoverned: listed with
+`gated: false` in the [inventory](#inventory), and with the status `ungoverned` (healthy all the
+same) in [export health](#export-health). The policy is still APPLIED and in force on everything
+the gates reach.
+
 - A metrics exporter autoexport builds a reader for that isn't a push exporter (`prometheus`),
   or any metrics exporter while `OTEL_METRICS_PRODUCERS` is set, is autoexport's own: an SDK
-  reader cannot be wrapped outside the SDK. The `signal_exports.metrics` control cannot stop it.
-  The package warns, and a policy that overrides that control is refused
-  ([the host](sdk-settings.md#the-host)).
+  reader cannot be wrapped outside the SDK, so `signal_exports.metrics` can't stop it. The package
+  warns and reports it ungoverned.
 - A global provider the application sets after `Setup` (`otel.SetTracerProvider`,
   `otel.SetMeterProvider`, `global.SetLoggerProvider`) has no sampler or gate of this package's.
   Go instrumentation takes its tracer, meter or logger from the global provider, often at each
   call (otelhttp's transport does at each request), so that signal's telemetry goes there. The
-  agent sees it, warns, and from then on no longer carries out the controls in the table below.
-  In the policy in force, each of their overrides is set aside: reported `local` in the effective
-  config, with the rest of the policy still in force. A policy offered later that overrides one is
-  refused (`signal_exports.traces: this SDK cannot apply the requested override`). The agent
-  reports the new effective config and inventory at once:
-
-  | Provider set | Set aside |
-  |---|---|
-  | tracer | `head_sampling`, `sampling_rules`, `trace_rate_limit`, `signal_exports.traces`, `attribute_redaction`, `scrubbing`, `instrumentations` (and `debug` `sampling_ratio`) |
-  | meter | `signal_exports.metrics` |
-  | logger | `signal_exports.logs`, `log_levels` (`level` and `scopes`), `log_rate_limit`, `attribute_redaction`, `scrubbing` (and `debug` `log_level`) |
-
-  The rest stay in force. With the meter or the logger provider set, the instrumentation switches
-  still stop spans and the metrics and log records that go through `Setup`'s providers, but not
-  what goes through the application's. The controls stay set aside if `Setup`'s provider is set
-  again: what took a tracer, meter or logger from the other one keeps it. The otel packages say
-  nothing when a global provider is set, so the agent looks: at each policy, before it decides,
-  and once a second. A provider that wraps `Setup`'s and is set in its place counts as one of the
-  application's own.
+  agent sees it, warns once, and reports it at once as an ungoverned exporter of that signal
+  (`app_provider`), with the inventory and export health. Nothing is set aside: every override
+  stays in force on what `Setup`'s providers export, and later policies are APPLIED. It stays
+  reported if `Setup`'s provider is set again: what took a tracer, meter or logger from the other
+  one keeps it. The otel packages say nothing when a global provider is set, so the agent looks:
+  at each policy, before it decides, and once a second. A provider that wraps `Setup`'s and is set
+  in its place counts as one of the application's own.
 - An SDK the application builds itself and never sets as the global providers: none of the
-  controls reach it, and the package can't see it. Nothing is set aside for it, so the server
-  may hear APPLIED for a policy that telemetry doesn't follow. Use `Setup`'s providers instead.
+  controls reach it, and the package can't see it, so it isn't reported either: the server may
+  hear APPLIED for a policy that telemetry doesn't follow. Use `Setup`'s providers instead.
 - A tracer taken from a provider other than the global one (`sdk.TracerProvider` is the global
   one) or a span it started isn't switched.
 
@@ -226,8 +218,9 @@ settings it carries out. For example, with otelhttp, a log bridge and a Promethe
 
 ```json
 {"instrumentations": {"otelhttp": {"version": "0.71.0"}, "checkout.db": {}},
- "exporters": {"traces": {"otlp": {"gated": true}}, "metrics": {"prometheus": {"gated": false}},
-               "logs": {"otlp": {"gated": true}}}}
+ "exporters": {"traces": {"otlp@localhost:4318": {"gated": true, "destination": "http://localhost:4318"}},
+               "metrics": {"prometheus": {"gated": false}},
+               "logs": {"otlp@localhost:4318": {"gated": true, "destination": "http://localhost:4318"}}}}
 ```
 
 - **Instrumentations** are the scopes that have taken a tracer, a meter or a logger from the
@@ -243,11 +236,14 @@ settings it carries out. For example, with otelhttp, a log bridge and a Promethe
   kept, the first by name, each with at most 16 versions, the first sorted, so an application
   that names a tracer per request doesn't grow the list and every instance lists the same set.
 - **Exporters** are the one `Setup` built for each signal, named as `OTEL_*_EXPORTER` names it
-  (`otlp` when unset); `none` lists none. `gated` is whether its gate wraps it: always for spans and
-  logs, and for metrics exactly when `signal_exports.metrics` is carried out, so a Prometheus reader, or any
-  reader while `OTEL_METRICS_PRODUCERS` is set, is `gated: false` ([above](#where-the-server-cant-reach)).
-- **Settings** are those of the host the layer is given at `Load` and `Decide`, with the same clock.
-  When a global provider set in place of `Setup`'s narrows the host, the inventory is sent again.
+  (`otlp` when unset), an OTLP one with the host and port its variables send it to
+  (`otlp@api.honeycomb.io:443`; never credentials or a path); `none` lists none. `gated` is
+  whether its gate wraps it: always for spans and logs, and for metrics wherever `Setup` builds the
+  reader, so a Prometheus reader, or any reader while `OTEL_METRICS_PRODUCERS` is set, is
+  `gated: false`. A global provider set in place of `Setup`'s adds an `app_provider`,
+  `gated: false`, and the inventory is sent again ([above](#where-the-server-cant-reach)).
+- **Settings** are those of the host the layer is given at `Load` and `Decide`, with the same
+  clock: every one.
 
 ## The settings that match telemetry
 
@@ -406,7 +402,8 @@ The top-level `healthy` stays the application's, true while it runs. The layer s
 at once when a status changes, at most every 60 s while only the counters move, never while
 nothing changes. Records a full batch queue drops never reach a gate, so they aren't counted
 (the Go SDK keeps that count private). A metrics reader that isn't gated (Prometheus) isn't
-counted either: its child stays `ok` at zero.
+counted either: its child stays `ok` at zero. Under each signal, every exporter of the inventory
+by its identity, `governed` or `ungoverned` (healthy either way).
 
 ## The application's own settings
 
@@ -473,15 +470,16 @@ told of.
     against the layer's own matchers (`Evaluate`) on generated inputs;
   - the inventory a typical setup reports reaches a server, with its hash: each name one
     the `instrumentations` control takes, versions given or from build info, a Prometheus reader
-    `gated: false` while `signal_exports.metrics` is left out, the settings the host's; a scope taken
+    `gated: false` with `send_metrics` still carried out, OTLP named by where it sends, the
+    settings the host's; a scope taken
     later is sent again, once; no instrumentation, every exporter `none`, and duplicates;
   - each setting's edge cases from [sdk-settings.md](sdk-settings.md), live changes and
     reverting, and a second, ungated exporter seeing the application's own telemetry;
-  - a global provider set in place of `Setup`'s (`globals_test.go`): each signal's overrides set
-    aside at once, reported `local` and put out of force, the others kept, and a later policy that
-    overrides one refused; still set aside when `Setup`'s provider is set again; seen through the
-    otel packages' globals by the agent's own look, warned once, and by a decision before it
-    answers;
+  - a global provider set in place of `Setup`'s (`globals_test.go`): each signal reported at once
+    as an ungoverned `app_provider`, in the inventory and export health, with every override kept
+    in force and a later policy APPLIED; still reported when `Setup`'s provider is set again; seen
+    through the otel packages' globals by the agent's own look, warned once, and by a decision
+    before it answers;
   - the application's own settings (`appsettings_test.go`): reads before any config, without a
     server and once a key is left out; the typed reads against `custom.json`'s `typed` vectors and
     their edges; every `custom.json` case through the layer and `Controls`; a function told once
@@ -508,8 +506,9 @@ told of.
   The `truth-global-tracer`, `truth-global-meter` and `truth-global-logger` checks run
   `check_truth` (`examples/integrations.py`) with the example in each `EXAMPLE_SETUP` of
   [setups.go](../examples/go-otel/setups.go): once `Setup` has returned, the application sets a
-  provider of its own as the global one, exporting to the same sink. The server offers one
-  policy per control. A control is set aside when the policy is FAILED as an override
-  the package can't carry out, or APPLIED with that override reported `local` in the effective
-  config. Every other override must change the telemetry the sink receives, and the controls set
-  aside must be exactly those in the table [above](#where-the-server-cant-reach).
+  provider of its own as the global one, exporting to a second sink. The server offers one
+  policy per control, and nothing may be set aside (a policy FAILED, or an override reported
+  `local`). Every override of another signal must change the telemetry the first sink receives;
+  those of the replaced signal, all of whose telemetry now goes to the second sink, need only be
+  in force. The inventory and export health must report that signal's `app_provider`
+  ungoverned, and the second sink must receive it.

@@ -1,4 +1,4 @@
-# @pydantic/opamp-client
+# @pydantic/logfire-fleet-client
 
 An [OpAMP](https://github.com/open-telemetry/opamp-spec) client for Node.js (22 or later), over
 plain HTTP or WebSocket.
@@ -14,7 +14,7 @@ other language's client here. In platform mode the package carries out the core'
 [`socks`](https://github.com/JoshGlazebrook/socks) package).
 
 ```ts
-import { AgentDescriptionSchema, Client, create } from "@pydantic/opamp-client";
+import { AgentDescriptionSchema, Client, create } from "@pydantic/logfire-fleet-client";
 
 const client = Client.start(
   { endpoint: "wss://opamp.example.com/v1/opamp", instanceUid, headers: { Authorization: "Bearer ..." } },
@@ -196,4 +196,4 @@ npm test                    # compile, then node --test
 
 The conformance suite runs this client through `conformance/drivers/node`.
 
-What the client promises around its callback (when it is called, one at a time and never before `start` returns, what a callback that throws does, which calls are allowed from the callback and from other threads, stop from the callback) is [the SDK contract](../../docs/sdk-contract.md), the same for every SDK here. The precise rules, around the core too, are the shell contract, `spec/shell-contract.md` (put in place by `scripts/fetch_core.py fetch`; it lists the breaks known today). The callback model test and the adversary harness in this client's tests check it, each in platform mode and in core mode.
+What the client promises around its callback (when it is called, one at a time and never before `start` returns, what a callback that throws does, which calls are allowed from the callback and from other threads, stop from the callback) is [the SDK contract](https://github.com/pydantic/opamp-clients/blob/main/docs/sdk-contract.md), the same for every SDK here. The precise rules, around the core too, are the shell contract, `spec/shell-contract.md` (put in place by `scripts/fetch_core.py fetch`; it lists the breaks known today). The callback model test and the adversary harness in this client's tests check it, each in platform mode and in core mode.

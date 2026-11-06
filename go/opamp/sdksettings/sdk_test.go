@@ -46,7 +46,7 @@ func effective(t *testing.T, e *protobufs.EffectiveConfig) string {
 
 // The controls of a policy in order: it must send the first two, and may leave out the others.
 var controls = []string{"head_sampling", "signal_exports", "sampling_rules", "trace_rate_limit", "log_levels",
-	"log_rate_limit", "attribute_redaction", "debug", "app_settings", "instrumentations", "scrubbing"}
+	"log_rate_limit", "attribute_redaction", "debug", "app_settings", "instrumentations", "scrubbing", "self_monitoring"}
 
 const allLocal = `{"traces":{"mode":"local"},"metrics":{"mode":"local"},"logs":{"mode":"local"}}`
 
@@ -224,7 +224,7 @@ func TestTheDescriptionNamesTheFormatAndTheControls(t *testing.T) {
 	}
 	defer l.Close(ctx)
 	all := "head_sampling,signal_exports.traces,signal_exports.metrics,signal_exports.logs,sampling_rules,trace_rate_limit," +
-		"log_levels,log_rate_limit,attribute_redaction,debug,app_settings,instrumentations,scrubbing"
+		"log_levels,log_rate_limit,attribute_redaction,debug,app_settings,instrumentations,scrubbing,self_monitoring"
 	for _, c := range []struct {
 		name     string
 		host     *settingspb.Host
@@ -255,6 +255,7 @@ func TestTheDescriptionNamesTheFormatAndTheControls(t *testing.T) {
 var declaring = &settingspb.Host{Live: []string{"debug_sampling_rate", "debug_send_logs_level", "debug_until",
 	"drop_attributes", "mask_attributes", "sampling_rate", "sampling_rules", "sampling_traces_per_second", "send_logs",
 	"scrub_defaults", "scrub_patterns", "send_logs_level", "send_logs_level_by_scope", "send_logs_per_second", "send_metrics",
+	"send_self_metrics",
 	"send_traces"},
 	NextStart: []string{"deactivate_all_instrumentations", "deactivate_instrumentations"}}
 
@@ -385,17 +386,24 @@ func TestExportHealth(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer l.Close(ctx)
-	first, err := l.Health(ctx, &settingspb.ExportCounts{}, nil, now, nil)
+	first, err := l.Health(ctx, &settingspb.ExportCounts{}, nil, now, nil, nil)
 	if err != nil || !first.GetSend() || len(first.GetExporters().GetComponentHealthMap()) != 3 || first.GetExporters().GetStatus() != "ok" {
 		t.Fatalf("first: %v %v", first, err)
 	}
-	if again, err := l.Health(ctx, &settingspb.ExportCounts{}, first, now+30_000, nil); err != nil || again.GetSend() {
+	if again, err := l.Health(ctx, &settingspb.ExportCounts{}, first, now+30_000, nil, nil); err != nil || again.GetSend() {
 		t.Fatalf("again: %v %v", again, err)
+	}
+	// An exporter the gates can't reach: listed under its signal, ungoverned, healthy, and sent at once.
+	ungoverned, err := l.Health(ctx, &settingspb.ExportCounts{}, first, now+30_000, nil,
+		[]*settingspb.Exporter{{Signal: "traces", Name: "zipkin", Gated: false}})
+	child := ungoverned.GetExporters().GetComponentHealthMap()["traces"].GetComponentHealthMap()["zipkin"]
+	if err != nil || !ungoverned.GetSend() || child.GetStatus() != "ungoverned" || !child.GetHealthy() {
+		t.Fatalf("ungoverned: %v %v", ungoverned, err)
 	}
 	off := false
 	failed, err := l.Health(ctx, &settingspb.ExportCounts{Traces: &settingspb.SignalCounts{
 		ExportsFailed: 1, ItemsFailed: 512, LastFailed: true, LastError: "connection refused"}},
-		first, now+30_000, &settingspb.Settings{SendLogs: &off})
+		first, now+30_000, &settingspb.Settings{SendLogs: &off}, nil)
 	m := failed.GetExporters().GetComponentHealthMap()
 	if err != nil || !failed.GetSend() || failed.GetExporters().GetHealthy() ||
 		m["traces"].GetLastError() != "connection refused" || m["logs"].GetStatus() != "off" {
@@ -444,6 +452,81 @@ func TestEvaluate(t *testing.T) {
 		Input: &settingspb.Evaluate_Log{Log: &settingspb.LogRecord{}}})
 	if err != nil || !strings.HasPrefix(refused.GetRefused(), "head_sampling:") {
 		t.Fatalf("refused: %v %v", refused, err)
+	}
+}
+
+// The shared exporters vectors (testdata/sdk-settings/exporters.json), each through Exporters:
+// the exporters, governed and ungoverned signals and warnings, each compared whole.
+func TestTheExportersVectors(t *testing.T) {
+	ctx := context.Background()
+	l, err := New(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer l.Close(ctx)
+	b, err := os.ReadFile(filepath.Join("..", "..", "..", "testdata", "sdk-settings", "exporters.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	type exporter struct {
+		Signal      string `json:"signal"`
+		Name        string `json:"name"`
+		Gated       bool   `json:"gated"`
+		Destination string `json:"destination"`
+	}
+	type decided struct {
+		Exporters  []exporter `json:"exporters"`
+		Governed   []string   `json:"governed"`
+		Ungoverned []string   `json:"ungoverned"`
+		Warnings   []string   `json:"warnings"`
+	}
+	var v struct {
+		Cases []struct {
+			Name  string `json:"name"`
+			Found []struct {
+				Signal   string `json:"signal"`
+				Kind     string `json:"kind"`
+				Gated    bool   `json:"gated"`
+				Endpoint string `json:"endpoint"`
+				FromEnv  bool   `json:"from_env"`
+			} `json:"found"`
+			Env             map[string]string `json:"env"`
+			DefaultProtocol string            `json:"default_protocol"`
+			Want            decided           `json:"want"`
+		} `json:"cases"`
+	}
+	if err := json.Unmarshal(b, &v); err != nil {
+		t.Fatal(err)
+	}
+	for _, c := range v.Cases {
+		t.Run(c.Name, func(t *testing.T) {
+			var found []*settingspb.FoundExporter
+			for _, f := range c.Found {
+				found = append(found, &settingspb.FoundExporter{Signal: f.Signal, Kind: f.Kind, Gated: f.Gated,
+					Endpoint: f.Endpoint, FromEnv: f.FromEnv})
+			}
+			var env []string
+			for k, val := range c.Env {
+				env = append(env, k+"="+val)
+			}
+			got, err := l.Exporters(ctx, found, env, c.DefaultProtocol)
+			if err != nil {
+				t.Fatal(err)
+			}
+			have := decided{Exporters: []exporter{}, Governed: got.GetGoverned(), Ungoverned: got.GetUngoverned(),
+				Warnings: got.GetWarnings()}
+			for _, e := range got.GetExporters() {
+				have.Exporters = append(have.Exporters, exporter{e.GetSignal(), e.GetName(), e.GetGated(), e.GetDestination()})
+			}
+			for _, s := range []*[]string{&have.Governed, &have.Ungoverned, &have.Warnings} {
+				if *s == nil {
+					*s = []string{}
+				}
+			}
+			if !reflect.DeepEqual(have, c.Want) {
+				t.Errorf("got %+v\nwant %+v", have, c.Want)
+			}
+		})
 	}
 }
 
@@ -560,7 +643,7 @@ func renderComponents(t *testing.T, a *protobufs.AvailableComponents) map[string
 		"instrumentations": each(part("instrumentations"), func(d *protobufs.ComponentDetails) any { return text(d, "version") }),
 		"exporters": each(part("exporters"), func(signal *protobufs.ComponentDetails) any {
 			return each(signal, func(e *protobufs.ComponentDetails) any {
-				if md := e.GetMetadata(); len(md) == 1 && md[0].GetKey() == "gated" {
+				if md := e.GetMetadata(); len(md) >= 1 && md[0].GetKey() == "gated" {
 					if g, ok := md[0].GetValue().GetValue().(*protobufs.AnyValue_BoolValue); ok {
 						return g.BoolValue
 					}
@@ -569,6 +652,22 @@ func renderComponents(t *testing.T, a *protobufs.AvailableComponents) map[string
 				return nil
 			})
 		}),
+		// Where each exporter sends, for those that say: signal to identity to destination.
+		"destinations": func() map[string]any {
+			out := map[string]any{}
+			for s, signal := range part("exporters").GetSubComponentMap() {
+				m := map[string]any{}
+				for name, e := range signal.GetSubComponentMap() {
+					if d := text(e, "destination"); d != nil {
+						m[name] = d
+					}
+				}
+				if len(m) > 0 {
+					out[s] = m
+				}
+			}
+			return out
+		}(),
 		"settings": each(part("settings"), func(d *protobufs.ComponentDetails) any { return text(d, "applies") }),
 	}
 }

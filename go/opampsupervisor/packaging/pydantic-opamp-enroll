@@ -17,6 +17,7 @@ usage() {
 usage: pydantic-opamp-enroll --endpoint URL [--token-file PATH] [--ca-file PATH] [--plaintext]
                              [--restricted [--exporter-endpoint URL]... [--log-path PATH]... [--host-logs]]
                              [--accept-packages] [--no-start]
+       pydantic-opamp-enroll --refresh
 
   --endpoint URL           the OpAMP server: wss:// or https:// (ws:// and http:// need --plaintext)
   --telemetry-token-stdin  read the enrollment token, then the telemetry token, on two input lines
@@ -36,6 +37,9 @@ usage: pydantic-opamp-enroll --endpoint URL [--token-file PATH] [--ca-file PATH]
   --accept-packages        install the collector the server offers, if this repository's release
                            workflow signed it (default: only the installed collector runs)
   --no-start               write the config and credentials, but don't start the service
+  --refresh                write the config again with the last enrollment's options and credentials,
+                           and start the service again unless it was enrolled with --no-start (a
+                           package upgrade runs this; a config edited by hand is kept)
 EOF
 	exit 2
 }
@@ -69,6 +73,41 @@ yaml_list() {
 	printf '[%s]' "$out"
 }
 
+# migrate_options writes the options of an enrollment by a package older than --refresh, which
+# kept none, from its config: only one this script wrote without --restricted, where the endpoint,
+# --plaintext and --accept-packages are all it could say. It replaces the old config only if
+# every setting in it is in the new one (keep_or_replace). A --restricted policy may have been widened or narrowed by hand: it stays.
+migrate_options() {
+	head -n 1 "$etc/supervisor.yaml" | grep -qx '# Written by pydantic-opamp-enroll.*' || return 1
+	! grep -q '^  remote_config_policy:' "$etc/supervisor.yaml" || return 1
+	old_endpoint=$(sed -n 's/^  endpoint: "\(.*\)"$/\1/p' "$etc/supervisor.yaml")
+	[ -n "$old_endpoint" ] || return 1
+	{
+		printf -- '--endpoint\n%s\n' "$old_endpoint"
+		case $old_endpoint in
+		ws://* | http://*) printf -- '--plaintext\n' ;;
+		esac
+		! grep -qx '  accepts_packages: true' "$etc/supervisor.yaml" || printf -- '--accept-packages\n'
+	} >"$migrated"
+	chmod 0600 "$migrated"
+}
+
+# keep_legacy keeps a config an older package wrote, and starts the Supervisor again with it.
+keep_legacy() {
+	rm -f "$migrated" "$etc/supervisor.yaml.tmp" "$etc/settings.tmp"
+	echo "pydantic-opamp-enroll: $etc/supervisor.yaml was written by an older package with --restricted, or edited, and is kept; run pydantic-opamp-enroll again with its options to add this version's settings" >&2
+	"$systemctl" disable --now pydantic-otelcol.service
+	"$systemctl" enable "$unit"
+	"$systemctl" restart "$unit"
+	echo "restarted the Supervisor ($unit)"
+	exit 0
+}
+
+# settings prints a config's settings: its lines but comments and blank ones, sorted.
+settings() {
+	grep -v -e '^[[:space:]]*#' -e '^[[:space:]]*$' "$1" | LC_ALL=C sort -u
+}
+
 root=${OPAMP_ENROLL_ROOT:-}
 creds=${SYSTEMD_CREDS:-systemd-creds}
 systemctl=${SYSTEMCTL:-systemctl}
@@ -76,6 +115,12 @@ supervisor=${OPAMP_SUPERVISOR:-/usr/lib/pydantic-opamp/opampsupervisor}
 storage=$root/var/lib/pydantic-opamp
 etc=$root/etc/pydantic-opamp
 unit=pydantic-opamp-supervisor.service
+# The last enrollment's options (one a line, no credentials) and its config's SHA-256, for --refresh.
+options=$etc/enroll.options
+written=$etc/supervisor.yaml.sha256
+# An older package's enrollment options, read from its config until the new one replaces it.
+migrated=$etc/enroll.options.migrated
+saved_options=$options
 
 endpoint=
 exporter_endpoints=
@@ -88,7 +133,28 @@ host_logs=
 restricted=
 start=yes
 telemetry_stdin=
+refresh=
+saved=
+if [ "${1:-}" = --refresh ]; then
+	[ $# -eq 1 ] || fail "--refresh takes no other options: it uses the last enrollment's"
+	[ -n "$root" ] || [ "$(id -u)" = 0 ] || fail "run it as root"
+	[ -f "$etc/supervisor.yaml" ] || fail "this host isn't enrolled: run pydantic-opamp-enroll --endpoint URL first"
+	refresh=yes
+	if [ ! -f "$options" ]; then
+		migrate_options || keep_legacy
+		saved_options=$migrated
+	fi
+	set --
+	while IFS= read -r line; do
+		set -- "$@" "$line"
+	done <"$saved_options"
+fi
 while [ $# -gt 0 ]; do
+	# The options --refresh can use again: everything but where the credentials come from.
+	case $1 in
+	--endpoint | --exporter-endpoint | --log-path) [ $# -ge 2 ] && saved="$saved$1$nl$2$nl" ;;
+	--plaintext | --host-logs | --restricted | --accept-packages | --no-start) saved="$saved$1$nl" ;;
+	esac
 	case $1 in
 	--endpoint) [ $# -ge 2 ] || usage; endpoint=$2; shift 2 ;;
 	--token-file) [ $# -ge 2 ] || usage; token_file=$2; shift 2 ;;
@@ -112,7 +178,7 @@ ws://* | http://*) [ -n "$plaintext" ] || fail "$endpoint isn't encrypted; pass 
 *) fail "the endpoint must be a wss://, https://, ws:// or http:// URL" ;;
 esac
 case $endpoint in
-*'"'* | *'\'* | *' '*) fail "the endpoint can't contain quotes, backslashes or spaces" ;;
+*'"'* | *'\'* | *' '* | *"$nl"*) fail "the endpoint can't contain quotes, backslashes, spaces or newlines" ;;
 esac
 authority=${endpoint#*://}
 authority=${authority%%/*}
@@ -177,7 +243,11 @@ if [ -n "$host_logs" ]; then
 fi
 
 telemetry_token=
-if [ -n "$telemetry_stdin" ]; then
+token=
+if [ -n "$refresh" ]; then
+	# The sealed tokens stay as they are.
+	[ -f "$etc/enroll-token.cred" ] || fail "$etc/enroll-token.cred is missing: run pydantic-opamp-enroll again with its options and the enrollment token"
+elif [ -n "$telemetry_stdin" ]; then
 	[ "$token_file" = - ] || fail "--telemetry-token-stdin cannot be combined with --token-file"
 	IFS= read -r token || fail "provide an enrollment token on the first input line"
 	IFS= read -r telemetry_token || fail "provide a telemetry token on the second input line"
@@ -192,20 +262,24 @@ elif [ "$token_file" = - ]; then
 else
 	token=$(cat -- "$token_file")
 fi
-# The token goes into an HTTP header: one line, no surrounding space.
-token=$(printf '%s' "$token" | tr -d '\r\n')
-[ -n "$token" ] || fail "the enrollment token is empty"
-case $token in
-*[!A-Za-z0-9._~+/=-]*) fail "the enrollment token has characters a bearer token can't" ;;
-esac
+if [ -z "$refresh" ]; then
+	# The token goes into an HTTP header: one line, no surrounding space.
+	token=$(printf '%s' "$token" | tr -d '\r\n')
+	[ -n "$token" ] || fail "the enrollment token is empty"
+	case $token in
+	*[!A-Za-z0-9._~+/=-]*) fail "the enrollment token has characters a bearer token can't" ;;
+	esac
+fi
 
 umask 077
 mkdir -p "$etc"
 chmod 0750 "$etc"
 
-printf '%s' "$token" | "$creds" encrypt --name=opamp-enroll-token - "$etc/enroll-token.cred.tmp"
-chmod 0600 "$etc/enroll-token.cred.tmp"
-mv -f "$etc/enroll-token.cred.tmp" "$etc/enroll-token.cred"
+if [ -z "$refresh" ]; then
+	printf '%s' "$token" | "$creds" encrypt --name=opamp-enroll-token - "$etc/enroll-token.cred.tmp"
+	chmod 0600 "$etc/enroll-token.cred.tmp"
+	mv -f "$etc/enroll-token.cred.tmp" "$etc/enroll-token.cred"
+fi
 
 if [ -n "$telemetry_stdin" ]; then
 	printf '%s' "$telemetry_token" | "$creds" encrypt --name=opamp-telemetry-token - "$etc/telemetry-token.cred.tmp"
@@ -241,6 +315,14 @@ if [ -n "$ca_file" ]; then
 	tls="  tls:
     ca_file: \"/etc/pydantic-opamp/ca.pem\"
 "
+elif [ -n "$refresh" ] && [ -f "$etc/ca.pem" ]; then
+	# --refresh keeps the copy the last enrollment made.
+	tls="  tls:
+    ca_file: \"/etc/pydantic-opamp/ca.pem\"
+"
+else
+	# Without --ca-file the system's CAs are trusted: no copy is left for --refresh to find.
+	rm -f "$etc/ca.pem"
 fi
 accepts_packages=
 package=
@@ -287,7 +369,14 @@ if [ -n "$restricted" ]; then
     # What its filelog receivers may read: these files, and what is under these directories.
     allowed_log_paths: $(yaml_list "$log_paths")$storage_directories"
 fi
-cat >"$etc/supervisor.yaml.tmp" <<EOF
+# --refresh keeps a config edited since it was written.
+edited=
+if [ -n "$refresh" ] && [ -f "$written" ] &&
+	[ "$(sha256sum <"$etc/supervisor.yaml" | cut -d ' ' -f 1)" != "$(cat "$written")" ]; then
+	edited=yes
+	echo "pydantic-opamp-enroll: $etc/supervisor.yaml was edited since it was written and is kept; run pydantic-opamp-enroll again with its options to rewrite it with this version's settings" >&2
+fi
+[ -n "$edited" ] || cat >"$etc/supervisor.yaml.tmp" <<EOF
 # Written by pydantic-opamp-enroll. Run it again to enroll with another server or token.
 server:
   endpoint: "$endpoint"
@@ -303,6 +392,10 @@ capabilities:
   accepts_restart_command: true
   reports_effective_config: true
   reports_health: true
+  # Where the Collector sends its own metrics and logs: the server offers the destination
+  # (own_metrics, own_logs), and without an offer they stay local.
+  reports_own_metrics: true
+  reports_own_logs: true
   reports_available_components: true$accepts_packages
 
 agent:
@@ -313,6 +406,10 @@ agent:
   automatic_config_rollback: true
   # The Collector's last 4 KiB of log goes with a FAILED config's status, so the server shows why.
   collector_crash_log_snippet_kib: 4
+  # The Collector counts what goes in and out of every receiver, processor and exporter in each
+  # pipeline (otelcol.*.consumed/produced.items), so Fleet can show what each step drops.
+  # Feature gates are command-line only, so this can't come from the server's remote config.
+  args: [--feature-gates=telemetry.newPipelineTelemetry]
 $agent_env
 
 $policy$package
@@ -322,8 +419,21 @@ storage:
   # The issued credentials, encrypted with the key systemd decrypts from state-key.cred.
   state_key: systemd-creds
 EOF
-chmod 0640 "$etc/supervisor.yaml.tmp"
-mv -f "$etc/supervisor.yaml.tmp" "$etc/supervisor.yaml"
+# A config an older package wrote is replaced only if the new one has every setting it had: one
+# edited by hand (another executable, storage directory or header) is kept.
+if [ "$saved_options" = "$migrated" ]; then
+	settings "$etc/supervisor.yaml.tmp" >"$etc/settings.tmp"
+	[ -z "$(settings "$etc/supervisor.yaml" | LC_ALL=C comm -23 - "$etc/settings.tmp")" ] || keep_legacy
+	rm -f "$etc/settings.tmp" "$migrated"
+	cp -p "$etc/supervisor.yaml" "$etc/supervisor.yaml.old"
+	echo "pydantic-opamp-enroll: rewriting the config an older package wrote; the old one is kept as $etc/supervisor.yaml.old" >&2
+fi
+if [ -z "$edited" ]; then
+	chmod 0640 "$etc/supervisor.yaml.tmp"
+	mv -f "$etc/supervisor.yaml.tmp" "$etc/supervisor.yaml"
+	sha256sum <"$etc/supervisor.yaml" | cut -d ' ' -f 1 >"$written"
+	printf '%s' "$saved" >"$options"
+fi
 if getent group pydantic-opamp >/dev/null 2>&1 && [ "$(id -u)" = 0 ]; then
 	chgrp pydantic-opamp "$etc" "$etc/supervisor.yaml"
 	[ ! -e "$etc/ca.pem" ] || chgrp pydantic-opamp "$etc/ca.pem"
@@ -340,6 +450,8 @@ wait_connected() {
 	exit 1
 }
 
+done=Enrolled
+[ -z "$refresh" ] || done=Refreshed
 if [ -n "$start" ]; then
 	# The unmanaged collector conflicts with the Supervisor: disabled, it doesn't come back at boot.
 	"$systemctl" disable --now pydantic-otelcol.service
@@ -347,7 +459,7 @@ if [ -n "$start" ]; then
 	started=$(date +%s)
 	"$systemctl" restart "$unit"
 	wait_connected "$started"
-	echo "Enrolled with $endpoint. The Supervisor is running and connected ($unit)."
+	echo "$done with $endpoint. The Supervisor is running and connected ($unit)."
 else
-	echo "Enrolled with $endpoint. Start the Supervisor with: systemctl enable --now $unit"
+	echo "$done with $endpoint. Start the Supervisor with: systemctl enable --now $unit"
 fi

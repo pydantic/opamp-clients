@@ -153,13 +153,14 @@ func TestTheInventoryOfATypicalSetupReachesTheServer(t *testing.T) {
 		sdkMeta["telemetry.sdk.version"] != otelsdk.Version() || otelsdk.Version() == "" {
 		t.Fatalf("sdk: %v", sdkMeta)
 	}
-	if got, want := exportersOf(c), map[string]map[string]bool{"traces": {"otlp": true}, "metrics": {"prometheus": false},
-		"logs": {"console": true}}; !reflect.DeepEqual(got, want) {
+	// Prometheus is pulled, so its reader can't be gated: listed ungoverned. OTLP by where it sends.
+	if got, want := exportersOf(c), map[string]map[string]bool{"traces": {"otlp@localhost:4318": true},
+		"metrics": {"prometheus": false}, "logs": {"console": true}}; !reflect.DeepEqual(got, want) {
 		t.Fatalf("exporters %v, want %v", got, want)
 	}
-	// The settings: those of the host Load and Decide are given, without send_metrics.
+	// The settings: those of the host Load and Decide are given, every one, send_metrics too.
 	settings := listed(c.GetComponents()["settings"])
-	if _, ok := settings["send_metrics"]; ok || settings["send_traces"]["applies"] != "at once" ||
+	if settings["send_metrics"]["applies"] != "at once" || settings["send_traces"]["applies"] != "at once" ||
 		settings["deactivate_instrumentations"]["applies"] != "at once" || settings["debug_until"]["applies"] != "at once" {
 		t.Fatalf("settings %v", settings)
 	}
@@ -252,8 +253,8 @@ func TestAnInventoryOfNothing(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer sdk.Shutdown(context.Background())
-	if len(sdk.exporters) != 0 {
-		t.Fatalf("exporters %v", sdk.exporters)
+	if len(sdk.found) != 0 {
+		t.Fatalf("exporters %v", sdk.found)
 	}
 	sdk.agent.mu.Lock()
 	c := sdk.agent.components(context.Background())
@@ -268,9 +269,9 @@ func TestAnInventoryOfNothing(t *testing.T) {
 	}
 }
 
-// The metrics exporter is gated exactly when send_metrics is carried out: the inventory and the
-// host agree, for each exporter Setup builds.
-func TestTheMetricsExporterIsGatedWhenSendMetricsIsCarriedOut(t *testing.T) {
+// The metrics exporter is gated wherever Setup builds its reader, and listed ungoverned where
+// autoexport does; send_metrics is carried out either way.
+func TestTheMetricsExporterIsGatedWhereSetupBuildsItsReader(t *testing.T) {
 	t.Setenv("OTEL_TRACES_EXPORTER", "none")
 	t.Setenv("OTEL_LOGS_EXPORTER", "none")
 	t.Setenv("OTEL_EXPORTER_PROMETHEUS_PORT", "0")
@@ -278,11 +279,11 @@ func TestTheMetricsExporterIsGatedWhenSendMetricsIsCarriedOut(t *testing.T) {
 		env  map[string]string
 		want map[string]map[string]bool
 	}{
-		{map[string]string{}, map[string]map[string]bool{"metrics": {"otlp": true}}},
+		{map[string]string{}, map[string]map[string]bool{"metrics": {"otlp@localhost:4318": true}}},
 		{map[string]string{"OTEL_METRICS_EXPORTER": "console"}, map[string]map[string]bool{"metrics": {"console": true}}},
 		{map[string]string{"OTEL_METRICS_EXPORTER": "none"}, map[string]map[string]bool{}},
 		{map[string]string{"OTEL_METRICS_EXPORTER": "prometheus"}, map[string]map[string]bool{"metrics": {"prometheus": false}}},
-		{map[string]string{"OTEL_METRICS_PRODUCERS": "prometheus"}, map[string]map[string]bool{"metrics": {"otlp": false}}},
+		{map[string]string{"OTEL_METRICS_PRODUCERS": "prometheus"}, map[string]map[string]bool{"metrics": {"otlp@localhost:4318": false}}},
 	} {
 		for k, v := range tc.env { // autoexport reads the process environment too
 			t.Setenv(k, v)
@@ -301,9 +302,8 @@ func TestTheMetricsExporterIsGatedWhenSendMetricsIsCarriedOut(t *testing.T) {
 		if got := exportersOf(c); !reflect.DeepEqual(got, tc.want) {
 			t.Errorf("%v: exporters %v, want %v", tc.env, got, tc.want)
 		}
-		_, carried := listed(c.GetComponents()["settings"])["send_metrics"]
-		if gated := tc.want["metrics"][metricsExporter(env(tc.env))]; carried != (gated || len(tc.want) == 0) {
-			t.Errorf("%v: send_metrics carried out %v, the exporter gated %v", tc.env, carried, gated)
+		if _, carried := listed(c.GetComponents()["settings"])["send_metrics"]; !carried {
+			t.Errorf("%v: send_metrics not carried out", tc.env)
 		}
 	}
 }
@@ -479,5 +479,28 @@ func TestAVersionWithACommaTakesNoSlot(t *testing.T) {
 	slices.Sort(versions)
 	if len(versions) != maxScopeVersions || versions[0] != "1.000" || versions[maxScopeVersions-1] != fmt.Sprintf("1.%03d", maxScopeVersions-1) {
 		t.Fatalf("versions %v: want the %d without a comma", versions, maxScopeVersions)
+	}
+}
+
+// Each exporter Setup built is listed as the layer decides from the variables autoexport read:
+// OTLP at its per-signal endpoint, the console under its own name.
+func TestTheExportersAreListedWhereTheVariablesSend(t *testing.T) {
+	t.Setenv("OTEL_TRACES_EXPORTER", "otlp")
+	t.Setenv("OTEL_EXPORTER_OTLP_TRACES_ENDPOINT", "https://collector.example.com:4318/v1/traces")
+	t.Setenv("OTEL_LOGS_EXPORTER", "console")
+	sdk, err := setup(context.Background(), env(map[string]string{"OTEL_OPAMP_ENDPOINT": "http://127.0.0.1:1/v1/opamp",
+		"OTEL_METRICS_EXPORTER": "none"}), WithStateDir("none"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer sdk.Shutdown(context.Background())
+	sdk.agent.mu.Lock()
+	defer sdk.agent.mu.Unlock()
+	var got []string
+	for _, e := range sdk.agent.listedExporters() {
+		got = append(got, fmt.Sprintf("%s/%s/%v/%s", e.GetSignal(), e.GetName(), e.GetGated(), e.GetDestination()))
+	}
+	if want := []string{"traces/otlp/true/https://collector.example.com:4318/v1/traces", "logs/console/true/"}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("listed %v, want %v", got, want)
 	}
 }
