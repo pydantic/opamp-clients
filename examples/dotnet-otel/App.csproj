@@ -9,6 +9,11 @@
     <AssemblyName>App</AssemblyName>
   </PropertyGroup>
 
+  <!-- Hosted/ is an application of its own (Hosted.csproj). -->
+  <ItemGroup>
+    <Compile Remove="Hosted/**" />
+  </ItemGroup>
+
   <ItemGroup>
     <!-- ASP.NET Core, for the requests it serves with APP_LISTEN set (sampling_rules' path). -->
     <FrameworkReference Include="Microsoft.AspNetCore.App" />

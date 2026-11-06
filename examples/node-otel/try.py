@@ -37,6 +37,12 @@ Then check_app_settings, for app.cjs and app.mjs: each reads the feature flag ex
 through appSettings (app.cjs from @pydantic/logfire-fleet-otel/app-settings, app.mjs from the package
 itself), which the server turns on and off (docs/app-settings.md). The package reaches them as
 an installed one would, by its name: examples/node-otel/node_modules holds a link to node/otel.
+
+check_outage (examples/integrations.py) runs for app.cjs, and again for manage.mjs, an application
+that sets its own NodeSDK up (its exporter, the http instrumentation) and then calls manage(): run
+with plain `node`, the server from OTEL_OPAMP_*, and for logfire/logfire-js.mjs, the same on the
+Logfire JS SDK (logfire.configure(), then manage(); its own dependency in logfire/package.json),
+its spans sent where LOGFIRE_TOKEN and LOGFIRE_BASE_URL (the sink) say.
 """
 from __future__ import annotations
 
@@ -54,7 +60,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-from integrations import (ROOT, check, check_app_settings, check_setup, check_rotation, check_signals, check_truth, key_in_code, main,  # noqa: E402
+from integrations import (ROOT, check, check_app_settings, check_setup, check_rotation, check_outage, check_signals, check_truth, key_in_code, main,  # noqa: E402
                           offer, read_log, server_binary, statuses, stop_group, target, opamp_url)
 
 HERE = Path(__file__).resolve().parent
@@ -68,6 +74,8 @@ def build() -> None:
         subprocess.run(["npm", "run", "build"], cwd=d, check=True, stdout=subprocess.DEVNULL)
     # in-code.mjs imports the package by name, and app.cjs and app.mjs require its appSettings by
     # name, as `npm install <this repository>/node/otel` in the application's directory would let them.
+    # logfire/logfire-js.mjs's own dependency, the Logfire JS SDK.
+    subprocess.run(["npm", "ci", "--no-audit", "--no-fund"], cwd=HERE / "logfire", check=True, stdout=subprocess.DEVNULL)
     link = HERE / "node_modules" / "@pydantic" / "logfire-fleet-otel"
     link.parent.mkdir(parents=True, exist_ok=True)
     if not link.is_symlink():
@@ -97,6 +105,10 @@ def launch(port: str, telemetry_port: str, state: Path, name: str, extra: dict[s
         env = {k: v for k, v in env.items() if not k.startswith("OTEL_OPAMP_")}
         env.update(APP_OPAMP_URL=opamp_url(port), APP_OPAMP_TOKEN="example", APP_STATE_DIR=str(state))
         command = ["node", str(HERE / APP)]
+    elif APP in ("manage.mjs", "logfire/logfire-js.mjs"):  # its own SDK, then manage(): no --import
+        command = ["node", str(HERE / APP)]
+        if APP.startswith("logfire/"):  # the Logfire JS SDK's own settings: its spans to the sink
+            env.update(LOGFIRE_TOKEN="example-token", LOGFIRE_BASE_URL=telemetry)
     else:
         command = ["node", "--import", str(OTEL / "dist/src/register.js"), str(HERE / APP)]
     app = subprocess.Popen([*command, f"{telemetry}/ping"], env=env | extra, start_new_session=True, stdout=subprocess.DEVNULL,
@@ -199,7 +211,8 @@ class Server:
         """`offers`: (message, overrides) pairs, each offered as a policy (integrations.offer())."""
         self.log = TARGET / f"{name}.jsonl"
         scenario = TARGET / f"{name}-scenario.json"
-        scenario.write_text(json.dumps({"server": {"faults": [offer(n, overrides) for n, overrides in offers]}}))
+        scenario.write_text(json.dumps({"server": {"sdk_fixture": True,
+                                                    "faults": [offer(n, overrides) for n, overrides in offers]}}))
         self.process = subprocess.Popen([str(TARGET / "server"), "-listen", listen, "-scenario", str(scenario),
                                          "-log", str(self.log)], stdout=subprocess.PIPE, text=True)
         listening = json.loads(self.process.stdout.readline())
@@ -392,7 +405,7 @@ def of(app: str, run_check: Callable[[Path], bool]) -> Callable[[], bool]:
         global APP
         APP = app
         directory = TARGET / app.replace(".", "-")
-        directory.mkdir(exist_ok=True)
+        directory.mkdir(parents=True, exist_ok=True)
         return run_check(directory)
     return run_
 
@@ -414,6 +427,9 @@ CHECKS = {
     "setup-in-code": of("in-code.mjs", lambda d: check_setup(launch, d, key=key_in_code("APP_OPAMP_TOKEN"),
                                                              named="the headers given to register()")),
     "rotation": of("app.cjs", lambda d: check_rotation(launch, d)),
+    "outage": of("app.cjs", lambda d: check_outage(launch, d)),
+    "outage-manage": of("manage.mjs", lambda d: check_outage(launch, d)),
+    "outage-logfire": of("logfire/logfire-js.mjs", lambda d: check_outage(launch, d)),
     "settings": check_settings,
 } | {
     f"app-{app.removeprefix('app.')}": of(app, lambda d: check_app_settings(launch, d))

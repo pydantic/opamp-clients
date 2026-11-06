@@ -1,0 +1,19 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- An application that sets its OpenTelemetry SDK up in code, with WithOpAmp() last
+       (Logfire.Fleet.Extensions.Hosting): no automatic instrumentation. -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <AssemblyName>Hosted</AssemblyName>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.Hosting" Version="8.0.1" />
+    <PackageReference Include="OpenTelemetry.Instrumentation.Http" Version="1.15.0" />
+    <ProjectReference Include="../../../dotnet/Logfire.Fleet.Extensions.Hosting/Logfire.Fleet.Extensions.Hosting.csproj" />
+  </ItemGroup>
+
+</Project>

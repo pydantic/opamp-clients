@@ -5,9 +5,11 @@ Node.js and Go that you connect to Logfire Fleet and change from a policy while 
 of this page covers the integration checks.
 
 The OpenTelemetry SDK integrations run against a reference OpAMP server that plays each check's
-scenario, with a telemetry sink that receives the exported spans, metrics and logs. This
-repository does not build that server: `OPAMP_EXAMPLES_SERVER` names its binary, and without one
-the checks stop and say so. The Go conformance server is not part of these integration examples.
+scenario, with a telemetry sink that receives the exported spans, metrics and logs: the
+conformance suite's Go server ([conformance/server](../conformance/server)) as the SDK fixture
+(`fixture.go`), which the checks build with `go build` the first time they need it.
+`OPAMP_EXAMPLES_SERVER` names another binary to use in its place, one that takes the same flags,
+scenarios and log.
 
 Run one integration:
 
@@ -94,6 +96,27 @@ starts it once more with the first endpoint still configured:
 | moves the agent to another port, with a third key | the agent takes it there, refusing no request, opens no connection to the first port after it, and is traced throughout |
 | (the next start) | the agent goes straight to the second port on the key it was given there, takes no new key, and none of its requests is refused |
 
+Then `check_outage` (the check `outage`) takes the OpAMP server away and starts the application
+while it is away. The telemetry goes to a sink that stays up throughout; the OpAMP servers come and
+go at one endpoint:
+
+| What happens | What the run checks |
+|---|---|
+| server A offers a policy that masks the URL | APPLIED; spans arrive with each URL `[REDACTED]` |
+| server A stops, and nothing listens for 15 s | the application goes on making requests, and its spans still arrive masked |
+| server B, a new server that knows nothing of the agent, comes up at the same endpoint | the agent comes back with the same UID, sends its whole state (its description) before any offer, and reports the masking policy it kept as its effective config |
+| server B offers a policy that drops the URL | APPLIED; spans arrive with no URL |
+| the next start, with nothing at the endpoint | the application starts and makes its requests, its spans without a URL from the first: it runs on the policy it saved, with no word from a server |
+| server C comes up there | the agent reports the same UID, and the dropping policy as its effective config |
+
+The Python integration also runs it on the Logfire SDK (`outage-logfire`: `logfire_app.py`, set up
+with `configure_logfire()`, its spans sent where the Logfire SDK sends them) and on an SDK the
+application set up itself (`outage-manage`: `logfire.configure()` then `manage()`), and Node.js on
+its own NodeSDK then `manage()` (`outage-manage`: `manage.mjs`) and on the Logfire JS SDK
+(`outage-logfire`: `logfire/logfire-js.mjs`, `logfire.configure()` then `manage()`, its spans sent
+where the Logfire SDK sends them). The .NET integration also runs it on an SDK set up in code with
+`WithOpAmp()` (`outage-hosted`: `dotnet-otel/Hosted/`, no automatic instrumentation).
+
 Each check is independent of the others (its own server, state directory and logs), so one can
 run alone, by name, or several side by side. A check waits on its scenario's clock (one message a
 second), not on the machine, so with `--jobs` they take about as long as the longest of them:
@@ -112,9 +135,9 @@ for that reason).
 A new check goes into its integration's `try.py`, in `CHECKS`, under a name of its own. Each run
 prints how long each check took.
 
-CI does not run these checks: they need the reference server's binary. It runs the checks' own
-tests (`examples/test_integrations.py`, `examples/test_settings_cookbook.py`) and each
-integration's unit tests.
+CI runs every check of each integration on every pull request that is not a draft (the job
+"…, end to end"), four at once, besides the checks' own tests (`examples/test_integrations.py`,
+`examples/test_settings_cookbook.py`) and each integration's unit tests.
 
 Every integration lets the application read its own settings ([docs/app-settings.md](../docs/app-settings.md)),
 checked by `check_app_settings` (the check `app`): its example application reads the flag

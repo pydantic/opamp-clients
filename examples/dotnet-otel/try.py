@@ -48,6 +48,11 @@ providers under OTEL_DOTNET_AUTO_SETUP_SDK=false, exporting there too. Each sett
 telemetry or is named as set aside; only own-sdk sets any aside (the sampler's settings: the
 plugin's sampler isn't in the application's provider), and what the gates aren't in front of is
 reported ungoverned.
+
+check_outage (examples/integrations.py) runs for Program.cs, and again for Hosted/Program.cs, the
+same requests from an application that sets its SDK up in code (the generic host,
+AddOpenTelemetry() with the HttpClient instrumentation and the OTLP exporter, and WithOpAmp()
+last), started with plain `dotnet`: outage-hosted.
 """
 from __future__ import annotations
 
@@ -69,7 +74,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "scripts"))
 import native_lib  # noqa: E402
 from integrations import (  # noqa: E402
-    MARGIN, ROOT, check, check_app_settings, check_setup, check_rotation, check_signals, check_truth, ended, main, offer, pings, run, sent_before,
+    MARGIN, ROOT, check, check_app_settings, check_setup, check_rotation, check_outage, check_signals, check_truth, ended, main, offer, pings, run, sent_before,
     statuses, stop_container, stop_group, target, opamp_url,
 )
 
@@ -88,6 +93,9 @@ PLUGIN = ("Elastic.OpenTelemetry.AutoInstrumentationPlugin, Elastic.OpenTelemetr
 INSTRUMENT = "./_instrument.sh" if EDOT else "./instrument.sh"
 # Not "app": on a case-insensitive disk that is the published "App" of an older layout.
 OUT = TARGET / "publish"
+#: Hosted/'s application (WithOpAmp in code), and the directory of its runs' files.
+HOSTED_OUT = TARGET / "publish-hosted"
+HOSTED = TARGET / "hosted"
 LOCAL = "--local" in sys.argv
 HOST = "127.0.0.1" if LOCAL else "host.docker.internal"
 
@@ -100,12 +108,18 @@ def build() -> None:
                         "-r", rid, "--self-contained", "false", "--nologo", "-v", "q", f"-p:Edot={str(EDOT).lower()}",
                         "-o", str(OUT)],
                        check=True, stdout=subprocess.DEVNULL)
+        subprocess.run(["dotnet", "publish", str(Path(__file__).resolve().parent / "Hosted" / "Hosted.csproj"), "-c",
+                        "Release", "-r", rid, "--self-contained", "false", "--nologo", "-v", "q", "-o", str(HOSTED_OUT)],
+                       check=True, stdout=subprocess.DEVNULL)
         return
     # The native core for Linux whatever the host (scripts/native_lib.py).
     lib = native_lib.build()
     subprocess.run(["docker", "run", "--rm", "--network", "host", "-v", f"{ROOT}:/work", *NUGET, "-w", "/work/examples/dotnet-otel", IMAGE,
                     "dotnet", "publish", "-c", "Release", "-r", rid, "--self-contained", "false", "--nologo", "-v", "q",
                     f"-p:OpAmpNativeLib=/work/{lib}", f"-p:Edot={str(EDOT).lower()}", "-o", f"/work/{OUT.relative_to(ROOT)}"], check=True, stdout=subprocess.DEVNULL)
+    subprocess.run(["docker", "run", "--rm", "--network", "host", "-v", f"{ROOT}:/work", *NUGET, "-w", "/work/examples/dotnet-otel/Hosted", IMAGE,
+                    "dotnet", "publish", "-c", "Release", "-r", rid, "--self-contained", "false", "--nologo", "-v", "q",
+                    f"-p:OpAmpNativeLib=/work/{lib}", "-o", f"/work/{HOSTED_OUT.relative_to(ROOT)}"], check=True, stdout=subprocess.DEVNULL)
 
 
 def launch(port: str, telemetry_port: str, state: Path, name: str, extra: dict[str, str]):
@@ -125,25 +139,31 @@ def launch(port: str, telemetry_port: str, state: Path, name: str, extra: dict[s
         # Program.cs's own activities (run 3's probe): exported only from a source named here.
         "OTEL_DOTNET_AUTO_TRACES_ADDITIONAL_SOURCES": "app",
     } | extra
-    stderr = open(TARGET / f"{name}.stderr", "w")
+    # EXAMPLE_APP=hosted: Hosted/'s application, its SDK set up in code with WithOpAmp(), started
+    # with plain `dotnet` (no automatic instrumentation, so no plugin).
+    hosted = env.pop("EXAMPLE_APP", None) == "hosted"
+    out, start = (HOSTED_OUT, ["dotnet", "Hosted.dll"]) if hosted else (OUT, [INSTRUMENT, "dotnet", "App.dll"])
+    if hosted:
+        env.pop("OTEL_DOTNET_AUTO_PLUGINS")
+    stderr = open((HOSTED if hosted else TARGET) / f"{name}.stderr", "w")
     if LOCAL:
         listen = env.pop("APP_PORT", None)
         if listen:
             env["APP_LISTEN"] = f"http://127.0.0.1:{listen}"
-        app = subprocess.Popen([INSTRUMENT, "dotnet", "App.dll", f"{telemetry}/ping"], cwd=OUT,
+        app = subprocess.Popen([*start, f"{telemetry}/ping"], cwd=out,
                                env=os.environ | env, start_new_session=True, stdout=subprocess.DEVNULL, stderr=stderr)
         return lambda: stop_group(app)
     # By this process too: two runs of one check started in the same second (one per transport,
     # side by side) would otherwise both ask for the same name.
     container = f"opamp-dotnet-otel-{name}-{os.getpid()}-{int(time.time())}"
     cmd = ["docker", "run", "--rm", "--name", container, "--add-host=host.docker.internal:host-gateway",
-           "-v", f"{OUT}:/app:ro", "-v", f"{state}:/state", "-w", "/app"]
+           "-v", f"{out}:/app:ro", "-v", f"{state}:/state", "-w", "/app"]
     if listen := env.pop("APP_PORT", None):
         cmd += ["-p", f"127.0.0.1:{listen}:8080"]
         env["APP_LISTEN"] = "http://0.0.0.0:8080"
     for k, v in env.items():
         cmd += ["-e", f"{k}={v}"]
-    cmd += [IMAGE, INSTRUMENT, "dotnet", "App.dll", f"{telemetry}/ping"]
+    cmd += [IMAGE, *start, f"{telemetry}/ping"]
     app = subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=stderr)
 
     return lambda: stop_container(app, container)
@@ -469,6 +489,8 @@ CHECKS = {
     "signals": lambda: check_signals(launch, TARGET, listen=LISTEN),
     "setup": lambda: check_setup(launch, TARGET, listen=LISTEN),
     "rotation": lambda: check_rotation(launch, TARGET, listen=LISTEN, host=HOST),
+    "outage": lambda: check_outage(launch, TARGET, listen=LISTEN),
+    "outage-hosted": lambda: check_outage(launch, HOSTED, listen=LISTEN, env={"EXAMPLE_APP": "hosted"}),
     "newer": lambda: check_newer_settings(launch, TARGET, listen=LISTEN),
     "app": lambda: check_app_settings(launch, TARGET, listen=LISTEN),
     "truth-plugin-exporters": lambda: check_truth(launch, TARGET, "plugin-exporters", set(), listen=LISTEN,
