@@ -72,7 +72,10 @@ echo "$ENROLLMENT_TOKEN" | sudo pydantic-opamp-enroll --endpoint wss://opamp.exa
   `storage.state_key: systemd-creds` and `agent.automatic_config_rollback` (a remote config the
   Collector fails on is replaced by the last one that ran healthy, and stays FAILED), and
   `agent.collector_crash_log_snippet_kib: 4` (the FAILED status carries the end of the Collector's
-  log, so the server can show why), and `agent.args: [--feature-gates=telemetry.newPipelineTelemetry]`
+  log, so the server can show why), and `agent.validate_config` (a remote config the Collector can't
+  load, such as one naming a component this Collector isn't built with, is checked with
+  `otelcol validate` first and refused, FAILED with the Collector's reason, while the running
+  config stays), and `agent.args: [--feature-gates=telemetry.newPipelineTelemetry]`
   (the Collector counts the items each receiver, processor and exporter takes in and passes on, as
   `otelcol.*.consumed.items` and `otelcol.*.produced.items`; see
   [Pipeline item counts](#pipeline-item-counts)), and limits what the server's remote config may do (see

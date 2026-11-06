@@ -91,6 +91,14 @@ and date. Tests, CI and docs alone don't need a line.
 
 ### Fixed
 
+- Supervisor installers and container image: a remote config naming a component the Collector
+  isn't built with (a receiver it doesn't have, say) is refused before it runs, FAILED with the
+  Collector's reason, and the Collector keeps running the config it had. The configs turn on
+  `agent.validate_config` (upstream's `otelcol validate` check); the Collector used to start on
+  such a config and exit 1. The container image's configs also turn on
+  `agent.automatic_config_rollback` and `agent.collector_crash_log_snippet_kib: 4`, as the host
+  installers' do: a config the Collector fails on there used to crash-loop until the server sent
+  another (#PR).
 - Node.js: the Logfire SDK's `configure({ fleet })` after its `shutdown()` joins Fleet again. The
   client stayed stopped, so the SDK looked managed with no client running (#135).
 - Supervisor: stopping the Collector no longer races a restart. When the Collector exited just
