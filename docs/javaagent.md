@@ -380,10 +380,17 @@ built by the SDK settings layer as in every language:
 
 - `sdk`: the extension's Maven coordinates, `dev.pydantic:opamp-javaagent-extension`, and its
   version; `telemetry.sdk.language` `java` and the version of the SDK the agent bundles.
-- `instrumentations`: every instrumentation module the agent can run (its own and any
-  extension's), switched off or not, under each name `otel.instrumentation.<name>.enabled` takes
-  for it, so the names are the ones the `instrumentations` control takes: `spring-webmvc` and
-  `spring-webmvc-6.0`, `jdbc`, `java-http-client`. The version is the one the agent embeds for that
+- `instrumentations`: each instrumentation module (the agent's own and any extension's) whose
+  library a class loader of the application's has, switched off or not, as the agent decides a
+  module can apply there: its class loader matcher, and one of its type instrumentations' class
+  loader matcher and the classes its type matcher names. One that matches only the JDK's classes
+  (`executors`, `java-http-client`, `jdbc`) applies wherever the JDK is. The class loaders are the
+  system class loader and every other that has loaded a class, but the agent's own; the extension
+  looks again every 30 s, and a module whose library comes later (a class loader the application
+  makes) is added and the inventory sent again. Each under every name
+  `otel.instrumentation.<name>.enabled` takes for it, so the names are the ones the
+  `instrumentations` control takes: `spring-webmvc` and `spring-webmvc-6.0`, `jdbc`,
+  `java-http-client`. The version is the one the agent embeds for that
   instrumentation (`2.31.1-alpha`, the version its telemetry's scope carries); a module that embeds
   none has no version.
 - `exporters`: each exporter the SDK was built with, by signal, as `otel.traces.exporter`,

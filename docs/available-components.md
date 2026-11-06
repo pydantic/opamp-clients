@@ -71,7 +71,7 @@ carries out and builds the one shape every language sends:
 | Component | What it holds |
 |---|---|
 | `sdk` | metadata `integration.name` and `integration.version` (our package), `telemetry.sdk.language` and `telemetry.sdk.version` (the OpenTelemetry SDK's) |
-| `instrumentations` | one sub-component per instrumentation it can run, switched off or not, under the name that the policy's `instrumentations` control takes, with metadata `version` when known, and `scope` when known: the OpenTelemetry instrumentation scope its telemetry carries (its tracer's, meter's or logger's name), so a server can tell which instrumentations send anything |
+| `instrumentations` | one sub-component per instrumentation that applies (one whose library the application has: see each integration's page), switched off or not, under the name that the policy's `instrumentations` control takes, with metadata `version` when known, and `scope` when known: the OpenTelemetry instrumentation scope its telemetry carries (its tracer's, meter's or logger's name), so a server can tell which instrumentations send anything |
 | `exporters` | one sub-component per signal (`traces`, `metrics`, `logs`) with an exporter, and under it one per exporter by its identity: its name as `OTEL_*_EXPORTER` names it (`otlp`, `console`, `prometheus`, `zipkin`) or its type, and `@host:port` where it sends somewhere known (`otlp@api.honeycomb.io:443`). Metadata: the boolean `gated`, whether the policy governs it (the integration's gate is in front of it: signal export, levels, caps, redaction), and `destination` (`scheme://host:port`) with a destination. Never the path, query or credentials. One not gated is ungoverned: reported, never a reason to refuse a policy ([sdk-settings.md](sdk-settings.md#where-each-setting-applies)). A global provider of the application's own (Node.js, Go, .NET) is listed as `app_provider`, not gated |
 | `settings` | one sub-component per setting it carries out, by the setting's name behind the policy's controls ([sdk-settings.md](sdk-settings.md#the-controls)), with metadata `applies`: `at once` or `next start`. A setting it cannot carry out in this process is left out |
 
@@ -107,6 +107,12 @@ For example, a Python service with Flask and a Prometheus reader:
 - A name listed twice is one sub-component: an instrumentation's versions joined, sorted, by
   `,` (a version with a `,` in it is left out, since it would read as several), and its scopes
   the same way; an exporter `gated` only if every exporter of that identity is.
+- Which instrumentations each integration lists: those that apply, never every one a bundle
+  ships. Python, the instrumentors whose library is installed (those `opentelemetry-instrument`
+  would run); Node.js, each once it has patched a module the application loaded; Go, each scope
+  once it is taken; the Java agent, each module whose library a class loader of the application's
+  has; the .NET plugin, each once its library's assembly is loaded; `WithOpAmp()`, those the
+  application added in code. One that applies later is added, and the inventory sent again.
 - Where each integration's scopes come from: Python, the module its entry point names
   (`opentelemetry.instrumentation.requests`, the name upstream's instrumentations get their
   tracers by); Node.js, the instrumentation's `instrumentationName`

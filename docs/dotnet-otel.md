@@ -334,9 +334,12 @@ and the server is sent their hash, and them in full when it asks. It lists:
   for `WithOpAmp()`) and its version, `telemetry.sdk.language` `dotnet`, and the OpenTelemetry
   SDK's version.
 - `instrumentations`: under the names that the `instrumentations` control takes, upstream's lowercase
-  (`httpclient`, `aspnetcore`, `netruntime`). The plugin lists every instrumentation automatic
-  instrumentation has on .NET, switched off or not (ASP.NET and WCF services, .NET Framework's
-  alone, aren't), at automatic instrumentation's version, which they ship with. `WithOpAmp()`
+  (`httpclient`, `aspnetcore`, `netruntime`). The plugin lists each instrumentation automatic
+  instrumentation has on .NET whose library the application has loaded (one of its assemblies:
+  `Npgsql` for `npgsql`; the runtime's and the process's metrics always), switched off or not
+  (ASP.NET and WCF services, .NET Framework's alone, aren't), at automatic instrumentation's
+  version, which they ship with. One whose library loads later is added when the agent next looks
+  (before each decision, and on the health timer), and the inventory is sent again. `WithOpAmp()`
   lists those the application added to its providers, by their packages
   (`OpenTelemetry.Instrumentation.Http` is `httpclient`; another's name after
   `OpenTelemetry.Instrumentation.`, without its punctuation), at each package's version.

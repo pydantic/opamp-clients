@@ -536,8 +536,11 @@ sends the hash at start, and the components in full when the server asks.
 
 - `sdk`: this package's name and version, from its `package.json`, and the SDK's
   `telemetry.sdk.language` and `telemetry.sdk.version`, as the resource has them.
-- `instrumentations`: every instrumentation the variables loaded (`OTEL_NODE_ENABLED_INSTRUMENTATIONS`,
-  `OTEL_NODE_DISABLED_INSTRUMENTATIONS`), switched off or not, under the short name
+- `instrumentations`: of the instrumentations the variables loaded (`OTEL_NODE_ENABLED_INSTRUMENTATIONS`,
+  `OTEL_NODE_DISABLED_INSTRUMENTATIONS`), those that apply, switched off or not: each once it has
+  patched a module the application requires or imports (its library, at a version it supports).
+  One that patches no module (undici's, on Node.js's diagnostics channels) applies at once; one that
+  applies later is added, and the inventory sent again. Each under the short name
   the `instrumentations` control takes (`http` for `@opentelemetry/instrumentation-http`), with its
   version. One not loaded isn't listed: the server can't switch it on.
 - `exporters`: every exporter on the SDK's providers, read off them once the gates are in, named
@@ -599,9 +602,9 @@ sends the hash at start, and the components in full when the server asks.
     the components and export health, with every override still in force and later configs
     APPLIED; one the API refuses changes nothing; one registered before NodeSDK starts is seen as
     the SDK's is refused; an exporter given to NodeSDK without a gate gets one (once);
-  - the inventory (`test/inventory.test.ts`): a typical setup's components; every instrumentation
-    `getNodeAutoInstrumentations` loads listed with its version, and switched off by the name
-    listed; no instrumentations, exporters set to `none`, repeated and unknown ones; every exporter
+  - the inventory (`test/inventory.test.ts`, `test/local.test.ts`): a typical setup's components;
+    of the instrumentations `getNodeAutoInstrumentations` loads, only those that apply listed, each
+    with its version and switched off by the name listed, and one listed once its module is loaded; no instrumentations, exporters set to `none`, repeated and unknown ones; every exporter
     NodeSDK builds (zipkin included) gated and named by where it sends, a pulled reader
     ungoverned, every setting declared; and in a real process, the hash at start and the
     components in full when the server asks.
