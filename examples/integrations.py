@@ -1836,13 +1836,30 @@ def uids_heard(events: list[dict], after: float = -1) -> list[str]:
     return list(dict.fromkeys(e["uid"] for e in events if e["event"] == "a2s" and e["t"] > after))
 
 
-def judge_slots(events: list[dict], base: Path, starts: list[float], heard: list[str | None]) -> list[tuple[str, bool]]:
+def files_under(base: Path) -> list[str]:
+    """Every file under `base`, as a path relative to it with / between its parts."""
+    return sorted(p.relative_to(base).as_posix() for p in base.rglob("*") if p.is_file())
+
+
+def files_in_container(image: str) -> Callable[[Path], list[str]]:
+    """files_under(), read in a container of `image` as root, with `base` mounted: what an
+    application in a container made there is readable by its user alone."""
+    def files(base: Path) -> list[str]:
+        out = subprocess.run(["docker", "run", "--rm", "-v", f"{base}:/base:ro", image, "find", "/base", "-type", "f"],
+                             capture_output=True, text=True, check=True).stdout
+        return sorted(line.removeprefix("/base/") for line in out.splitlines() if line.startswith("/base/"))
+    return files
+
+
+def judge_slots(events: list[dict], files: list[str], starts: list[float], heard: list[str | None]) -> list[tuple[str, bool]]:
     """check_slots' four starts (`starts`, on the wall clock (on_wall)): the UID each was heard with
-    first (`heard`), and the default state directory's base (`base`, XDG_STATE_HOME) at the end."""
+    first (`heard`), and the files under the default state directory's base (XDG_STATE_HOME) at
+    the end (files_under())."""
     u1, u2, u3, u4 = heard
-    service = sorted(p.name for p in (base / "opamp").iterdir()) if (base / "opamp").is_dir() else []
-    slots = sorted(p.name for p in (base / "opamp" / service[0]).iterdir() if p.is_dir()) if len(service) == 1 else []
-    kept = all(any(f.name != "lock" for f in (base / "opamp" / service[0] / slot).iterdir()) for slot in slots)
+    parts = [f.split("/") for f in files if f.startswith("opamp/")]
+    service = sorted({p[1] for p in parts if len(p) > 2})
+    slots = sorted({p[2] for p in parts if len(p) > 3}) if len(service) == 1 else []
+    kept = all(any(p[2] == slot and p[3] != "lock" for p in parts if len(p) == 4) for slot in slots)
     # The drop, as each restart's effective config: the state its slot kept, not a fresh start. (The
     # server's answers carry no UID: the offers looked for are those until the next start, when the
     # agent that runs on has long had the drop.)
@@ -1863,14 +1880,17 @@ def judge_slots(events: list[dict], base: Path, starts: list[float], heard: list
 
 
 def check_slots(launch: Launch, target_: Path, listen: str = "127.0.0.1:0", seconds: float = 90,
-                env: dict[str, str] | None = None, name: str = "slots") -> bool:
+                env: dict[str, str] | None = None, name: str = "slots",
+                list_files: Callable[[Path], list[str]] = files_under) -> bool:
     """The default state directory (docs/default-state-dir.md), with several processes of one
     program; every check printed, True when all pass. No state directory is named
     (OTEL_OPAMP_STATE_DIR set but empty, which is unset) and the user's state directory is one of
     the check's own (XDG_STATE_HOME). The server offers the drop (OUTAGE_DROP) to each new agent.
     Two processes start, one after the other; the second stops and starts again while the first
     runs; then both stop, and one starts (judge_slots). `launch` is given that directory as the
-    state directory too, for a container to mount: the variables naming it are rewritten there."""
+    state directory too, for a container to mount: the variables naming it are rewritten there.
+    `list_files` lists what is under it at the end: files_under(), or for an application in a
+    container, which makes them as another user, readable by it alone, a listing from in one."""
     target_.mkdir(parents=True, exist_ok=True)
     base = Path(tempfile.mkdtemp(prefix=f"xdg-{name}-", dir=target_))
     base.chmod(0o777)
@@ -1918,7 +1938,7 @@ def check_slots(launch: Launch, target_: Path, listen: str = "127.0.0.1:0", seco
             time.sleep(1)
             start(4)()
             print(f"UIDs heard at each start {heard}")
-            for what, cond in [*judge_slots(events(), base, starts, heard), *judge_transport(events())]:
+            for what, cond in [*judge_slots(events(), list_files(base), starts, heard), *judge_transport(events())]:
                 ok &= cond
                 print(f"  {'ok  ' if cond else 'FAIL'} {what}")
     finally:

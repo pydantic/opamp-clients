@@ -60,7 +60,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from integrations import (  # noqa: E402
-    MARGIN, PREVIOUS, ROOT, check, check_app_settings, check_setup, check_rotation, check_outage, check_slots, check_upgrade, check_signals, check_truth, ended, main, offer, pings, run, sent_before, statuses,
+    MARGIN, PREVIOUS, ROOT, check, check_app_settings, check_setup, check_rotation, check_outage, check_slots, check_upgrade, files_in_container, files_under, check_signals, check_truth, ended, main, offer, pings, run, sent_before, statuses,
     stop_container, stop_group, target, opamp_url,
 )
 
@@ -488,7 +488,8 @@ CHECKS = {
     "rotation": lambda: check_rotation(launch, TARGET, listen=LISTEN, host=HOST),
     "outage": lambda: check_outage(launch, TARGET, listen=LISTEN),
     "upgrade": lambda: check_upgrade(lambda *a: launch(*a, release=True), launch, TARGET, listen=LISTEN),
-    "slots": lambda: check_slots(launch, TARGET, listen=LISTEN),
+    "slots": lambda: check_slots(launch, TARGET, listen=LISTEN,
+                                 list_files=files_under if LOCAL else files_in_container("eclipse-temurin:21-jdk")),
     "matching": lambda: check_matching_settings(launch, TARGET, listen=LISTEN),
     "app": lambda: check_app_settings(launch, TARGET, listen=LISTEN),
     "truth-extension-processor": lambda: check_truth(launch, TARGET, "extension-processor", set(), listen=LISTEN,

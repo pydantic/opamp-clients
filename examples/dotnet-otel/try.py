@@ -76,7 +76,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "scripts"))
 import native_lib  # noqa: E402
 from integrations import (  # noqa: E402
-    MARGIN, PREVIOUS, ROOT, check, check_app_settings, check_setup, check_rotation, check_outage, check_slots, check_upgrade, check_signals, check_truth, ended, main, offer, pings, run, sent_before,
+    MARGIN, PREVIOUS, ROOT, check, check_app_settings, check_setup, check_rotation, check_outage, check_slots, check_upgrade, files_in_container, files_under, check_signals, check_truth, ended, main, offer, pings, run, sent_before,
     statuses, stop_container, stop_group, target, opamp_url,
 )
 
@@ -506,7 +506,8 @@ CHECKS = {
     "outage": lambda: check_outage(launch, TARGET, listen=LISTEN),
     "outage-hosted": lambda: check_outage(launch, HOSTED, listen=LISTEN, env={"EXAMPLE_APP": "hosted"}),
     "upgrade": lambda: check_upgrade(lambda *a: launch(*a, release=True), launch, TARGET, listen=LISTEN),
-    "slots": lambda: check_slots(launch, TARGET, listen=LISTEN),
+    "slots": lambda: check_slots(launch, TARGET, listen=LISTEN,
+                                 list_files=files_under if LOCAL else files_in_container(IMAGE)),
     "newer": lambda: check_newer_settings(launch, TARGET, listen=LISTEN),
     "app": lambda: check_app_settings(launch, TARGET, listen=LISTEN),
     "truth-plugin-exporters": lambda: check_truth(launch, TARGET, "plugin-exporters", set(), listen=LISTEN,

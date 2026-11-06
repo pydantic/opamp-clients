@@ -1397,7 +1397,8 @@ class Slots(unittest.TestCase):
     def judged(self, heard: list[str | None] = [U1, U2, U2, U1], log: Log | None = None, **kw) -> list[str]:
         with tempfile.TemporaryDirectory() as d:
             slots(Path(d), **kw)
-            return failed(integrations.judge_slots((log or four_starts()).events, Path(d), [0, 10, 20, 30], heard))
+            return failed(integrations.judge_slots((log or four_starts()).events, integrations.files_under(Path(d)),
+                                                   [0, 10, 20, 30], heard))
 
     def test_a_good_run_passes(self):
         self.assertEqual(self.judged(), [])
