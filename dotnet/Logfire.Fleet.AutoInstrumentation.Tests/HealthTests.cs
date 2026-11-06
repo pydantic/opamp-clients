@@ -264,7 +264,7 @@ public class HealthTests
                     {
                         if (wanted.TryGetProperty("send", out var w) && w.GetBoolean())
                         {
-                            failed.Add($"{where}: nothing sent");
+                            failed.Add($"{where}: nothing sent (timers {this.timers.Count}, the health last sent {agent.Sdk.HealthSent}, the flow's report {agent.Sdk.State.Health})");
                         }
 
                         continue;
