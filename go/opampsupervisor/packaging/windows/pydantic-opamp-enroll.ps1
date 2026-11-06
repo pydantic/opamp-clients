@@ -314,7 +314,7 @@ agent:
   # The Collector's last 4 KiB of log goes with a FAILED config's status, so the server shows why.
   collector_crash_log_snippet_kib: 4
   # A remote config the Collector can't load (a component this Collector doesn't have, a setting a
-  # component doesn't know) is refused before it runs: `otelcol validate` checks it first, the
+  # component doesn't know) is refused before it runs: otelcol validate checks it first, the
   # running config stays, and the new one is FAILED with the Collector's reason.
   validate_config: true
   # The Collector counts what goes in and out of every receiver, processor and exporter in each
