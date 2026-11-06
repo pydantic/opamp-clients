@@ -1,0 +1,14 @@
+{
+  "name": "logfire-fleet-example-logfire-js",
+  "private": true,
+  "description": "logfire-js.mjs's dependency: the Logfire JS SDK, at the version the check runs",
+  "type": "module",
+  "dependencies": {
+    "@pydantic/logfire-node": "0.21.1"
+  },
+  "overrides": {
+    "rimraf": {
+      "glob": "^14.0.3"
+    }
+  }
+}

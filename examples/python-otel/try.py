@@ -29,6 +29,11 @@ and export health throughout: the metrics go to a port nothing listens on, so a 
 follows the first one, when the timer finds the metric exports failing. Then check_app_settings:
 app.py reads the feature flag example.feature (logfire_fleet_otel.app_settings), which the server turns on
 and off (docs/app-settings.md).
+
+check_outage (examples/integrations.py) runs for app.py, and twice for logfire_app.py, the same
+requests from an application on the Logfire SDK, its spans sent where the Logfire SDK sends them
+(LOGFIRE_TOKEN, and its base URL the sink): set up with configure_logfire() (outage-logfire), and
+with logfire.configure() left as it is and manage() called after it (outage-manage).
 """
 from __future__ import annotations
 
@@ -42,7 +47,7 @@ from collections.abc import Callable
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-from integrations import (DRIFT, MARGIN, ROOT, check, check_app_settings, check_setup, check_rotation,  # noqa: E402
+from integrations import (DRIFT, MARGIN, ROOT, check, check_app_settings, check_setup, check_rotation, check_outage,  # noqa: E402
                           key_in_code, offer,
                           check_signals, check_truth, main, pings, run, signal as exports, spans, statuses, stop_group, target, opamp_url)
 
@@ -55,13 +60,16 @@ UV = ["uv", "run", "--quiet", "--no-project", "--python", "3.13",
       "--with", str(ROOT / "python"), "--with", str(ROOT / "python/otel"),
       # aiohttp-client too: the OpAMP client is aiohttp, and its own requests must not be traced.
       "--with", "opentelemetry-instrumentation-urllib", "--with", "opentelemetry-instrumentation-aiohttp-client",
+      # logfire_app.py's: the Logfire SDK, at the versions configure_logfire is checked with.
+      "--with", f"{ROOT / 'python/otel'}[logfire]",
       *(["--with", f"elastic-opentelemetry=={EDOT_VERSION}"] if EDOT else [])]
 #: With --edot: this package's distro and configurator, EDOT's sampler and resource detectors.
 EDOT_ENV = {"OTEL_PYTHON_DISTRO": "opamp", "OTEL_PYTHON_CONFIGURATOR": "opamp",
             "OTEL_TRACES_SAMPLER": "experimental_composite_parentbased_traceidratio",
             "OTEL_EXPERIMENTAL_RESOURCE_DETECTORS": "process_runtime,os,telemetry_distro,otel"} if EDOT else {}
 APPS = {"app.py": ["opentelemetry-instrument", "python", str(HERE / "app.py")],
-        "in_code.py": ["python", str(HERE / "in_code.py")]}
+        "in_code.py": ["python", str(HERE / "in_code.py")],
+        "logfire_app.py": ["python", str(HERE / "logfire_app.py")]}
 APP = "app.py"
 
 
@@ -75,7 +83,13 @@ def launch(port: str, telemetry_port: str, state: Path, name: str, extra: dict[s
                OTEL_BSP_SCHEDULE_DELAY="500",
                OTEL_PYTHON_LOGGING_AUTO_INSTRUMENTATION_ENABLED="true")
     env.update(EDOT_ENV)
-    if APP == "app.py":
+    if APP == "logfire_app.py":  # the Logfire SDK's own settings: its spans to the sink
+        env.update(OTEL_OPAMP_ENDPOINT=opamp_url(port),
+                   OTEL_OPAMP_HEADERS="Authorization=Bearer%20example",
+                   OTEL_OPAMP_STATE_DIR=str(state),
+                   OTEL_OPAMP_HEARTBEAT_INTERVAL="1s",
+                   LOGFIRE_TOKEN="pylf_v1_us_test", LOGFIRE_BASE_URL=telemetry, LOGFIRE_SEND_TO_LOGFIRE="true")
+    elif APP == "app.py":
         env.update(OTEL_SERVICE_NAME="checkout",
                    OTEL_OPAMP_ENDPOINT=opamp_url(port),
                    OTEL_OPAMP_HEADERS="Authorization=Bearer%20example",
@@ -225,6 +239,9 @@ CHECKS = {
     # With the logging handler installed, the agent's warnings are log records, not stderr.
     "setup": of("app.py", lambda d: check_setup(launch, d, env={"OTEL_PYTHON_LOGGING_AUTO_INSTRUMENTATION_ENABLED": "false"})),
     "rotation": of("app.py", lambda d: check_rotation(launch, d, env={"OTEL_PYTHON_LOGGING_AUTO_INSTRUMENTATION_ENABLED": "false"})),
+    "outage": of("app.py", lambda d: check_outage(launch, d)),
+    "outage-logfire": of("logfire_app.py", lambda d: check_outage(launch, d, name="outage-logfire")),
+    "outage-manage": of("logfire_app.py", lambda d: check_outage(launch, d, env={"EXAMPLE_SETUP": "manage"}, name="outage-manage")),
     "next": of("app.py", lambda d: check_next(launch, d)),
     "app": of("app.py", lambda d: check_app_settings(launch, d)),
     "truth-late-processor": of("app.py", lambda d: check_truth(launch, d, "late-processor", set(),

@@ -60,7 +60,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from integrations import (  # noqa: E402
-    MARGIN, ROOT, check, check_app_settings, check_setup, check_rotation, check_signals, check_truth, ended, main, offer, pings, run, sent_before, statuses,
+    MARGIN, ROOT, check, check_app_settings, check_setup, check_rotation, check_outage, check_signals, check_truth, ended, main, offer, pings, run, sent_before, statuses,
     stop_container, stop_group, target, opamp_url,
 )
 
@@ -470,6 +470,7 @@ CHECKS = {
     "signals": lambda: check_signals(launch, TARGET, listen=LISTEN),
     "setup": lambda: check_setup(launch, TARGET, listen=LISTEN),
     "rotation": lambda: check_rotation(launch, TARGET, listen=LISTEN, host=HOST),
+    "outage": lambda: check_outage(launch, TARGET, listen=LISTEN),
     "matching": lambda: check_matching_settings(launch, TARGET, listen=LISTEN),
     "app": lambda: check_app_settings(launch, TARGET, listen=LISTEN),
     "truth-extension-processor": lambda: check_truth(launch, TARGET, "extension-processor", set(), listen=LISTEN,

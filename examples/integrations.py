@@ -2,8 +2,9 @@
 # SPDX-License-Identifier: MIT
 """The end-to-end check every SDK integration passes (examples/<integration>/try.py).
 
-An instrumented application runs against the reference OpAMP server for these checks: built from
-its sources where they are (a Cargo.toml at the root), else the binary OPAMP_EXAMPLES_SERVER names.
+An instrumented application runs against the reference OpAMP server for these checks: the
+conformance suite's Go server (conformance/server) as the SDK fixture (its fixture.go), built
+here, or the binary OPAMP_EXAMPLES_SERVER names, which takes the same flags, scenarios and log.
 The SDK traces its HTTP requests. Two runs share one state directory.
 
 Each offer is a remote config whose only file is a Logfire SDK policy, `logfire-sdk-policy.json`
@@ -102,6 +103,18 @@ second listener it opens no connection to the first. The next start, with the sa
 directory and the first endpoint still configured, goes straight to the second listener on the
 key it was given there: no connection to the first, nothing refused, no new key.
 
+check_outage takes the OpAMP server away and starts the application while it is away, the
+telemetry going to a sink that stays up throughout (a server of its own whose OpAMP endpoint no
+application is given), the OpAMP servers coming and going at one endpoint, a port fixed ahead:
+server A offers a policy masking the URL; once spans arrive masked it stops, and for OUTAGE_S
+seconds nothing listens there, while the application goes on and its spans still arrive masked.
+Then server B, a new server that knows nothing of the agent, comes up at the same endpoint: the
+agent comes back with its UID, its description and the masking policy as its effective config,
+before B offers anything; B then offers a policy dropping the URL, APPLIED, and spans arrive with
+none. The next start, with the same state directory and nothing at the endpoint: the application
+starts, makes its requests, and its spans have no URL from the first (the policy it saved), until
+server C comes up there and hears it with the same UID and that policy in force.
+
 check_truth runs one more, under a setup (EXAMPLE_SETUP) that adds telemetry paths of its own:
 the server offers TRUTH's documents, one setting each beside sampling_rate 1, and each is either
 carried out (the sink shows it) or named as set aside in the effective config, never APPLIED and
@@ -139,6 +152,7 @@ import json
 import os
 import re
 import shutil
+import socket
 from signal import SIGKILL, SIGTERM
 import subprocess
 import sys
@@ -352,22 +366,17 @@ def app_settings_scenario(gap: int = 10) -> dict:
 
 @functools.cache
 def built_server() -> Path:
-    """The reference server: OPAMP_EXAMPLES_SERVER if set, else built from its sources, once a
-    process, where they are (a Cargo.toml at the root)."""
+    """The reference server: OPAMP_EXAMPLES_SERVER if set, else the conformance suite's Go server,
+    built once a process."""
     given = os.environ.get("OPAMP_EXAMPLES_SERVER")
     if given:
         if not Path(given).is_file():
             sys.exit(f"OPAMP_EXAMPLES_SERVER={given}: no such file")
         return Path(given).resolve()
-    if not (ROOT / "Cargo.toml").is_file():
-        sys.exit("the integration checks need their reference OpAMP server, whose sources aren't here: "
-                 "set OPAMP_EXAMPLES_SERVER to the path of its binary")
-    subprocess.run(["cargo", "build", "--release", "--locked", "-p", "opamp-agents", "--example", "sdk-integrations"],
-                   cwd=ROOT, check=True)
-    cargo_target = Path(os.environ.get("CARGO_TARGET_DIR", ROOT / "target"))
-    if not cargo_target.is_absolute():
-        cargo_target = ROOT / cargo_target
-    return cargo_target / "release" / "examples" / "sdk-integrations"
+    out = ROOT / "target" / "integrations" / "fixture-server"
+    out.parent.mkdir(parents=True, exist_ok=True)
+    subprocess.run(["go", "build", "-o", str(out), "."], cwd=ROOT / "conformance" / "server", check=True)
+    return out
 
 
 def server_binary(target_: Path) -> Path:
@@ -415,13 +424,13 @@ def serving(scenario_: dict, name: str, listen: str, target_: Path):
     """The server, with `scenario_`, for the block: (OpAMP port, telemetry port, its log). It is
     stopped whatever happens."""
     path = target_ / f"{name}-scenario.json"
-    path.write_text(json.dumps(scenario_))
+    path.write_text(json.dumps({**scenario_, "server": {**scenario_["server"], "sdk_fixture": True}}))
     log = target_ / f"{name}.jsonl"
     server = subprocess.Popen([str(server_binary(target_)), "-listen", listen, "-scenario", str(path), "-log", str(log)],
                               stdout=subprocess.PIPE, text=True)
     try:
         listening = json.loads(server.stdout.readline())
-        assert listening["implementation"] == "rust"
+        assert listening["implementation"] in ("go", "rust"), listening
         yield listening["addr"].rsplit(":", 1)[1], listening["telemetry_addr"].rsplit(":", 1)[1], log
     finally:
         server.terminate()
@@ -1508,6 +1517,226 @@ def check_rotation(launch: Launch, target_: Path, listen: str = "127.0.0.1:0", s
         expect(judge_transport(nine))
         expect(judge_moved_start(again))
         expect(judge_transport(again))
+    finally:
+        shutil.rmtree(state, ignore_errors=True)
+    return ok
+
+
+#: check_outage's policies: the URL masked, then dropped, every other control local. Redaction
+#: alone, as every setup carries it out, manage()'s included, which leaves sampling to the
+#: application (the SDK's own sampler traces every request).
+OUTAGE_MASK = {"attribute_redaction": {"mask": ["url.full", "http.url"]}}
+OUTAGE_DROP = {"attribute_redaction": {"drop": ["url.full", "http.url"]}}
+#: How long check_outage keeps the OpAMP server away, in seconds.
+OUTAGE_S = 15
+
+
+def on_wall(events: list[dict], origin: float) -> list[dict]:
+    """A server log's events on the wall clock, in seconds since `origin` (a time.time()): `t` and
+    `ends` from `wall` and `ends_wall`, so that the logs of servers started at different times
+    compare."""
+    out = []
+    for e in events:
+        e = dict(e)
+        if "wall" in e:
+            e["t"] = e["wall"] - origin
+        if "ends_wall" in e:
+            e["ends"] = [end - origin for end in e["ends_wall"]]
+        out.append(e)
+    return out
+
+
+def once(stop: Callable[[], None]) -> Callable[[], None]:
+    """`stop`, carried out the first time only."""
+    done = []
+
+    def stop_once() -> None:
+        if not done:
+            done.append(True)
+            stop()
+    return stop_once
+
+
+def free_port(host: str) -> int:
+    """A port nothing listens on at `host` now, for a server started there later."""
+    with socket.socket() as s:
+        s.bind((host, 0))
+        return s.getsockname()[1]
+
+
+def masked_ending(sink: list[dict], after: float, before: float) -> tuple[list[str], list[str]]:
+    """The names of the requests' spans that ended between `after` and `before` and arrived by
+    `before` (the sink names a span by its URL, else its name), and those of them that show a URL."""
+    names = ending(sink, after, before, arrived_before=before)
+    return names, [n for n in names if "://" in n]
+
+
+def first_full(events: list[dict]) -> dict | None:
+    """The first message of an agent's that carried its description (a full report), if any."""
+    return next((e for e in events if e["event"] == "a2s" and e.get("full")), None)
+
+
+def reported(events: list[dict], overrides: dict[str, dict], before: float = 1e9) -> bool:
+    """Whether an effective config the agent reported before `before` is the policy with
+    `overrides`, every other control local."""
+    def same_fields(got: dict | None, want: dict) -> bool:
+        # Lists as sets (an agent may report the keys it masks in its own order), numbers as numbers.
+        def norm(v: object) -> object:
+            return sorted(map(str, v)) if isinstance(v, list) else float(v) if isinstance(v, (int, float)) else v
+        return got is not None and {k: norm(v) for k, v in got.items()} == {k: norm(v) for k, v in want.items()}
+
+    def matches(e: dict) -> bool:
+        return (list(e) == [POLICY_FILE] and all(same_fields(overridden(e, c), f) for c, f in overrides.items())
+                and all(overridden(e, c) is None for c in (*(f"signal_exports.{s}" for s in _SIGNALS), *_MORE_CONTROLS)
+                        if c not in overrides))
+    return any(matches(e) for e in effective_configs(events, before=before))
+
+
+def judge_outage(sink: list[dict], a: list[dict], b: list[dict], down: float, up: float) -> list[tuple[str, bool]]:
+    """check_outage's first run: the mask APPLIED on server A; the server gone from `down` to `up`
+    (the application going on, its spans still masked); server B, a fresh server at the same
+    endpoint that knows nothing of the agent, hearing the agent again with its UID and the mask
+    in force, then the drop APPLIED. Every time is the wall clock's (on_wall)."""
+    out = []
+    st_a, st_b = statuses(a), statuses(b)
+    applied = st_a[0][0] if st_a and st_a[0][1] == "APPLIED" else None
+    out.append((f"server A: the mask APPLIED ({[s for _, s, _ in st_a]})", applied is not None))
+    if applied is None:
+        return out
+    names, shown = masked_ending(sink, applied + DRIFT, down)
+    out.append((f"the mask in force while connected: spans, each URL [REDACTED] ({names.count('[REDACTED]')} of "
+                f"{len(names)}, {shown[:2]})", "[REDACTED]" in names and not shown))
+    made = pings(sink, down + MARGIN, up)
+    names, shown = masked_ending(sink, down + MARGIN, up)
+    out.append((f"with the server gone the application goes on ({len(made)} requests in {up - down:.0f} s)",
+                len(made) > REQUESTS))
+    out.append((f"and the policy holds: spans still exported, each URL [REDACTED] ({names.count('[REDACTED]')} of "
+                f"{len(names)}, {shown[:2]})", "[REDACTED]" in names and not shown))
+    uid_a = next((e["uid"] for e in a if e["event"] == "a2s"), None)
+    heard = [e for e in b if e["event"] == "a2s"]
+    out.append((f"server B hears the agent again ({len(heard)} messages), with the same UID",
+                bool(heard) and all(e["uid"] == uid_a for e in heard)))
+    full = first_full(b)
+    offered = min((e["t"] for e in b if e["event"] == "s2a" and e.get("offer_config")), default=1e9)
+    out.append(("the agent reports its whole state to the new server (its description) before any offer",
+                full is not None and full["t"] <= offered))
+    out.append(("and the mask, the policy it kept, as its effective config", reported(b, OUTAGE_MASK, offered)))
+    # (The agent's first message to B repeats the APPLIED of the mask it kept: B's answer to the
+    # drop is the one after B offered it.)
+    dropped_at = next((t for t, s, _ in st_b if s == "APPLIED" and t > offered), None)
+    out.append((f"server B: the drop APPLIED ({[s for _, s, _ in st_b]})", dropped_at is not None))
+    if dropped_at is not None:
+        names = ending(sink, dropped_at + DRIFT, heard[-1]["t"])
+        named = [n for n in names if "://" in n or n == "[REDACTED]"]
+        out.append((f"then spans arrive, none with a URL ({len(names)}, {named[:2]})", bool(names) and not named))
+    out.append(("goodbye (agent_disconnect) at the end", bool(heard) and heard[-1]["disconnect"]))
+    return out
+
+
+def judge_offline_start(sink: list[dict], c: list[dict], started: float, up: float,
+                        uid: str | None) -> list[tuple[str, bool]]:
+    """check_outage's next start, `started` with no server at the OpAMP endpoint, until server C
+    comes up there at `up`: the application runs on the policy it saved (the drop) from its first
+    span, with no word from a server; server C then hears it with the same UID and the drop in
+    force. Every time is the wall clock's (on_wall)."""
+    made = pings(sink, started, up)
+    names = ending(sink, started, up)
+    named = [n for n in names if "://" in n or n == "[REDACTED]"]
+    heard = [e for e in c if e["event"] == "a2s"]
+    return [
+        (f"with no server the application starts and makes its requests ({len(made)} in {up - started:.0f} s)",
+         len(made) > REQUESTS),
+        (f"traced from its first span on the policy it saved: none with a URL ({len(names)}, {named[:2]})",
+         len(names) > REQUESTS and not named),
+        (f"once a server comes up there it hears the agent ({len(heard)} messages), with the same UID",
+         bool(heard) and uid is not None and all(e["uid"] == uid for e in heard)),
+        ("and the drop, the policy it started on, as its effective config", reported(c, OUTAGE_DROP)),
+        ("goodbye (agent_disconnect) at the end", bool(heard) and heard[-1]["disconnect"]),
+    ]
+
+
+def check_outage(launch: Launch, target_: Path, listen: str = "127.0.0.1:0", seconds: float = 90,
+                 env: dict[str, str] | None = None, name: str = "outage") -> bool:
+    """The OpAMP server goes away and comes back, and the application starts while it is away;
+    every check printed, True when all pass. The telemetry goes to a sink of its own (a server
+    whose OpAMP endpoint nobody is given), which stays up throughout; the OpAMP servers come and
+    go at one endpoint, a port fixed ahead.
+
+    The first run: server A offers the mask (OUTAGE_MASK) at the first message; once spans arrive
+    masked it stops, and OUTAGE_S seconds later server B, a new server that knows nothing of the
+    agent, comes up at the same endpoint and offers the drop (OUTAGE_DROP) at the agent's third
+    message there (judge_outage). The next start, with the same state directory: no server at the
+    endpoint until the application has made its requests, then server C, which offers nothing
+    (judge_offline_start). `name` names its logs and state: two checks of one application in one
+    directory, run at once, each give their own."""
+    target_.mkdir(parents=True, exist_ok=True)
+    state = Path(tempfile.mkdtemp(prefix=f"state-{name}-", dir=target_))
+    state.chmod(0o777)
+    env = env or {}
+    host = listen.rsplit(":", 1)[0]
+    at = f"{host}:{free_port(host)}"
+    ok = True
+
+    def expect(results: list[tuple[str, bool]]) -> None:
+        nonlocal ok
+        for what, cond in results:
+            ok &= cond
+            print(f"  {'ok  ' if cond else 'FAIL'} {what}")
+
+    origin = time.time()
+
+    def wall(log: Path) -> list[dict]:
+        return on_wall(read_log(log), origin)
+
+    try:
+        with serving({"server": {}}, f"{name}-sink", listen, target_) as (_, telemetry, sink_log):
+            port = at.rsplit(":", 1)[1]
+            stop = once(launch(port, telemetry, state, name, env))
+            try:
+                with serving({"server": {"faults": [offer(1, OUTAGE_MASK)]}}, f"{name}-a", at, target_) as (_, _, a_log):
+                    def masked() -> bool:
+                        st = statuses(wall(a_log))
+                        return bool(st) and "[REDACTED]" in ending(wall(sink_log), st[0][0] + DRIFT, 1e9)
+                    wait_for(masked, seconds, MARGIN)
+                down = time.time() - origin
+                time.sleep(OUTAGE_S)
+                up = time.time() - origin
+                with serving({"server": {"faults": [offer(3, OUTAGE_DROP)]}}, f"{name}-b", at, target_) as (_, _, b_log):
+                    def dropped() -> bool:
+                        b = wall(b_log)
+                        offered = min((e["t"] for e in b if e["event"] == "s2a" and e.get("offer_config")), default=1e9)
+                        at = next((t for t, s, _ in statuses(b) if s == "APPLIED" and t > offered), None)
+                        return at is not None and len(ending(wall(sink_log), at + DRIFT, 1e9)) > REQUESTS
+                    wait_for(dropped, seconds, MARGIN)
+                    stop()
+                    time.sleep(0.5)
+            finally:
+                stop()
+            a, b = wall(a_log), wall(b_log)
+            print(f"the first run: server A statuses {[s for _, s, _ in statuses(a)]}, away {up - down:.0f} s, "
+                  f"server B {sum(e['event'] == 'a2s' for e in b)} messages, statuses {[s for _, s, _ in statuses(b)]}")
+            expect(judge_outage(wall(sink_log), a, b, down, up))
+            expect(judge_transport(a))
+            expect(judge_transport(b))
+            uid = next((e["uid"] for e in a if e["event"] == "a2s"), None)
+
+            started = time.time() - origin
+            stop = once(launch(port, telemetry, state, f"{name}-again", env))
+            try:
+                wait_for(lambda: len(pings(wall(sink_log), started)) > 3 * REQUESTS
+                         and len(ending(wall(sink_log), started, 1e9)) > REQUESTS, seconds, 2)
+                up = time.time() - origin
+                with serving({"server": {}}, f"{name}-c", at, target_) as (_, _, c_log):
+                    wait_for(lambda: bool(effective_configs(wall(c_log))), seconds, MARGIN)
+                    stop()
+                    time.sleep(0.5)
+            finally:
+                stop()
+            c = wall(c_log)
+            print(f"the next start: {len(pings(wall(sink_log), started, up))} requests before a server came up, "
+                  f"server C {sum(e['event'] == 'a2s' for e in c)} messages")
+            expect(judge_offline_start(wall(sink_log), c, started, up, uid))
+            expect(judge_transport(c))
     finally:
         shutil.rmtree(state, ignore_errors=True)
     return ok

@@ -52,7 +52,7 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-from integrations import (MARGIN, DRIFT, SIGNALS, check, check_app_settings, check_setup, check_rotation, key_in_code,  # noqa: E402
+from integrations import (MARGIN, DRIFT, SIGNALS, check, check_app_settings, check_setup, check_rotation, check_outage, key_in_code,  # noqa: E402
                           check_signals, check_truth, ended, main, offer, pings, run, signal, spans, statuses, stop_group, target, opamp_url)
 import json  # noqa: E402
 import shutil  # noqa: E402
@@ -244,6 +244,7 @@ CHECKS = {
     "signals": lambda: check_signals(FROM_ENV, TARGET, switch_at_once=True),
     "setup": lambda: check_setup(FROM_ENV, TARGET),
     "rotation": lambda: check_rotation(FROM_ENV, TARGET),
+    "outage": lambda: check_outage(FROM_ENV, TARGET),
     "settings": lambda: check_settings(FROM_ENV, TARGET),
     "app": lambda: check_app_settings(FROM_ENV, TARGET),
     "truth-global-tracer": lambda: check_truth(FROM_ENV, TARGET, "global-tracer", set(), switch_at_once=True,
