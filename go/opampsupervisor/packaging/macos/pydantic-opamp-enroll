@@ -415,15 +415,15 @@ wait_connected() {
 	exit 1
 }
 
-done=enrolled
-[ -z "$refresh" ] || done=refreshed
+done=Enrolled
+[ -z "$refresh" ] || done=Refreshed
 if [ -n "$start" ]; then
 	# Loaded already (enrolling again): unload it first, so it reads the new config.
 	"$launchctl" bootout "system/$label" 2>/dev/null || true
 	started=$(date +%s)
 	"$launchctl" bootstrap system "$plist"
 	wait_connected "$started"
-	echo "$done with $endpoint; the Supervisor is running and connected ($label)"
+	echo "$done with $endpoint. The Supervisor is running and connected ($label)."
 else
-	echo "$done with $endpoint; start the Supervisor with: sudo launchctl bootstrap system $plist"
+	echo "$done with $endpoint. Start the Supervisor with: sudo launchctl bootstrap system $plist"
 fi

@@ -229,7 +229,7 @@ func TestMacEnrollRefresh(t *testing.T) {
 			require.NoError(t, os.RemoveAll(filepath.Join(tools, "launchctl.log")))
 			out, err := macEnroll(t, root, tools, "", "--refresh")
 			require.NoError(t, err, out)
-			assert.Contains(t, out, "refreshed with wss://opamp.example.com/v1/opamp")
+			assert.Contains(t, out, "Refreshed with wss://opamp.example.com/v1/opamp")
 			assert.Equal(t, enrolled, read("supervisor.yaml"))
 			assert.Equal(t, "s3cr3t-token", read("enroll-token"))
 			log, err := os.ReadFile(filepath.Join(tools, "launchctl.log"))

@@ -97,7 +97,7 @@ func TestAStatusFromAGoneProcessIsNotRunning(t *testing.T) {
 	var out bytes.Buffer
 	st.Print(&out, time.Now())
 	assert.Contains(t, out.String(), "not running")
-	assert.Contains(t, out.String(), "none received")
+	assert.Contains(t, out.String(), "none received yet")
 }
 
 // An unhealthy Collector with no reason reads as waiting for its config, or unhealthy, never

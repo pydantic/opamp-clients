@@ -239,7 +239,7 @@ func TestWinEnrollRefresh(t *testing.T) {
 
 	out, err = winEnroll(t, root, "", "-Refresh")
 	require.NoError(t, err, out)
-	assert.Contains(t, out, "refreshed with wss://opamp.example.com/v1/opamp; start the Supervisor with")
+	assert.Contains(t, out, "Refreshed with wss://opamp.example.com/v1/opamp. Start the Supervisor with")
 	assert.Equal(t, enrolled, read("supervisor.yaml"))
 	assert.Equal(t, "s3cr3t-token", read("enroll-token"))
 

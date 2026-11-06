@@ -450,8 +450,8 @@ wait_connected() {
 	exit 1
 }
 
-done=enrolled
-[ -z "$refresh" ] || done=refreshed
+done=Enrolled
+[ -z "$refresh" ] || done=Refreshed
 if [ -n "$start" ]; then
 	# The unmanaged collector conflicts with the Supervisor: disabled, it doesn't come back at boot.
 	"$systemctl" disable --now pydantic-otelcol.service
@@ -459,7 +459,7 @@ if [ -n "$start" ]; then
 	started=$(date +%s)
 	"$systemctl" restart "$unit"
 	wait_connected "$started"
-	echo "$done with $endpoint; the Supervisor is running and connected ($unit)"
+	echo "$done with $endpoint. The Supervisor is running and connected ($unit)."
 else
-	echo "$done with $endpoint; start the Supervisor with: systemctl enable --now $unit"
+	echo "$done with $endpoint. Start the Supervisor with: systemctl enable --now $unit"
 fi
