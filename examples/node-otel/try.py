@@ -42,7 +42,9 @@ check_outage (examples/integrations.py) runs for app.cjs, and again for manage.m
 that sets its own NodeSDK up (its exporter, the http instrumentation) and then calls manage(): run
 with plain `node`, the server from OTEL_OPAMP_*, and for logfire/logfire-js.mjs, the same on the
 Logfire JS SDK (logfire.configure(), then manage(); its own dependency in logfire/package.json),
-its spans sent where LOGFIRE_TOKEN and LOGFIRE_BASE_URL (the sink) say.
+its spans sent where LOGFIRE_TOKEN and LOGFIRE_BASE_URL (the sink) say. check_upgrade runs app.cjs
+on the last release (previous/package.json, from npm; examples/previous-release.json), then on
+this checkout.
 """
 from __future__ import annotations
 
@@ -60,12 +62,16 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-from integrations import (ROOT, check, check_app_settings, check_setup, check_rotation, check_outage, check_signals, check_truth, key_in_code, main,  # noqa: E402
+from integrations import (ROOT, check, check_app_settings, check_setup, check_rotation, check_outage, check_slots, check_upgrade,  # noqa: E402
+                          check_signals, check_truth, key_in_code, main,
                           offer, read_log, server_binary, statuses, stop_group, target, opamp_url)
 
 HERE = Path(__file__).resolve().parent
 TARGET = target("node-otel")
 OTEL = ROOT / "node" / "otel"
+#: check_upgrade's application on the last release, as published (previous/package.json): app.cjs
+#: beside its own node_modules, so that it requires the release's package, not this checkout's.
+PREVIOUS = TARGET / "previous"
 
 
 def build() -> None:
@@ -76,6 +82,10 @@ def build() -> None:
     # name, as `npm install <this repository>/node/otel` in the application's directory would let them.
     # logfire/logfire-js.mjs's own dependency, the Logfire JS SDK.
     subprocess.run(["npm", "ci", "--no-audit", "--no-fund"], cwd=HERE / "logfire", check=True, stdout=subprocess.DEVNULL)
+    PREVIOUS.mkdir(exist_ok=True)
+    for f in ["previous/package.json", "previous/package-lock.json", "app.cjs", "setups.cjs"]:
+        shutil.copy(HERE / f, PREVIOUS)
+    subprocess.run(["npm", "ci", "--no-audit", "--no-fund"], cwd=PREVIOUS, check=True, stdout=subprocess.DEVNULL)
     link = HERE / "node_modules" / "@pydantic" / "logfire-fleet-otel"
     link.parent.mkdir(parents=True, exist_ok=True)
     if not link.is_symlink():
@@ -85,7 +95,7 @@ def build() -> None:
 APP = "app.cjs"
 
 
-def launch(port: str, telemetry_port: str, state: Path, name: str, extra: dict[str, str]):
+def launch(port: str, telemetry_port: str, state: Path, name: str, extra: dict[str, str], release: bool = False):
     telemetry = f"http://127.0.0.1:{telemetry_port}"
     env = dict(os.environ,
                OTEL_SERVICE_NAME="checkout",
@@ -109,6 +119,10 @@ def launch(port: str, telemetry_port: str, state: Path, name: str, extra: dict[s
         command = ["node", str(HERE / APP)]
         if APP.startswith("logfire/"):  # the Logfire JS SDK's own settings: its spans to the sink
             env.update(LOGFIRE_TOKEN="example-token", LOGFIRE_BASE_URL=telemetry)
+    elif release:  # app.cjs on the last release
+        env["NODE_PATH"] = str(PREVIOUS / "node_modules")
+        command = ["node", "--import", str(PREVIOUS / "node_modules/@pydantic/logfire-fleet-otel/dist/src/register.js"),
+                   str(PREVIOUS / APP)]
     else:
         command = ["node", "--import", str(OTEL / "dist/src/register.js"), str(HERE / APP)]
     app = subprocess.Popen([*command, f"{telemetry}/ping"], env=env | extra, start_new_session=True, stdout=subprocess.DEVNULL,
@@ -430,6 +444,8 @@ CHECKS = {
     "outage": of("app.cjs", lambda d: check_outage(launch, d)),
     "outage-manage": of("manage.mjs", lambda d: check_outage(launch, d)),
     "outage-logfire": of("logfire/logfire-js.mjs", lambda d: check_outage(launch, d)),
+    "upgrade": of("app.cjs", lambda d: check_upgrade(lambda *a: launch(*a, release=True), launch, d)),
+    "slots": of("app.cjs", lambda d: check_slots(launch, d)),
     "settings": check_settings,
 } | {
     f"app-{app.removeprefix('app.')}": of(app, lambda d: check_app_settings(launch, d))

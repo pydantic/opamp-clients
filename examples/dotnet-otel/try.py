@@ -52,7 +52,9 @@ reported ungoverned.
 check_outage (examples/integrations.py) runs for Program.cs, and again for Hosted/Program.cs, the
 same requests from an application that sets its SDK up in code (the generic host,
 AddOpenTelemetry() with the HttpClient instrumentation and the OTLP exporter, and WithOpAmp()
-last), started with plain `dotnet`: outage-hosted.
+last), started with plain `dotnet`: outage-hosted. check_upgrade runs Program.cs on the plugin's
+last release (App.csproj's PreviousRelease, from NuGet; examples/previous-release.json), then on
+this checkout.
 """
 from __future__ import annotations
 
@@ -74,7 +76,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "scripts"))
 import native_lib  # noqa: E402
 from integrations import (  # noqa: E402
-    MARGIN, ROOT, check, check_app_settings, check_setup, check_rotation, check_outage, check_signals, check_truth, ended, main, offer, pings, run, sent_before,
+    MARGIN, PREVIOUS, ROOT, check, check_app_settings, check_setup, check_rotation, check_outage, check_slots, check_upgrade, files_in_container, files_under, check_signals, check_truth, ended, main, offer, pings, run, sent_before,
     statuses, stop_container, stop_group, target, opamp_url,
 )
 
@@ -96,6 +98,9 @@ OUT = TARGET / "publish"
 #: Hosted/'s application (WithOpAmp in code), and the directory of its runs' files.
 HOSTED_OUT = TARGET / "publish-hosted"
 HOSTED = TARGET / "hosted"
+#: check_upgrade's application on the last release (App.csproj's PreviousRelease, from NuGet).
+PREVIOUS_OUT = TARGET / "publish-previous"
+PREVIOUS_VERSION = PREVIOUS["dotnet"].split()[1]
 LOCAL = "--local" in sys.argv
 HOST = "127.0.0.1" if LOCAL else "host.docker.internal"
 
@@ -111,6 +116,11 @@ def build() -> None:
         subprocess.run(["dotnet", "publish", str(Path(__file__).resolve().parent / "Hosted" / "Hosted.csproj"), "-c",
                         "Release", "-r", rid, "--self-contained", "false", "--nologo", "-v", "q", "-o", str(HOSTED_OUT)],
                        check=True, stdout=subprocess.DEVNULL)
+        subprocess.run(["dotnet", "publish", str(Path(__file__).resolve().parent / "App.csproj"), "-c", "Release",
+                        "-r", rid, "--self-contained", "false", "--nologo", "-v", "q", f"-p:Edot={str(EDOT).lower()}",
+                        f"-p:PreviousRelease={PREVIOUS_VERSION}",
+                        "-o", str(PREVIOUS_OUT)],
+                       check=True, stdout=subprocess.DEVNULL)
         return
     # The native core for Linux whatever the host (scripts/native_lib.py).
     lib = native_lib.build()
@@ -120,9 +130,13 @@ def build() -> None:
     subprocess.run(["docker", "run", "--rm", "--network", "host", "-v", f"{ROOT}:/work", *NUGET, "-w", "/work/examples/dotnet-otel/Hosted", IMAGE,
                     "dotnet", "publish", "-c", "Release", "-r", rid, "--self-contained", "false", "--nologo", "-v", "q",
                     f"-p:OpAmpNativeLib=/work/{lib}", "-o", f"/work/{HOSTED_OUT.relative_to(ROOT)}"], check=True, stdout=subprocess.DEVNULL)
+    subprocess.run(["docker", "run", "--rm", "--network", "host", "-v", f"{ROOT}:/work", *NUGET, "-w", "/work/examples/dotnet-otel", IMAGE,
+                    "dotnet", "publish", "-c", "Release", "-r", rid, "--self-contained", "false", "--nologo", "-v", "q",
+                    f"-p:Edot={str(EDOT).lower()}", f"-p:PreviousRelease={PREVIOUS_VERSION}",
+                    "-o", f"/work/{PREVIOUS_OUT.relative_to(ROOT)}"], check=True, stdout=subprocess.DEVNULL)
 
 
-def launch(port: str, telemetry_port: str, state: Path, name: str, extra: dict[str, str]):
+def launch(port: str, telemetry_port: str, state: Path, name: str, extra: dict[str, str], release: bool = False):
     telemetry = f"http://{HOST}:{telemetry_port}"
     env = {
         "OTEL_DOTNET_AUTO_PLUGINS": PLUGIN,
@@ -142,7 +156,7 @@ def launch(port: str, telemetry_port: str, state: Path, name: str, extra: dict[s
     # EXAMPLE_APP=hosted: Hosted/'s application, its SDK set up in code with WithOpAmp(), started
     # with plain `dotnet` (no automatic instrumentation, so no plugin).
     hosted = env.pop("EXAMPLE_APP", None) == "hosted"
-    out, start = (HOSTED_OUT, ["dotnet", "Hosted.dll"]) if hosted else (OUT, [INSTRUMENT, "dotnet", "App.dll"])
+    out, start = (HOSTED_OUT, ["dotnet", "Hosted.dll"]) if hosted else (PREVIOUS_OUT if release else OUT, [INSTRUMENT, "dotnet", "App.dll"])
     if hosted:
         env.pop("OTEL_DOTNET_AUTO_PLUGINS")
     stderr = open((HOSTED if hosted else TARGET) / f"{name}.stderr", "w")
@@ -161,8 +175,8 @@ def launch(port: str, telemetry_port: str, state: Path, name: str, extra: dict[s
     if listen := env.pop("APP_PORT", None):
         cmd += ["-p", f"127.0.0.1:{listen}:8080"]
         env["APP_LISTEN"] = "http://0.0.0.0:8080"
-    for k, v in env.items():
-        cmd += ["-e", f"{k}={v}"]
+    for k, v in env.items():  # the state directory, as the container mounts it (check_slots' XDG_STATE_HOME)
+        cmd += ["-e", f"{k}={v.replace(str(state), '/state')}"]
     cmd += [IMAGE, *start, f"{telemetry}/ping"]
     app = subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=stderr)
 
@@ -491,6 +505,9 @@ CHECKS = {
     "rotation": lambda: check_rotation(launch, TARGET, listen=LISTEN, host=HOST),
     "outage": lambda: check_outage(launch, TARGET, listen=LISTEN),
     "outage-hosted": lambda: check_outage(launch, HOSTED, listen=LISTEN, env={"EXAMPLE_APP": "hosted"}),
+    "upgrade": lambda: check_upgrade(lambda *a: launch(*a, release=True), launch, TARGET, listen=LISTEN),
+    "slots": lambda: check_slots(launch, TARGET, listen=LISTEN,
+                                 list_files=files_under if LOCAL else files_in_container(IMAGE)),
     "newer": lambda: check_newer_settings(launch, TARGET, listen=LISTEN),
     "app": lambda: check_app_settings(launch, TARGET, listen=LISTEN),
     "truth-plugin-exporters": lambda: check_truth(launch, TARGET, "plugin-exporters", set(), listen=LISTEN,
