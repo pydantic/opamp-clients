@@ -1363,6 +1363,79 @@ class OfflineStart(unittest.TestCase):
                       failed(judge_offline_start(sink.events, c.events, 0, 20, UID)))
 
 
+U1, U2 = "11" * 16, "22" * 16
+
+
+def slots(base: Path, dirs: tuple[str, ...] = ("checkout-0123abcd",), slot_names: tuple[str, ...] = ("1", "2"),
+          empty: tuple[str, ...] = ()) -> None:
+    """The default state directory as check_slots leaves it: `dirs` under opamp/, each with
+    `slot_names`, each holding its lock and, but for those in `empty`, its state."""
+    for d in dirs:
+        for slot in slot_names:
+            (base / "opamp" / d / slot).mkdir(parents=True)
+            (base / "opamp" / d / slot / "lock").touch()
+            if slot not in empty:
+                (base / "opamp" / d / slot / "opamp-state").write_text("{}")
+
+
+def four_starts(offered: bool = False, forgot: bool = False) -> Log:
+    """check_slots' server log as it should go: starts at 0 and 10 (UIDs 1 and 2, each offered the
+    drop and answering APPLIED), at 20 (the second again) and at 30 (the first again), each restart
+    reporting the drop it kept."""
+    log = Log()
+    for t, uid in ((0, U1), (10, U2)):
+        log.a2s(t + 1, uid=uid).offer(t + 1).a2s(t + 2, uid=uid, status="APPLIED", effective=effective_of(OUTAGE_DROP))
+    for t, uid in ((20, U2), (30, U1)):
+        if offered:
+            log.offer(t + 1.5)
+        log.a2s(t + 1, uid=uid, status="APPLIED", effective={} if forgot else effective_of(OUTAGE_DROP))
+        log.a2s(t + 2, uid=uid, disconnect=True)
+    return log
+
+
+class Slots(unittest.TestCase):
+    def judged(self, heard: list[str | None] = [U1, U2, U2, U1], log: Log | None = None, **kw) -> list[str]:
+        with tempfile.TemporaryDirectory() as d:
+            slots(Path(d), **kw)
+            return failed(integrations.judge_slots((log or four_starts()).events, Path(d), [0, 10, 20, 30], heard))
+
+    def test_a_good_run_passes(self):
+        self.assertEqual(self.judged(), [])
+
+    def test_one_uid_for_both_processes_fails(self):
+        self.assertIn(f"two processes at once, each its own instance: two UIDs ({U1}, {U1})", self.judged(heard=[U1, U1, U1, U1]))
+
+    def test_a_second_service_directory_fails(self):
+        self.assertEqual(self.judged(dirs=("checkout-0123abcd", "checkout-4567cdef")),
+                         ["in the user's state directory: opamp/ holds one directory for the service "
+                          "(['checkout-0123abcd', 'checkout-4567cdef'])",
+                          "with a slot for each process, each holding its state ([])"])
+
+    def test_a_slot_without_state_fails(self):
+        self.assertEqual(self.judged(empty=("2",)), ["with a slot for each process, each holding its state (['1', '2'])"])
+
+    def test_a_third_slot_fails(self):
+        self.assertEqual(self.judged(slot_names=("1", "2", "3")),
+                         ["with a slot for each process, each holding its state (['1', '2', '3'])"])
+
+    def test_a_restart_with_a_new_identity_fails(self):
+        self.assertEqual(self.judged(heard=[U1, U2, "33" * 16, U1]),
+                         [f"the second restarted while the first runs takes its slot back: the same UID ({'33' * 16})",
+                          "each restart starts on the policy its slot kept (the drop, as its effective config, with no offer)"])
+
+    def test_the_last_start_in_the_second_slot_fails(self):
+        self.assertIn(f"with both gone, the next start takes the first slot: the first's UID ({U2})",
+                      self.judged(heard=[U1, U2, U2, U2]))
+
+    def test_a_restart_offered_the_policy_again_fails(self):
+        self.assertEqual(self.judged(log=four_starts(offered=True)),
+                         ["each restart starts on the policy its slot kept (the drop, as its effective config, with no offer)"])
+
+    def test_a_restart_on_its_own_settings_fails(self):
+        self.assertEqual(self.judged(log=four_starts(forgot=True)),
+                         ["each restart starts on the policy its slot kept (the drop, as its effective config, with no offer)"])
+
+
 def seventh(early: bool = False, on: bool = True, failed_off: bool = False, stays_on: bool = False,
             again: bool = True, changes: int = 3, error: str = "app_settings: values must be an object of keys to strings, "
             "numbers or booleans") -> Log:

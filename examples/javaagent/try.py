@@ -60,7 +60,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from integrations import (  # noqa: E402
-    MARGIN, ROOT, check, check_app_settings, check_setup, check_rotation, check_outage, check_signals, check_truth, ended, main, offer, pings, run, sent_before, statuses,
+    MARGIN, PREVIOUS, ROOT, check, check_app_settings, check_setup, check_rotation, check_outage, check_slots, check_upgrade, check_signals, check_truth, ended, main, offer, pings, run, sent_before, statuses,
     stop_container, stop_group, target, opamp_url,
 )
 
@@ -90,6 +90,10 @@ def build() -> None:
                         f"-DoutputDirectory={TARGET}", "-Dmdep.stripVersion=true",
                         "-f", str(ROOT / "java/opamp-javaagent/pom.xml")], check=True, stdout=subprocess.DEVNULL)
         copy_jars()
+        for artifact in PREVIOUS_JARS:
+            subprocess.run([*mvn, "org.apache.maven.plugins:maven-dependency-plugin:3.9.0:copy", f"-Dartifact={artifact}",
+                            f"-DoutputDirectory={TARGET / 'previous'}", "-Dmdep.stripVersion=true",
+                            "-f", str(ROOT / "java/opamp-javaagent/pom.xml")], check=True, stdout=subprocess.DEVNULL)
         for name in SETUPS_CLASSPATH:
             subprocess.run([*mvn, "org.apache.maven.plugins:maven-dependency-plugin:3.9.0:copy",
                             f"-Dartifact=io.opentelemetry:{name}:{SDK_VERSION}", f"-DoutputDirectory={TARGET / 'setups-lib'}",
@@ -108,6 +112,11 @@ def build() -> None:
                         "maven:3.9-eclipse-temurin-21", "mvn", "-q", "-B", "dependency:copy",
                         f"-Dartifact={AGENT}", "-DoutputDirectory=/out", "-Dmdep.stripVersion=true"], check=True, stdout=subprocess.DEVNULL)
         copy_jars()
+        for artifact in PREVIOUS_JARS:
+            subprocess.run(["docker", "run", "--rm", "--network", "host", *M2, "-v", f"{TARGET}:/out",
+                            "maven:3.9-eclipse-temurin-21", "mvn", "-q", "-B", "dependency:copy",
+                            f"-Dartifact={artifact}", "-DoutputDirectory=/out/previous", "-Dmdep.stripVersion=true"],
+                           check=True, stdout=subprocess.DEVNULL)
         for name in SETUPS_CLASSPATH:
             subprocess.run(["docker", "run", "--rm", "--network", "host", *M2, "-v", f"{TARGET}:/out",
                             "maven:3.9-eclipse-temurin-21", "mvn", "-q", "-B", "dependency:copy",
@@ -143,6 +152,9 @@ def package_setups() -> None:
 
 
 APP_SETTINGS = "opamp-app-settings.jar"
+#: check_upgrade's last release, from Maven Central (examples/previous-release.json): the extension
+#: and its application side, in TARGET/previous with their versions stripped.
+PREVIOUS_JARS = [PREVIOUS["java"], f"{PREVIOUS['java']}:jar:app-settings"]
 
 
 def app_api(root: object) -> str:
@@ -163,7 +175,7 @@ def copy_jars() -> None:
 HOST = "127.0.0.1" if LOCAL else "host.docker.internal"
 
 
-def launch(port: str, telemetry_port: str, state: Path, name: str, extra: dict[str, str]):
+def launch(port: str, telemetry_port: str, state: Path, name: str, extra: dict[str, str], release: bool = False):
     telemetry = f"http://{HOST}:{telemetry_port}"
     env = {
         "OTEL_SERVICE_NAME": "checkout",
@@ -179,10 +191,14 @@ def launch(port: str, telemetry_port: str, state: Path, name: str, extra: dict[s
     } | extra
     agent = TARGET if LOCAL else Path("/agent")
     extensions = f"{agent}/logfire-fleet-javaagent-extension.jar"
+    app_settings = f"{agent}/{APP_SETTINGS}"
+    if release:  # the last release's extension and application side
+        extensions = f"{agent}/previous/logfire-fleet-javaagent-extension.jar"
+        app_settings = f"{agent}/previous/logfire-fleet-javaagent-extension-app-settings.jar"
     if env.get("EXAMPLE_SETUP"):  # check_truth's setups: a second extension (Setups.java)
         extensions += f",{agent}/{SETUPS}"
     java = ["java", f"-javaagent:{agent}/{AGENT_JAR}", f"-Dotel.javaagent.extensions={extensions}",
-            "-cp", f"{agent}/app:{agent}/{APP_SETTINGS}:{app_api(agent)}", "App", f"{telemetry}/ping"]
+            "-cp", f"{agent}/app:{app_settings}:{app_api(agent)}", "App", f"{telemetry}/ping"]
     stderr = open(TARGET / f"{name}.stderr", "w")
     # EDOT's agent logs to standard output, the upstream agent to standard error: both kept.
     stdout = stderr if EDOT else subprocess.DEVNULL
@@ -194,8 +210,8 @@ def launch(port: str, telemetry_port: str, state: Path, name: str, extra: dict[s
     container = f"opamp-javaagent-{name}-{os.getpid()}-{int(time.time())}"
     cmd = ["docker", "run", "--rm", "--name", container, "--add-host=host.docker.internal:host-gateway",
            "-v", f"{TARGET}:/agent:ro", "-v", f"{state}:/state"]
-    for k, v in env.items():
-        cmd += ["-e", f"{k}={v}"]
+    for k, v in env.items():  # the state directory, as the container mounts it (check_slots' XDG_STATE_HOME)
+        cmd += ["-e", f"{k}={v.replace(str(state), '/state')}"]
     app = subprocess.Popen([*cmd, "eclipse-temurin:21-jdk", *java], stdout=stdout, stderr=stderr)
     return lambda: stop_container(app, container)
 
@@ -471,6 +487,8 @@ CHECKS = {
     "setup": lambda: check_setup(launch, TARGET, listen=LISTEN),
     "rotation": lambda: check_rotation(launch, TARGET, listen=LISTEN, host=HOST),
     "outage": lambda: check_outage(launch, TARGET, listen=LISTEN),
+    "upgrade": lambda: check_upgrade(lambda *a: launch(*a, release=True), launch, TARGET, listen=LISTEN),
+    "slots": lambda: check_slots(launch, TARGET, listen=LISTEN),
     "matching": lambda: check_matching_settings(launch, TARGET, listen=LISTEN),
     "app": lambda: check_app_settings(launch, TARGET, listen=LISTEN),
     "truth-extension-processor": lambda: check_truth(launch, TARGET, "extension-processor", set(), listen=LISTEN,
