@@ -73,29 +73,6 @@ public sealed class StateFileTests : IDisposable
         Assert.Equal(newer, File.ReadAllBytes(path));
     }
 
-    [Fact]
-    public void DownloadsArePrivate()
-    {
-        var path = new TestLoop(ClientTransport.Create(null, null), Path.Combine(this.dir, "state.bin")).X.DownloadPath(3);
-        Assert.True(StateFile.MakePrivateDirectory(Path.GetDirectoryName(path)!));
-        Assert.False(StateFile.MakePrivateDirectory(Path.GetDirectoryName(path)!));
-        StateFile.CreateDownload(path).Dispose();
-        Assert.True(File.Exists(path));
-
-        // Made new: never one already there.
-        Assert.Throws<IOException>(() => StateFile.CreateDownload(path).Dispose());
-        if (OperatingSystem.IsWindows())
-        {
-            AllowsTheUserAlone(new DirectoryInfo(Path.GetDirectoryName(path)!).GetAccessControl(), inherited: false);
-            AllowsTheUserAlone(new FileInfo(path).GetAccessControl(), inherited: true);
-        }
-        else
-        {
-            Assert.Equal(UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute, File.GetUnixFileMode(Path.GetDirectoryName(path)!));
-            Assert.Equal(UnixFileMode.UserRead | UnixFileMode.UserWrite, File.GetUnixFileMode(path));
-        }
-    }
-
     /// <summary>Windows: the state file's list allows the user alone, and the directory's doesn't apply.</summary>
     [Fact]
     public void OnWindowsTheStateFileAllowsTheUserAlone()

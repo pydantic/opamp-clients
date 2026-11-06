@@ -6,21 +6,18 @@ using System.Text.Json;
 
 namespace Logfire.Fleet.Client;
 
-/// <summary>A file being written by a save (its temporary file) or a download.</summary>
+/// <summary>A file being written by a save (its temporary file).</summary>
 internal interface IWritingFile : IDisposable
 {
     /// <summary>Append <paramref name="data"/>.</summary>
     void Write(ReadOnlySpan<byte> data);
-
-    /// <summary>Append <paramref name="data"/>.</summary>
-    ValueTask WriteAsync(ReadOnlyMemory<byte> data, CancellationToken ct);
 
     /// <summary>Flush what was written to the disk (fsync).</summary>
     void Sync();
 }
 
 /// <summary>
-/// The file operations of the client's saves and downloads: the real file system
+/// The file operations of the client's saves: the real file system
 /// (<see cref="FileOps.Real"/>), recorded in the core tap when it is on (<see cref="FileJournal"/>),
 /// or a test's, to inject faults. Each throws an <see cref="IOException"/> (or
 /// <see cref="UnauthorizedAccessException"/>) when it fails.
@@ -29,10 +26,9 @@ internal interface IFileOps
 {
     /// <summary>
     /// A new file at <paramref name="path"/>, made exclusively (an error if one is there), that only
-    /// the user can open; <paramref name="download"/>: a download's, in the downloads directory
-    /// (whose access-control list it inherits on Windows).
+    /// the user can open.
     /// </summary>
-    IWritingFile CreateNew(string path, bool download);
+    IWritingFile CreateNew(string path);
 
     /// <summary>Rename <paramref name="from"/> over <paramref name="to"/>.</summary>
     void Rename(string from, string to);
@@ -42,12 +38,6 @@ internal interface IFileOps
 
     /// <summary>Delete file <paramref name="path"/>: whether there was one.</summary>
     bool Remove(string path);
-
-    /// <summary>Make directory <paramref name="dir"/>, the user's only, if need be: whether it was made.</summary>
-    bool MakeDir(string dir);
-
-    /// <summary>Delete directory <paramref name="dir"/> and everything in it: whether there was one.</summary>
-    bool Clear(string dir);
 }
 
 /// <summary>The real file system's operations.</summary>
@@ -56,23 +46,9 @@ internal static partial class FileOps
     /// <summary>The real file system.</summary>
     public static readonly IFileOps Real = new RealFileOps();
 
-    /// <summary>
-    /// Blocking file work (a download's file made, flushed to the disk, deleted) on a thread of its
-    /// own, as a save is written: on one of the pool's, for as long as the disk took, it kept a
-    /// thread the client's loop, transport and timers need, and in a busy process the heartbeats
-    /// waited for the disk.
-    /// </summary>
-    public static Task<T> OffPool<T>(Func<T> blocking) =>
-        Task.Factory.StartNew(blocking, CancellationToken.None, TaskCreationOptions.LongRunning, TaskScheduler.Default);
-
-    /// <inheritdoc cref="OffPool{T}(Func{T})"/>
-    public static Task OffPool(Action blocking) =>
-        Task.Factory.StartNew(blocking, CancellationToken.None, TaskCreationOptions.LongRunning, TaskScheduler.Default);
-
     private sealed class RealFileOps : IFileOps
     {
-        public IWritingFile CreateNew(string path, bool download) =>
-            new RealFile(download ? StateFile.CreateDownload(path) : StateFile.CreatePrivate(path));
+        public IWritingFile CreateNew(string path) => new RealFile(StateFile.CreatePrivate(path));
 
         public void Rename(string from, string to)
         {
@@ -98,28 +74,11 @@ internal static partial class FileOps
             File.Delete(path);
             return true;
         }
-
-        public bool MakeDir(string dir) => StateFile.MakePrivateDirectory(dir);
-
-        public bool Clear(string dir)
-        {
-            try
-            {
-                Directory.Delete(dir, recursive: true);
-                return true;
-            }
-            catch (DirectoryNotFoundException)
-            {
-                return false;
-            }
-        }
     }
 
     private sealed class RealFile(FileStream file) : IWritingFile
     {
         public void Write(ReadOnlySpan<byte> data) => file.Write(data);
-
-        public ValueTask WriteAsync(ReadOnlyMemory<byte> data, CancellationToken ct) => file.WriteAsync(data, ct);
 
         public void Sync() => file.Flush(flushToDisk: true);
 
@@ -259,7 +218,7 @@ internal static partial class FileOps
 /// The file operations of a client with a core tap, recorded in it (records of kind 5, one JSON
 /// object each, the tap checker's file records) after each succeeded, before anything that depends
 /// on it reaches the core. Paths are relative to the state file's directory, joined with
-/// <c>/</c>: <c>.</c> is that directory. A save's writes carry their bytes, a download's how many.
+/// <c>/</c>: <c>.</c> is that directory. A save's writes carry their bytes.
 /// </summary>
 internal sealed class FileJournal : IFileOps
 {
@@ -282,11 +241,11 @@ internal sealed class FileJournal : IFileOps
         this.Record("state", ("path", this.Relative(full)));
     }
 
-    public IWritingFile CreateNew(string path, bool download)
+    public IWritingFile CreateNew(string path)
     {
-        var file = this.inner.CreateNew(path, download);
+        var file = this.inner.CreateNew(path);
         this.Record("create", ("path", this.Relative(path)));
-        return new Journaled(this, file, this.Relative(path), download);
+        return new Journaled(this, file, this.Relative(path));
     }
 
     public void Rename(string from, string to)
@@ -315,28 +274,6 @@ internal sealed class FileJournal : IFileOps
         }
 
         return removed;
-    }
-
-    public bool MakeDir(string dir)
-    {
-        var made = this.inner.MakeDir(dir);
-        if (made)
-        {
-            this.Record("mkdir", ("path", this.Relative(dir)));
-        }
-
-        return made;
-    }
-
-    public bool Clear(string dir)
-    {
-        var cleared = this.inner.Clear(dir);
-        if (cleared)
-        {
-            this.Record("clear", ("path", this.Relative(dir)));
-        }
-
-        return cleared;
     }
 
     /// <summary><paramref name="path"/> as the tap names it.</summary>
@@ -371,18 +308,12 @@ internal sealed class FileJournal : IFileOps
         this.tap.Record(Kind, buf.ToArray());
     }
 
-    private sealed class Journaled(FileJournal journal, IWritingFile file, string path, bool download) : IWritingFile
+    private sealed class Journaled(FileJournal journal, IWritingFile file, string path) : IWritingFile
     {
         public void Write(ReadOnlySpan<byte> data)
         {
             file.Write(data);
-            this.Wrote(data);
-        }
-
-        public async ValueTask WriteAsync(ReadOnlyMemory<byte> data, CancellationToken ct)
-        {
-            await file.WriteAsync(data, ct).ConfigureAwait(false);
-            this.Wrote(data.Span);
+            journal.Record("write", ("path", path), ("data", Convert.ToHexString(data).ToLowerInvariant()));
         }
 
         public void Sync()
@@ -392,17 +323,5 @@ internal sealed class FileJournal : IFileOps
         }
 
         public void Dispose() => file.Dispose();
-
-        private void Wrote(ReadOnlySpan<byte> data)
-        {
-            if (download)
-            {
-                journal.Record("write", ("path", path), ("len", (long)data.Length));
-            }
-            else
-            {
-                journal.Record("write", ("path", path), ("data", Convert.ToHexString(data).ToLowerInvariant()));
-            }
-        }
     }
 }

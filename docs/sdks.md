@@ -142,7 +142,7 @@ named.
 | Node.js | `mode: "platform"` | takes none | nothing |
 | Python | `Config(mode="platform")` | takes none | nothing |
 | Java | `mode(OpampClient.Mode.PLATFORM)` | `httpClient(...)`, with platform mode named | an `httpClient` without `Mode.PLATFORM`; in platform mode `proxyResolveLocally`, `spliceDownloads(false)` and a proxy that isn't `http://` |
-| .NET | `Mode = OpAmpMode.Platform` | `HttpClient`, with platform mode named | an `HttpClient` without `OpAmpMode.Platform`; in platform mode `ProxyResolveLocally` and `SpliceDownloads = false` |
+| .NET | `Mode = OpAmpMode.Platform` | `HttpClient`, with platform mode named | an `HttpClient` without `OpAmpMode.Platform`; in platform mode `ProxyResolveLocally` |
 
 The examples name no mode, so they run in core mode. The integrations of
 [sdk-settings.md](sdk-settings.md) ask for platform mode by name: keeping the client's own

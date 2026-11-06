@@ -18,8 +18,7 @@ namespace Logfire.Fleet.Client.Tests;
 /// operation of one of its first saves, an error (EIO); a write that writes half and fails (ENOSPC);
 /// a slow operation (0.5-2 s, and then until the client has sent two messages since it began); a
 /// rename that lands with a directory flush that fails; a failed write whose temporary file can't
-/// be removed either (left over); and for downloads, a downloads
-/// directory that can't be made, or a discard whose removal fails. Whatever the fault: the client
+/// be removed either (left over). Whatever the fault: the client
 /// keeps heartbeating (a slow save holds up nothing: it holds no thread of the pool the client
 /// runs on, and the messages it waits for come), every save gets at most one answer and all
 /// but one still writing at stop exactly one, a save that failed is followed by one that is
@@ -31,7 +30,6 @@ namespace Logfire.Fleet.Client.Tests;
 /// </summary>
 public class FileFaultPropertyTests
 {
-    private static readonly byte[] Package = Encoding.ASCII.GetBytes("the package, version 1");
     private static readonly TimeSpan StopTimeout = TimeSpan.FromMilliseconds(500);
 
     /// <summary>How long a slow operation waits, past its time, for the client's next two messages.</summary>
@@ -48,8 +46,7 @@ public class FileFaultPropertyTests
             _ => Gen.Constant("write"),
         }
         from slowMs in Gen.Choose(500, 2000)
-        from download in Gen.Elements(DownloadFault.None, DownloadFault.NoDirectory, DownloadFault.DiscardFails)
-        select new Plan(kind, save, op, slowMs, download);
+        select new Plan(kind, save, op, slowMs);
 
     private readonly ITestOutputHelper output;
 
@@ -62,13 +59,6 @@ public class FileFaultPropertyTests
         Slow,
         LandsButFails,
         LeftOver,
-    }
-
-    internal enum DownloadFault
-    {
-        None,
-        NoDirectory,
-        DiscardFails,
     }
 
     // covers: RULE-SHELL-07, RULE-SHELL-09
@@ -103,9 +93,9 @@ public class FileFaultPropertyTests
         }
     }
 
-    private static ServerToAgent Reply(AgentToServer msg, int port, int n)
+    private static ServerToAgent Reply(AgentToServer msg, int n)
     {
-        var reply = TapKit.Offer(msg, $"http://127.0.0.1:{port}/pkg", Package);
+        var reply = new ServerToAgent { InstanceUid = msg.InstanceUid };
         var hash = ByteString.CopyFromUtf8($"config-{n}");
         var config = new AgentConfigMap();
         config.ConfigMap[string.Empty] = new AgentConfigObject { Body = hash, ContentType = "text/plain" };
@@ -161,18 +151,10 @@ public class FileFaultPropertyTests
         {
             while (true)
             {
-                var (line, headers) = await c.ReadHeadAsync();
-                if (line.StartsWith("POST", StringComparison.Ordinal))
-                {
-                    Interlocked.Increment(ref messages);
-                    var port = ((System.Net.IPEndPoint)c.Tcp.Client.LocalEndPoint!).Port;
-                    // A new remote config every 250 ms: a save each time.
-                    await c.AnswerAsync(headers, m => Reply(m, port, (int)(since.ElapsedMilliseconds / 250)));
-                }
-                else
-                {
-                    await Http1.WriteAsync(c.Stream, $"HTTP/1.1 200 OK\r\nContent-Length: {Package.Length}\r\n\r\n", Package);
-                }
+                var (_, headers) = await c.ReadHeadAsync();
+                Interlocked.Increment(ref messages);
+                // A new remote config every 250 ms: a save each time.
+                await c.AnswerAsync(headers, m => Reply(m, (int)(since.ElapsedMilliseconds / 250)));
             }
         });
 
@@ -185,24 +167,14 @@ public class FileFaultPropertyTests
             HeartbeatInterval = TimeSpan.FromMilliseconds(100),
             StopTimeout = StopTimeout,
             StateFile = state,
-            AcceptPackages = true,
         };
-        var installs = new ConcurrentQueue<string>();
         OpAmpClient? a = null;
-        void Notify(OpAmpNotification note)
-        {
-            if (note is OpAmpNotification.InstallPackage install)
-            {
-                installs.Enqueue(install.Path);
-                a!.PackageInstalled(install.Name, install.Package.Hash.ToByteArray());
-            }
-        }
 
         var clock = new Stopwatch();
         StateFile.Saving += faulty.SaveStarts;
         try
         {
-            a = OpAmpClient.Start(options, new OpAmpStatus(), Notify, new Seams { Files = faulty, Tap = tapA });
+            a = OpAmpClient.Start(options, new OpAmpStatus(), null, new Seams { Files = faulty, Tap = tapA });
 
             // The fault comes, and the client goes on: it heartbeats, and the next save after a
             // failed one is stored.
@@ -230,16 +202,6 @@ public class FileFaultPropertyTests
             if (!await UntilAsync(() => Answered(Records(tapA), Input.KindOneofCase.Stored) > faulty.StoredBefore))
             {
                 throw new InvalidOperationException($"no save stored after the fault (saves stored before it: {faulty.StoredBefore}; the tap's inputs: {Said(Records(tapA))})");
-            }
-
-            if (plan.Download != DownloadFault.None && !await UntilAsync(() => faulty.DownloadFaulted))
-            {
-                throw new InvalidOperationException("the download fault never came");
-            }
-
-            if (plan.Download == DownloadFault.None && !await UntilAsync(() => !installs.IsEmpty))
-            {
-                throw new InvalidOperationException("no package installed");
             }
         }
         finally
@@ -291,8 +253,7 @@ public class FileFaultPropertyTests
         }
 
         // The next client, with a temporary file left as a crash leaves it: it starts from what
-        // was saved, saves, and the downloads left are gone.
-        var leftovers = Directory.Exists(Executor.DownloadsDir(state)) ? Directory.GetFiles(Executor.DownloadsDir(state)) : [];
+        // was saved, and saves.
         await File.WriteAllBytesAsync(state + ".tmp", Encoding.ASCII.GetBytes("half a save"));
         var b = OpAmpClient.Start(options, new OpAmpStatus(), null, new Seams { Tap = tapB });
         try
@@ -312,11 +273,6 @@ public class FileFaultPropertyTests
         if (!saved.AsSpan().SequenceEqual(content ?? []))
         {
             throw new InvalidOperationException("the next client didn't start from the state file");
-        }
-
-        if (leftovers.FirstOrDefault(File.Exists) is { } left)
-        {
-            throw new InvalidOperationException($"a download left by the first client is still there: {left}");
         }
 
         if (TapKit.Check(tapB) is { Code: not 0 } v2)
@@ -360,10 +316,10 @@ public class FileFaultPropertyTests
         }
     }
 
-    internal sealed record Plan(Kind Kind, int Save, string Op, int SlowMs, DownloadFault Download)
+    internal sealed record Plan(Kind Kind, int Save, string Op, int SlowMs)
     {
         public override string ToString() =>
-            $"{this.Kind} on the {this.Op} of save {this.Save}{(this.Kind == Kind.Slow ? $" ({this.SlowMs} ms)" : string.Empty)}, download: {this.Download}";
+            $"{this.Kind} on the {this.Op} of save {this.Save}{(this.Kind == Kind.Slow ? $" ({this.SlowMs} ms)" : string.Empty)}";
     }
 
     /// <summary>The real file system, with the plan's faults.</summary>
@@ -371,20 +327,16 @@ public class FileFaultPropertyTests
     {
         private readonly IFileOps real = FileOps.Real;
         private readonly string full = Path.GetFullPath(state);
-        private readonly string downloads = Path.GetFullPath(Executor.DownloadsDir(state));
         private int save = -1;
         private int removes;
         private int fired;
         private int done;
-        private int downloadFaulted;
 
         /// <summary>Whether the fault came.</summary>
         public bool Fired => Volatile.Read(ref this.fired) == 1;
 
         /// <summary>Whether the save it came in is over.</summary>
         public bool Done => Volatile.Read(ref this.done) == 1;
-
-        public bool DownloadFaulted => Volatile.Read(ref this.downloadFaulted) == 1;
 
         public Plan Plan => plan;
 
@@ -422,10 +374,10 @@ public class FileFaultPropertyTests
             }
         }
 
-        public IWritingFile CreateNew(string path, bool download)
+        public IWritingFile CreateNew(string path)
         {
             this.Fault("create", path);
-            return new FaultyFile(this, this.real.CreateNew(path, download), path, download);
+            return new FaultyFile(this, this.real.CreateNew(path), path);
         }
 
         public void Rename(string from, string to)
@@ -442,18 +394,6 @@ public class FileFaultPropertyTests
 
         public bool Remove(string path)
         {
-            if (this.IsDownload(path))
-            {
-                if (plan.Download == DownloadFault.DiscardFails && File.Exists(path))
-                {
-                    Volatile.Write(ref this.downloadFaulted, 1);
-                    log.Enqueue($"fault: removing {path} fails");
-                    throw new IOException("EIO: removing the download");
-                }
-
-                return this.real.Remove(path);
-            }
-
             if (this.removes++ == 0)
             {
                 this.Fault("remove", path);
@@ -467,29 +407,13 @@ public class FileFaultPropertyTests
             return this.real.Remove(path);
         }
 
-        public bool MakeDir(string dir)
-        {
-            if (plan.Download == DownloadFault.NoDirectory)
-            {
-                Volatile.Write(ref this.downloadFaulted, 1);
-                log.Enqueue("fault: the downloads directory can't be made");
-                throw new IOException("EACCES: making the downloads directory");
-            }
-
-            return this.real.MakeDir(dir);
-        }
-
-        public bool Clear(string dir) => this.real.Clear(dir);
-
-        private bool IsDownload(string path) => Path.GetFullPath(path).StartsWith(this.downloads + Path.DirectorySeparatorChar, StringComparison.Ordinal);
-
         /// <summary>
         /// Before operation <paramref name="op"/> of a save: the plan's fault, if this is its
         /// save and operation. Slow: sleeps, then goes on; the others throw.
         /// </summary>
         private void Fault(string op, string path)
         {
-            if (this.IsDownload(path) || op != plan.Op || Volatile.Read(ref this.save) != plan.Save || this.Fired)
+            if (op != plan.Op || Volatile.Read(ref this.save) != plan.Save || this.Fired)
             {
                 return;
             }
@@ -519,12 +443,12 @@ public class FileFaultPropertyTests
             }
         }
 
-        private sealed class FaultyFile(FaultyFiles files, IWritingFile file, string path, bool download) : IWritingFile
+        private sealed class FaultyFile(FaultyFiles files, IWritingFile file, string path) : IWritingFile
         {
             public void Write(ReadOnlySpan<byte> data)
             {
                 files.Fault("write", path);
-                if (!download && files.Fired && !files.Done && files.Plan.Kind == Kind.HalfWrite && Volatile.Read(ref files.save) == files.Plan.Save)
+                if (files.Fired && !files.Done && files.Plan.Kind == Kind.HalfWrite && Volatile.Read(ref files.save) == files.Plan.Save)
                 {
                     file.Write(data[..(data.Length / 2)]);
                     throw new IOException("ENOSPC: no space left on device");
@@ -532,8 +456,6 @@ public class FileFaultPropertyTests
 
                 file.Write(data);
             }
-
-            public ValueTask WriteAsync(ReadOnlyMemory<byte> data, CancellationToken ct) => file.WriteAsync(data, ct);
 
             public void Sync()
             {

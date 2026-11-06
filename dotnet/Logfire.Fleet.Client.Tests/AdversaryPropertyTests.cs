@@ -21,7 +21,7 @@ namespace Logfire.Fleet.Client.Tests;
 /// local server that does what each URL's query says. The harness is the one every SDK runs: one client per
 /// seed, several at once; it reads the adversary's notes, calls, stops, violations and verdict
 /// from the callback, and checks what only it can see (callbacks, stop's bound, connections and
-/// requests after stop, downloads after stop, the state file). Seeds: OPAMP_ADVERSARY_SEEDS
+/// requests after stop, the state file). Seeds: OPAMP_ADVERSARY_SEEDS
 /// (default 24) from OPAMP_ADVERSARY_BASE (default 1); OPAMP_ADVERSARY_SEED=S replays one;
 /// OPAMP_ADVERSARY_WASM overrides the module. The main property and the cancel productions run in
 /// both modes. In core mode each run has a raw server of its own (AdversaryRawServer.cs), which the
@@ -185,14 +185,14 @@ public partial class AdversaryPropertyTests
     /// <summary>The cancel productions (RULE-SHELL-06), in every run's grammar.</summary>
     private static readonly string[] Cancels =
     [
-        "cancel_download", "cancel_http", "cancel_http_done", "cancel_store", "cancel_twice",
+        "cancel_http", "cancel_http_done", "cancel_store", "cancel_twice",
         "cancel_ws_closing", "cancel_ws_opening", "stop_cancel",
     ];
 
     /// <summary>The cancel productions of the streams and their files (RULE-SHELL-06), in a core mode run's grammar.</summary>
     private static readonly string[] StreamCancels =
     [
-        "cancel_file", "cancel_splice", "cancel_stream_open", "cancel_stream_opening", "cancel_stream_resolving",
+        "cancel_stream_open", "cancel_stream_opening", "cancel_stream_resolving",
     ];
 
     /// <summary>
@@ -467,18 +467,6 @@ public partial class AdversaryPropertyTests
         return run.Result();
     }
 
-    private static Dictionary<string, (long Size, DateTime Written)> Listing(string dir)
-    {
-        try
-        {
-            return new DirectoryInfo(dir).GetFiles().ToDictionary(f => f.Name, f => (f.Length, f.LastWriteTimeUtc));
-        }
-        catch (DirectoryNotFoundException)
-        {
-            return new();
-        }
-    }
-
     private sealed record Known(string Bug, string Why, string Says);
 
     private sealed record SeedResult(ulong Seed, List<string> Failures, List<string> Tolerated, string[] Used, string[] Enabled, bool Verdict);
@@ -520,7 +508,9 @@ public partial class AdversaryPropertyTests
         {
             // Core mode: the streams go to the run's raw server, whose certificate (for TlsName) is
             // under the CA the client is given.
-            var streams = this.raw is null ? string.Empty : $"&raw={this.raw.Port}&tls={TlsName}";
+            // downloads=0: this client takes no packages, so the adversary, as the real core, hands it
+            // no download.
+            var streams = (this.raw is null ? string.Empty : $"&raw={this.raw.Port}&tls={TlsName}") + "&downloads=0";
             var client = OpAmpClient.Start(
                 new OpAmpClientOptions
                 {
@@ -583,9 +573,6 @@ public partial class AdversaryPropertyTests
             }
 
             // The run gets a moment for its connections to close; then nothing is left.
-            var downloads = Executor.DownloadsDir(this.StateFile);
-            var before = Listing(downloads);
-            var listedAt = DateTime.UtcNow;
             await Task.Delay(Settle);
             var counts = server.For(seed);
             if (counts.Open > 0)
@@ -633,15 +620,6 @@ public partial class AdversaryPropertyTests
                 {
                     this.Fail($"RULE-SHELL-07: {all} stream connection(s) still open {Settle.TotalSeconds} s after stop returned ({anonymous} never said who they were)");
                 }
-            }
-
-            var after = Listing(downloads);
-            var changed = after.Where(f => !before.TryGetValue(f.Key, out var b) || b != f.Value)
-                .Select(f => $"{f.Key} ({(before.TryGetValue(f.Key, out var b) ? $"{b.Size} bytes at {b.Written:HH:mm:ss.fffffff}" : "none")} at stop, {f.Value.Size} bytes at {f.Value.Written:HH:mm:ss.fffffff} after)")
-                .ToArray();
-            if (changed.Length > 0)
-            {
-                this.Fail($"download file(s) {string.Join(", ", changed)} appeared or changed after stop (S3, RULE-SHELL-07); listed at stop at {listedAt:HH:mm:ss.fffffff}");
             }
 
             if (Volatile.Read(ref this.stopped) != 1)

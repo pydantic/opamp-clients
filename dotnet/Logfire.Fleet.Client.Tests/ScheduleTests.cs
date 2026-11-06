@@ -62,8 +62,6 @@ public class ScheduleTests
     {
         PostSend,
         PostBody,
-        GetSend,
-        GetBody,
         Connect,
         WsReceive,
         WsSend,
@@ -146,13 +144,13 @@ public class ScheduleTests
     /// <summary>
     /// Whatever the transport throws, from wherever (sending, the body, connecting, a connection's
     /// receive, send or close), synchronously or in its task, the effect ends: the core hears
-    /// http_failed, download_failed, ws_failed or ws_lost, once, without waiting on any timer.
+    /// http_failed, ws_failed or ws_lost, once, without waiting on any timer.
     /// This is the test of the catch filters (S7's class).
     /// </summary>
     // covers: RULE-SHELL-04, RULE-SHELL-05, RULE-SHELL-07
     [Fact]
     public void EveryEffectEndsWhateverTheTransportThrows() => this.Run(nameof(this.EveryEffectEndsWhateverTheTransportThrows), (seed, iter) =>
-        (from site in Gen.Int[0, 7]
+        (from site in Gen.Int[0, 5]
          from fault in Gen.Int[0, Faults.Count - 1]
          from sync in Gen.Bool
          select ((Site)site, fault, sync))
@@ -178,100 +176,6 @@ public class ScheduleTests
     [InlineData(Site.WsClose, 9, true)]
     [InlineData(Site.WsClose, 11, false)]
     public void AConnectionEndsWhateverItThrows(Site site, int fault, bool sync) => Assert.True(EndsWhateverIsThrown(site, fault, sync));
-
-    /// <summary>
-    /// Found by <see cref="ScheduleKeepsTheContract"/> (seed bjyC-mrZtLl2): the core's output that
-    /// says stopped can carry a notification after <c>Stopped</c> (a package downloaded while
-    /// stopping, whose save was the last thing stop waited for, is handed over in the same
-    /// output, after it), and the client delivered it: the application heard
-    /// <c>InstallPackage</c> after <c>Stopped</c>. Within each output <c>Stopped</c> is told last,
-    /// after the output's other notifications (RULE-SHELL-01). Here the save is held behind one of
-    /// the test's own until the stop is in.
-    /// </summary>
-    // covers: RULE-SHELL-01
-    [Fact]
-    public void StoppedIsToldLastWhateverTheCoreHandsOver()
-    {
-        Rig rig = null!;
-        rig = Track(new Rig(ws: false, 0, onCall: c =>
-        {
-            if (c.Kind == CallKind.Post)
-            {
-                c.Respond(200, rig.Offer(c.OfKind == 0 ? How.Package : How.Ok, AgentToServer.Parser.ParseFrom(c.Body).InstanceUid));
-            }
-        }));
-        bool Saving() => rig.Trace.Unended().Any(u => u.StartsWith("Store", StringComparison.Ordinal));
-        using var hold = new ManualResetEventSlim();
-        try
-        {
-            _ = rig.Client;
-            Assert.True(Rig.Until(() => rig.Transport.Calls.Any(c => c.Kind == CallKind.Get) && !Saving()), "no download, or a save never ended");
-
-            // The saves from now on wait behind this one: the download's, until the stop is in.
-            _ = StateFile.SaveBeside(rig.StateFile, [], () => hold.Wait(TimeSpan.FromSeconds(30)) && false, _ => { });
-            var get = rig.Transport.Calls.First(c => c.Kind == CallKind.Get);
-            Assert.True(get.Respond(200, rig.FileAt(get.Url)));
-            Assert.True(Rig.Until(() => rig.Trace.EffectOf(CallKind.Get, 0) is { Ended: true } && Saving()), "no save after the download");
-            rig.Stops.Add(rig.Client.StopAsync());
-            Assert.True(Rig.Until(() => rig.Trace.StopTaken), "stop not taken");
-        }
-        finally
-        {
-            hold.Set();
-        }
-
-        rig.Finish("stopped while the download's save was held");
-        var seen = rig.Agent.Seen();
-        Assert.True(seen.Any(n => n is OpAmpNotification.InstallPackage), $"the package handed over with Stopped was never told: {string.Join(", ", seen.AsEnumerable())}");
-    }
-
-    /// <summary>
-    /// A download that finishes, file and all, just as the core cancels it (its result queued
-    /// behind the timer that cancels it) leaves no file: the cancel deletes what the download
-    /// wrote (RULE-SHELL-06). The schedules reach this only by chance (the window is a queue's
-    /// length), so here the loop is held while the timer and the result queue up.
-    /// </summary>
-    // covers: RULE-SHELL-06
-    [Fact]
-    public void ADownloadDoneAsItIsCancelledLeavesNoFile()
-    {
-        Rig rig = null!;
-        rig = Track(new Rig(ws: false, 0, onCall: c =>
-        {
-            if (c.Kind == CallKind.Post)
-            {
-                c.Respond(200, rig.Offer(c.OfKind == 0 ? How.Package : How.Ok, AgentToServer.Parser.ParseFrom(c.Body).InstanceUid));
-            }
-        }));
-        using var hold = new ManualResetEventSlim();
-        try
-        {
-            _ = rig.Client;
-            Assert.True(Rig.Until(() => rig.Transport.Calls.Any(c => c.Kind == CallKind.Get)), "no download");
-            rig.Pace();
-
-            // The loop held in its next step; the download's deadline passes (its timer queues),
-            // then the download finishes (its result queues behind).
-            rig.Trace.HoldLoop = hold;
-            rig.Client.SetHealth(new ComponentHealth { Status = "hold the loop" });
-            Assert.True(Rig.Until(() => rig.Trace.Holding), "the loop never stepped");
-            var queued = rig.Client.Queued;
-            rig.Time.Advance(TimeSpan.FromSeconds(61));
-            Assert.True(Rig.Until(() => rig.Client.Queued > queued), "no timer");
-            var get = rig.Transport.Calls.First(c => c.Kind == CallKind.Get);
-            Assert.True(get.Respond(200, rig.FileAt(get.Url)));
-            Assert.True(Rig.Until(() => rig.Client.Queued > queued + 1), "the download never finished");
-        }
-        finally
-        {
-            rig.Trace.HoldLoop = null;
-            hold.Set();
-        }
-
-        Assert.True(Rig.Until(() => rig.Trace.EffectOf(CallKind.Get, 0) is { Cancelled: true } or { Ended: true }));
-        Assert.True(rig.Trace.EffectOf(CallKind.Get, 0)!.Cancelled, $"the download wasn't cancelled first: {rig.Report()}");
-        rig.Finish("a download done as it was cancelled");
-    }
 
     /// <summary>
     /// All of stop takes one stop timeout (RULE-SHELL-07), though a save is held writing and the
@@ -476,7 +380,6 @@ public class ScheduleTests
         var (kind, end) = site switch
         {
             Site.PostSend or Site.PostBody => (CallKind.Post, Input.KindOneofCase.HttpFailed),
-            Site.GetSend or Site.GetBody => (CallKind.Get, Input.KindOneofCase.DownloadFailed),
             Site.Connect => (CallKind.Connect, Input.KindOneofCase.WsFailed),
             _ => (CallKind.Connect, Input.KindOneofCase.WsLost),
         };
@@ -542,14 +445,8 @@ public class ScheduleTests
                     return;
                 }
 
-                var body = rig.Offer(first && site is Site.GetSend or Site.GetBody ? How.Package : How.Ok, uid);
+                var body = rig.Offer(How.Ok, uid);
                 c.Respond(200, body, bodyFault: first && site == Site.PostBody ? fault : null);
-                break;
-            case CallKind.Get when site == Site.GetSend:
-                Throw();
-                break;
-            case CallKind.Get:
-                c.Respond(200, rig.FileAt(c.Url), bodyFault: site == Site.GetBody ? fault : null);
                 break;
             case CallKind.Connect when site == Site.Connect:
                 Throw();

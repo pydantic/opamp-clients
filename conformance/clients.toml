@@ -89,7 +89,7 @@ run = ["env", "OPAMP_PYTHON_MODE=platform", "uv", "run", "--quiet", "--project",
 [python-core]
 # Ours: python/ in core mode (the SDK's default; the driver asks for it by name): the core speaks
 # HTTP/1.1, WebSocket, CONNECT and SOCKS5 itself,
-# over asyncio's TCP connections and TLS (the core's shell), and decides download redirects.
+# over asyncio's TCP connections and TLS (the core's shell).
 upstream = false
 features = ["connection_settings", "remote_config_lifecycle", "core", "number_zero_until_answered", "instance_uid_kept", "telemetry_settings", "available_components", "request_instance_uid", "tls", "mtls_configured", "proxy_configured", "proxy_socks5", "file_journal", "callback_failure", "max_send_bytes"]
 transports = ["http", "ws"]
@@ -150,7 +150,7 @@ run = ["docker", "run", "--rm", "--add-host=host.docker.internal:host-gateway", 
 # client, in platform mode (HttpClient; the driver asks for it by name, OPAMP_DOTNET_MODE=platform:
 # the SDK's default is core mode).
 upstream = false
-features = ["connection_settings", "remote_config_lifecycle", "core", "number_zero_until_answered", "instance_uid_kept", "telemetry_settings", "available_components", "custom_messages", "packages", "request_instance_uid",
+features = ["connection_settings", "remote_config_lifecycle", "core", "number_zero_until_answered", "instance_uid_kept", "telemetry_settings", "available_components", "request_instance_uid",
             "tls", "mtls_configured", "proxy_configured", "proxy_socks5", "file_journal", "callback_failure", "max_send_bytes"]
 transports = ["http", "ws"]
 docker = true
@@ -171,9 +171,9 @@ run = ["docker", "run", "--rm", "--add-host=host.docker.internal:host-gateway", 
 [dotnet-core]
 # Ours: dotnet/Logfire.Fleet.Client in core mode (the SDK's default; the driver asks for it by
 # name): the core speaks HTTP/1.1, WebSocket, CONNECT and
-# SOCKS5 itself, over .NET's sockets and SslStream (the core's shell), and decides download redirects.
+# SOCKS5 itself, over .NET's sockets and SslStream (the core's shell).
 upstream = false
-features = ["connection_settings", "remote_config_lifecycle", "core", "number_zero_until_answered", "instance_uid_kept", "telemetry_settings", "available_components", "custom_messages", "packages", "request_instance_uid", "tls", "mtls_configured", "proxy_configured", "proxy_socks5", "file_journal", "callback_failure", "max_send_bytes"]
+features = ["connection_settings", "remote_config_lifecycle", "core", "number_zero_until_answered", "instance_uid_kept", "telemetry_settings", "available_components", "request_instance_uid", "tls", "mtls_configured", "proxy_configured", "proxy_socks5", "file_journal", "callback_failure", "max_send_bytes"]
 transports = ["http", "ws"]
 docker = true
 native = true

@@ -37,8 +37,6 @@ namespace Logfire.Fleet.Client.Tests;
 /// </remarks>
 public class CallbackPropertyTests
 {
-    private const string Capability = "io.example.model";
-
     // Stop's bound, and a call's from another thread: over WebSocket nothing is in flight at stop
     // but the goodbye.
     private static readonly TimeSpan Bound = TimeSpan.FromSeconds(5);
@@ -59,11 +57,11 @@ public class CallbackPropertyTests
     private static readonly Gen<Step> AnyStep = Gen.OneOf(
         StartGen,
         from caller in Gen.Elements(Where.Outside, Where.Thread, Where.Inside)
-        from what in Gen.Choose(0, 3)
+        from what in Gen.Choose(0, 2)
         select (Step)new CallStep(caller, what),
-        from what in Gen.Elements(Offer.Config, Offer.Custom, Offer.Heartbeat)
+        from what in Gen.Elements(Offer.Config, Offer.Heartbeat)
         select (Step)new OfferStep(what),
-        from what in Gen.Elements(Offer.Config, Offer.Custom, Offer.Heartbeat)
+        from what in Gen.Elements(Offer.Config, Offer.Heartbeat)
         select (Step)new OfferStep(what),
         from inside in Gen.Elements(true, false)
         select (Step)new StopStep(inside));
@@ -89,7 +87,6 @@ public class CallbackPropertyTests
     private enum Offer
     {
         Config,
-        Custom,
         Heartbeat,
     }
 
@@ -471,7 +468,6 @@ public class CallbackPropertyTests
                 Description = Description(0),
                 Health = new ComponentHealth { Healthy = true, Status = "starting" },
                 EffectiveConfig = new EffectiveConfig(),
-                CustomCapabilities = new CustomCapabilities { Capabilities = { Capability } },
             },
             a.Notify);
 
@@ -591,7 +587,6 @@ public class CallbackPropertyTests
             {
                 0 => h => h.SetHealth(new ComponentHealth { Healthy = n % 2 == 0, Status = $"s{n}" }),
                 1 => h => h.SetDescription(Description(n)),
-                2 => h => h.SendCustomMessage(new CustomMessage { Capability = Capability, Type = "t", Data = ByteString.CopyFromUtf8($"{n}") }),
                 _ => h => h.SetEffectiveConfig(new EffectiveConfig { ConfigMap = new AgentConfigMap() }),
             };
             switch (c.From)
@@ -636,8 +631,8 @@ public class CallbackPropertyTests
             }
         }
 
-        /// <summary>A custom message from the server, so the callback is called.</summary>
-        private async Task TriggerAsync(Agent a) => await this.OfferAsync(Offer.Custom);
+        /// <summary>A remote config from the server, so the callback is called.</summary>
+        private async Task TriggerAsync(Agent a) => await this.OfferAsync(Offer.Config);
 
         private async Task OfferAsync(Offer what)
         {
@@ -665,11 +660,6 @@ public class CallbackPropertyTests
                     msg = ConfigOffer(hash);
                     isIt = x => x is OpAmpNotification.RemoteConfig rc && rc.Config.ConfigHash == hash;
                     a.Outstanding = hash.ToByteArray();
-                    break;
-                case Offer.Custom:
-                    var data = ByteString.CopyFromUtf8($"custom-{n}");
-                    msg = new ServerToAgent { CustomMessage = new CustomMessage { Capability = Capability, Type = "m", Data = data } };
-                    isIt = x => x is OpAmpNotification.CustomMessage cm && cm.Message.Data == data;
                     break;
                 default:
                     var seconds = (ulong)(100 + n);

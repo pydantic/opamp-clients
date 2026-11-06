@@ -50,9 +50,6 @@ AgentDescription Description(int change)
     return d;
 }
 
-// The custom capability DRIVERS.md names: ping is answered with pong.
-const string Echo = "io.opentelemetry.echo";
-
 var platform = Environment.GetEnvironmentVariable("OPAMP_DOTNET_MODE") == "platform";
 OpAmpClient? client = null;
 // The status to start from, a restart after a crash going on from where the application was
@@ -65,9 +62,6 @@ var status = new OpAmpStatus
     Health = new ComponentHealth { Healthy = true, StartTimeUnixNano = (ulong)DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() * 1_000_000UL },
     EffectiveConfig = new EffectiveConfig { ConfigMap = new AgentConfigMap() },
     AvailableComponents = Environment.GetEnvironmentVariable("DRIVER_COMPONENTS") == "1" ? Components() : null,
-    CustomCapabilities = Environment.GetEnvironmentVariable("DRIVER_CUSTOM") == "1"
-        ? new CustomCapabilities { Capabilities = { Echo } }
-        : null,
 };
 var accept = Environment.GetEnvironmentVariable("DRIVER_ACCEPT_CONNECTION_SETTINGS") == "1";
 // DRIVER_THROW_ON_CONFIG: the callback itself throws on the first remote config (RULE-SHELL-02).
@@ -107,10 +101,8 @@ try
                 ? new Dictionary<string, string> { ["Authorization"] = "Bearer " + token }
                 : new Dictionary<string, string>(),
             AcceptConnectionSettings = accept,
-            AcceptPackages = Environment.GetEnvironmentVariable("DRIVER_PACKAGES") == "1",
             RequestInstanceUid = Environment.GetEnvironmentVariable("DRIVER_REQUEST_UID") == "1",
             StateFile = Environment.GetEnvironmentVariable("DRIVER_STATE_FILE") is { Length: > 0 } state ? state : null,
-            // For messages and package downloads alike: one handler carries both.
             Tls = ca is null && clientCert is null
                 ? null
                 : new OpAmpTlsOptions { CaPem = ca, ClientCertPem = clientCert, ClientKeyPem = clientKey },
@@ -160,47 +152,6 @@ try
                         LastRemoteConfigHash = r.Config.ConfigHash,
                         Status = RemoteConfigStatuses.Applied,
                     });
-                    break;
-                case OpAmpNotification.CustomMessage { Message: var m }:
-                    Emit("custom_message", new()
-                    {
-                        ["capability"] = m.Capability,
-                        ["type"] = m.Type,
-                        ["data"] = Convert.ToHexString(m.Data.ToByteArray()).ToLowerInvariant(),
-                    });
-                    if (m.Type == "ping")
-                    {
-                        handle.SendCustomMessage(new CustomMessage { Capability = Echo, Type = "pong", Data = m.Data });
-                    }
-
-                    break;
-                case OpAmpNotification.CustomMessageNotSent ns:
-                    Emit("custom_message_not_sent", new() { ["reason"] = ns.Reason });
-                    break;
-                case OpAmpNotification.InstallPackage ip:
-                {
-                    string? sha = null;
-                    string? error = null;
-                    try
-                    {
-                        sha = Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(File.ReadAllBytes(ip.Path))).ToLowerInvariant();
-                    }
-                    catch (IOException e)
-                    {
-                        error = e.Message;
-                    }
-
-                    Emit("install_package", new() { ["name"] = ip.Name, ["version"] = ip.Package.Version, ["sha256"] = sha, ["error"] = error });
-                    handle.PackageInstalled(ip.Name, ip.Package.Hash.ToByteArray(), error);
-                    break;
-                }
-
-                case OpAmpNotification.RemovePackage rp:
-                    Emit("remove_package", new() { ["name"] = rp.Name });
-                    handle.PackageRemoved(rp.Name);
-                    break;
-                case OpAmpNotification.ServerCustomCapabilities sc:
-                    Emit("server_custom_capabilities", new() { ["capabilities"] = sc.Capabilities });
                     break;
                 case OpAmpNotification.ConnectionSettings s:
                     Emit("telemetry_settings", new()

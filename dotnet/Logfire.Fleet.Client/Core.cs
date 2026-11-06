@@ -90,7 +90,7 @@ internal sealed class CoreInstance : IDisposable
 /// 4 step out), a u32 LE length, a u64 LE monotonic time in nanoseconds, then the bytes exactly as
 /// they crossed (Config, Reply, Step, Reply). A process's first core writes &lt;path&gt;, each later one
 /// &lt;path&gt;.&lt;pid&gt;.&lt;n&gt;. Unset, it costs nothing. The client's file operations go to it too
-/// (kind 5, <see cref="FileJournal"/>), from the threads that save and download: records are
+/// (kind 5, <see cref="FileJournal"/>), from the threads that save: records are
 /// written one at a time, and none once the tap is closed.
 /// </summary>
 internal sealed class CoreTap : IDisposable
@@ -184,7 +184,7 @@ internal sealed class CoreTap : IDisposable
         {
             if (this.closed)
             {
-                return; // a save or download outlived its client: nothing more of it is told
+                return; // a save outlived its client: nothing more of it is told
             }
 
             try

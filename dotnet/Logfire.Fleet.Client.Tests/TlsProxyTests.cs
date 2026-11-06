@@ -12,7 +12,7 @@ using Xunit;
 namespace Logfire.Fleet.Client.Tests;
 
 /// <summary>
-/// The application's TLS and proxy settings, over plain HTTP and WebSocket and for downloads,
+/// The application's TLS and proxy settings, over plain HTTP and WebSocket,
 /// against a test server and proxies of our own (NetworkTestKit.cs); in both modes: .NET's
 /// HttpClient and ClientWebSocket, and core mode (the core's own HTTP, WebSocket, CONNECT and
 /// SOCKS5 over .NET's sockets and SslStream).
@@ -230,40 +230,6 @@ public class TlsProxyTests
         Assert.Contains(notes, n => n is OpAmpNotification.ConnectFailed);
     }
 
-    // covers: RULE-TLS-01, RULE-TLS-02, RULE-PROXY-01
-    [Theory]
-    [InlineData("http")]
-    [InlineData("socks5")]
-    [InlineData("socks5h")]
-    public async Task DownloadsTakeTheSameRoute(string proxy)
-    {
-        using var server = new TestServer(Pki.Server, Pki.Ca);
-        using var via = new TestProxy(proxy == "http" ? "http" : "socks5");
-        var url = new UriBuilder(via.Url) { Scheme = proxy }.Uri;
-        var tls = new OpAmpTlsOptions { CaPem = Pki.Pem(Pki.Ca), ClientCertPem = Pki.Pem(Pki.Agent), ClientKeyPem = Pki.KeyPem(Pki.Agent) };
-        using var transport = ClientTransport.Create(tls, url);
-
-        var got = await DownloadAsync(transport, $"https://localhost:{server.Port}/redirect");
-
-        Assert.Equal(200u, got.DownloadResponse.Status);
-        Assert.Equal(SHA256.HashData(TestServer.File), got.DownloadResponse.Sha256.ToByteArray());
-        Assert.Equal(new[] { "/redirect", "/file" }, server.Gets.ToArray());
-        Assert.NotEmpty(via.Tunnels);
-        Assert.All(via.Tunnels, t => Assert.Equal($"localhost:{server.Port}", t.Target)); // the proxy resolves the name
-        Assert.All(via.Tunnels, t => Assert.Equal(proxy == "http" ? null : (byte?)3, t.Atyp));
-        Assert.True(server.Handshakes > 0);
-
-        // Without the client certificate, the same download fails.
-        using var bare = ClientTransport.Create(tls with { ClientCertPem = null, ClientKeyPem = null }, url);
-        Assert.Equal(Input.KindOneofCase.DownloadFailed, (await DownloadAsync(bare, $"https://localhost:{server.Port}/file")).KindCase);
-
-        // The client certificate goes only to a file at the server's own origin, as the core says
-        // (Download.server_origin): told otherwise, the client presents none, and the download fails.
-        Assert.Equal(
-            Input.KindOneofCase.DownloadFailed,
-            (await DownloadAsync(transport, $"https://localhost:{server.Port}/file", serverOrigin: false)).KindCase);
-    }
-
     /// <summary>
     /// With socks5:// and socks5h:// alike, the SOCKS5 proxy is given the server's host name
     /// (address type 3) and resolves it; socks5h:// is taken as socks5://, which .NET knows.
@@ -369,19 +335,6 @@ public class TlsProxyTests
         }
     }
 
-    // covers: RULE-TLS-01
-    [Fact]
-    public async Task DownloadsVerifyTheServerToo()
-    {
-        using var server = new TestServer(Pki.Server);
-        using var transport = ClientTransport.Create(new OpAmpTlsOptions { CaPem = Pki.Pem(Pki.OtherCa) }, null);
-
-        var got = await DownloadAsync(transport, $"https://127.0.0.1:{server.Port}/file");
-
-        Assert.Equal(Input.KindOneofCase.DownloadFailed, got.KindCase);
-        Assert.Empty(server.Gets);
-    }
-
     [Theory]
     [InlineData("http")]
     [InlineData("ws")]
@@ -415,9 +368,7 @@ public class TlsProxyTests
         Assert.NotEmpty(via.Tunnels);
         Assert.All(via.Tunnels, t => Assert.Equal(transport == "ws" ? "connect" : "forward", t.Via));
 
-        // Downloads too; and it is still the application's to use.
-        var got = await DownloadAsync(ClientTransport.Of(app), $"http://127.0.0.1:{server.Port}/redirect");
-        Assert.Equal(200u, got.DownloadResponse.Status);
+        // It is still the application's to use.
         Assert.Equal(HttpStatusCode.NotFound, (await app.GetAsync($"http://127.0.0.1:{server.Port}/nothing")).StatusCode);
     }
 
@@ -491,26 +442,6 @@ public class TlsProxyTests
         }
 
         return (server.Messages.ToArray(), notes.ToArray());
-    }
-
-    /// <summary>Download <paramref name="url"/>, and where a redirect points, as the core would ask.</summary>
-    private static async Task<Input> DownloadAsync(ClientTransport transport, string url, bool serverOrigin = true)
-    {
-        var dir = Directory.CreateTempSubdirectory();
-        var loop = new TestLoop(transport, Path.Combine(dir.FullName, "state"));
-        Input input;
-        ulong id = 0;
-        do
-        {
-            loop.Run(new Effect { Download = new Download { Id = ++id, Url = url, MaxBytes = 1 << 20, TimeoutMs = 10_000, ServerOrigin = serverOrigin } });
-            Assert.True(loop.TryTake(out input, TimeSpan.FromSeconds(15)));
-            url = input.DownloadResponse?.Location ?? string.Empty;
-        }
-        while (input.DownloadResponse is { Status: >= 300 and < 400 } && id < 3);
-
-        await loop.X.ReleaseAsync(TimeSpan.FromSeconds(5));
-        dir.Delete(recursive: true);
-        return input;
     }
 
     /// <summary>.NET's network, but for the names it resolves: server.test is 127.0.0.1.</summary>

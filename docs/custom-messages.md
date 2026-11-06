@@ -45,7 +45,6 @@ connection, with their own types and data.
 |---|---|---|---|
 | Go | `Status.CustomCapabilities`, `SetCustomCapabilities` | `SendCustomMessage` | kinds `CustomMessage`, `ServerCustomCapabilities`, `CustomMessageNotSent` |
 | Java | `OpampClient.Status` (the sixth component), `setCustomCapabilities` | `sendCustomMessage` | `Notification.CustomMessage`, `ServerCustomCapabilities`, `CustomMessageNotSent` |
-| .NET | `OpAmpStatus.CustomCapabilities`, `SetCustomCapabilities` | `SendCustomMessage` | `OpAmpNotification.CustomMessage`, `ServerCustomCapabilities`, `CustomMessageNotSent` |
 
 ## How it is checked
 

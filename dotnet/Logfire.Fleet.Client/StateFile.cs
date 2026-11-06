@@ -10,20 +10,17 @@ namespace Logfire.Fleet.Client;
 /// <summary>
 /// Where the client keeps the core's saved state: one file, replaced atomically, that only the
 /// agent's user can open. It holds secrets: the credentials of connection settings the server
-/// offered, and the private keys of telemetry settings' certificates. The package files downloaded
-/// beside it are the user's only too.
+/// offered, and the private keys of telemetry settings' certificates.
 /// </summary>
 /// <remarks>
-/// On Unix the file is created with mode 0600 (downloads: a 0700 directory of 0600 files). On
-/// Windows it is created, unshared, with an access-control list that allows the user alone and is
-/// protected from inheritance, so the directory's entries never apply to it; the downloads
-/// directory gets the same list, which the files in it inherit. No entry for SYSTEM or
+/// On Unix the file is created with mode 0600. On Windows it is created, unshared, with an
+/// access-control list that allows the user alone and is protected from inheritance, so the
+/// directory's entries never apply to it. No entry for SYSTEM or
 /// Administrators is added: the client needs none, and administrators can take ownership of a
 /// file whatever its list says.
 /// <para>
 /// Saves run beside the client's loop, one at a time per file, so a slow disk holds up nothing and
-/// stop doesn't wait for one already writing; so do a cancelled download's last writes and the
-/// deletion of its file. A save is written on a thread of its own, not the pool's the loop runs
+/// stop doesn't wait for one already writing. A save is written on a thread of its own, not the pool's the loop runs
 /// on. A client started on the same path in the same process waits for all of
 /// that first (<see cref="Settled"/>): it starts from what the last save left, and nothing of a
 /// stopped client lands on its files after it starts. One client at a time per file.
@@ -35,8 +32,7 @@ internal static class StateFile
     private static readonly Dictionary<string, Busy> All = new();
 
     /// <summary>
-    /// Work on the files of the state file at <paramref name="path"/> (a save, a download, a
-    /// deletion) starting now: counted until the result is disposed, for <see cref="Settled"/>.
+    /// Work on the files of the state file at <paramref name="path"/> (a save) starting now: counted until the result is disposed, for <see cref="Settled"/>.
     /// </summary>
     public static IDisposable Begin(string path)
     {
@@ -140,7 +136,7 @@ internal static class StateFile
         try
         {
             files.Remove(tmp);
-            using (var f = files.CreateNew(tmp, download: false))
+            using (var f = files.CreateNew(tmp))
             {
                 f.Write(data);
                 f.Sync();
@@ -165,49 +161,6 @@ internal static class StateFile
 
             throw new IOException($"saving {path}: {e.Message}", e);
         }
-    }
-
-    /// <summary>
-    /// Make directory <paramref name="dir"/> (a download's), if need be, the user's only: whether
-    /// it was made.
-    /// </summary>
-    public static bool MakePrivateDirectory(string dir)
-    {
-        var made = !Directory.Exists(dir);
-        if (OperatingSystem.IsWindows())
-        {
-            var security = UserOnlyDirectory(CurrentUser());
-            var info = new DirectoryInfo(dir);
-            info.Create(security);
-            info.SetAccessControl(security);
-            return made;
-        }
-
-        Directory.CreateDirectory(dir, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute);
-        return made;
-    }
-
-    /// <summary>
-    /// A new file for a download at <paramref name="path"/> (an error if one is there), in its
-    /// directory (made already): the user's only.
-    /// </summary>
-    public static FileStream CreateDownload(string path)
-    {
-        const int bufferSize = 64 * 1024;
-        if (OperatingSystem.IsWindows())
-        {
-            // The file inherits the directory's list.
-            return new FileStream(path, FileMode.CreateNew, FileAccess.Write, FileShare.None, bufferSize);
-        }
-
-        return new FileStream(path, new FileStreamOptions
-        {
-            Mode = FileMode.CreateNew,
-            Access = FileAccess.Write,
-            Share = FileShare.None,
-            BufferSize = bufferSize,
-            UnixCreateMode = UnixFileMode.UserRead | UnixFileMode.UserWrite,
-        });
     }
 
     /// <summary>A new file at <paramref name="path"/>, open for writing, that only the user can open.</summary>
@@ -242,21 +195,6 @@ internal static class StateFile
         var security = new FileSecurity();
         security.SetAccessRuleProtection(isProtected: true, preserveInheritance: false);
         security.AddAccessRule(new FileSystemAccessRule(user, FileSystemRights.FullControl, AccessControlType.Allow));
-        return security;
-    }
-
-    /// <summary>A directory's list: as for a file, and inherited by what is created in it.</summary>
-    [SupportedOSPlatform("windows")]
-    internal static DirectorySecurity UserOnlyDirectory(SecurityIdentifier user)
-    {
-        var security = new DirectorySecurity();
-        security.SetAccessRuleProtection(isProtected: true, preserveInheritance: false);
-        security.AddAccessRule(new FileSystemAccessRule(
-            user,
-            FileSystemRights.FullControl,
-            InheritanceFlags.ContainerInherit | InheritanceFlags.ObjectInherit,
-            PropagationFlags.None,
-            AccessControlType.Allow));
         return security;
     }
 

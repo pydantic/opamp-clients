@@ -130,23 +130,18 @@ internal static class TapKit
         }
     }
 
-    /// <summary>A package offer: package "p" at <paramref name="url"/>, holding <paramref name="file"/>.</summary>
-    public static ServerToAgent Offer(AgentToServer msg, string url, byte[] file, string version = "1")
+    /// <summary>A remote config offer: config "c" holding the message's sequence number.</summary>
+    public static ServerToAgent ConfigOffer(AgentToServer msg)
     {
-        var reply = new ServerToAgent { InstanceUid = msg.InstanceUid };
-        var available = new PackagesAvailable { AllPackagesHash = ByteString.CopyFromUtf8("all-" + version) };
-        available.Packages.Add("p", new PackageAvailable
+        var body = ByteString.CopyFromUtf8($"config {msg.SequenceNum}");
+        return new ServerToAgent
         {
-            Type = PackageType.TopLevel,
-            Version = version,
-            Hash = ByteString.CopyFromUtf8("p-" + version),
-            File = new DownloadableFile
+            InstanceUid = msg.InstanceUid,
+            RemoteConfig = new AgentRemoteConfig
             {
-                DownloadUrl = url,
-                ContentHash = ByteString.CopyFrom(System.Security.Cryptography.SHA256.HashData(file)),
+                ConfigHash = ByteString.CopyFromUtf8($"{msg.SequenceNum}"),
+                Config = new AgentConfigMap { ConfigMap = { [string.Empty] = new AgentConfigObject { Body = body } } },
             },
-        });
-        reply.PackagesAvailable = available;
-        return reply;
+        };
     }
 }
