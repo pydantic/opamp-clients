@@ -302,12 +302,12 @@ keeps its bucket. Both stay in force in debug mode. Declared with the sampler an
  "debug": {"mode": "override", "until": "2026-10-14T17:30:00Z", "sampling_ratio": 1, "log_level": "debug"}}
 ```
 
-The layer decides with the instance's clock and folds the window into the settings it hands
-over; the agent runs one timer (`System.Threading.Timer`) for the end the layer gives
-(`refresh_at_unix_ms`), as a deadline on the monotonic clock: the wall clock jumping while the
-process runs doesn't move it. When it goes off the agent calls `Refresh`, puts the result in
-force and reports the effective config: debug mode ends without the server. A later remote config
-re-arms it (a generation counter makes the old timer's call do nothing). Declared always. A policy
+The layer's agent flow decides with the instance's clock and folds the window into the settings
+it hands over; the agent runs one timer (`System.Threading.Timer`) for the wake the flow asks for,
+on the monotonic clock: the wall clock jumping while the process runs doesn't move it. When it
+goes off the agent steps the flow, which puts the settings without debug in force and reports the
+effective config: debug mode ends without the server. Each step re-arms it (a generation counter
+makes an old timer's call do nothing). Declared always. A policy
 that overrides the debug `sampling_ratio` is refused where `sampling_rate` is not declared.
 
 ### Export health
@@ -499,9 +499,9 @@ told of.
     check, with export health sent at once;
   - the application's own settings (`AppSettingsTests`): reads before any policy and once
     `app_settings` is local; the typed reads against `custom.json`'s `typed` vectors and their edges; every
-    `custom.json` case through the .NET wrapper's `Decide` and `Controls`, and through the plugin's
-    agent; a handler told once per change and never for the same map (sent again, another way, by a
-    Refresh at the end of debug mode), in order, one at a time; an exception caught and logged;
+    `custom.json` case through the .NET wrapper's agent flow and `Controls`, and through the plugin's
+    agent; a handler told once per change and never for the same map (sent again, another way, at the
+    end of debug mode), in order, one at a time; an exception caught and logged;
     unsubscribing, also from inside a handler; readers and subscribers on other threads, and each
     policy's SDK settings and application values in force together; bad values FAILED with nothing
     changed; restarts with and without a state directory; a plugin that fails as it starts putting

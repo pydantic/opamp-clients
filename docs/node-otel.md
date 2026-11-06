@@ -522,7 +522,7 @@ const unsubscribe = appSettings.onChange((settings, changed) => {
 - `onChange(callback)` returns a function that unsubscribes (calling it again does nothing). The
   callback gets the frozen map now in force and the keys added, changed or removed, sorted, once
   per change, in order, each callback in the order it was added: when a config is applied, at the
-  timer's Refresh, at start from the saved settings (before the application's code runs, so an
+  end of debug mode, at start from the saved settings (before the application's code runs, so an
   application is not told of those: read the snapshot). The same map again, another control
   changing, debug mode's start and end, and a FAILED config tell nothing. A callback that throws,
   or returns a promise that rejects, is logged as an error (on the console without
@@ -612,7 +612,7 @@ sends the hash at start, and the components in full when the server asks.
     the layer and through the agent (what the application reads, and the effective config), its
     typed reads (beyond the safe integers, the default); reads before any config and with keys
     named like Object's own; once per change and never for the same map, however it is sent;
-    `app_settings` local; a FAILED config and a failed save changing nothing; the timer's Refresh and
+    `app_settings` local; a FAILED config and a failed save changing nothing; the end of debug mode and
     debug mode telling nothing; callbacks in order, ones that throw or reject, unsubscribing and
     subscribing from inside a callback; restarts with and without a state directory; one map for
     the register and the application, by `import` or `require`;

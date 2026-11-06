@@ -21,6 +21,10 @@ and date. Tests, CI and docs alone don't need a line.
 
 ### Breaking
 
+- Go, Python, Node.js, Java, .NET: the SDK settings an earlier release kept itself
+  (`sdk-settings.json` in the state directory) are no longer read at start. The settings to start
+  with are the config the client kept applied; a state directory with only the old file starts
+  with the SDK's own settings until the server sends a config (#PR).
 - Go, Java, .NET: an HTTP client of the application's no longer switches the client to platform
   mode silently. Platform mode is an advanced option and must be named (`Mode: opamp.ModePlatform`,
   `mode(OpampClient.Mode.PLATFORM)`, `Mode = OpAmpMode.Platform`); an HTTP client without it is
@@ -76,6 +80,9 @@ and date. Tests, CI and docs alone don't need a line.
 
 ### Changed
 
+- Go, Python, Node.js, Java, .NET: every SDK runs the settings layer's agent flow, so what an
+  SDK does around a policy is the same in each language: when debug mode ends, when export health
+  is sent, and the lines it logs about reaching the server (#PR).
 - Go, Python, Node.js, Java, .NET, the Supervisor: on core 0.15.0, which the clients now pin. It
   decides which exporters the SDK policy governs and how each is named (#109).
 - Go, Python, Node.js, Java, .NET: the name each exporter is listed under, where it sends, and the

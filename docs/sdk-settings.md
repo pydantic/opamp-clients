@@ -368,9 +368,10 @@ ends on its own, whether the server can still reach the instance or not.
   depends on it is refused (`debug: log_level: this SDK cannot apply the requested override`).
 - The effective config reports the override while debug mode lasts, as sent, and `debug` local
   after it.
-  Each decision says when to ask again (`refresh_at_unix_ms`): the integration runs a timer and,
-  when it fires, calls `Refresh` and puts in force what it returns, and reports the new effective
-  config. A restart before the end is still in debug mode, after it, not.
+  The layer's [agent flow](#the-agent-flow) ends it: it asks to be woken at the end, on the
+  monotonic clock (a wall clock moved back or forward doesn't move it), then puts in force the
+  settings without debug and reports the new effective config. A config refused after the wall
+  clock passed the end ends it too. A restart before the end is still in debug mode, after it, not.
 - An integration that does not give the layer the time (`now_unix_ms` 0), or does not declare
   `debug_until` (see [the host](#the-host)), refuses a policy that overrides `debug`
   (`debug: until: this SDK cannot apply the requested override`).
@@ -400,10 +401,10 @@ gates see, and the agent's health (`ComponentHealth`) carries it under
   (spans, metric points or log records in failed exports), and `items.filtered`: dropped on
   purpose by a level, a cap or redaction, which is never unhealthy. Records dropped by a full
   queue aren't counted.
-- **When it is sent.** The layer's `Health` call builds the entry and says whether to send it:
-  at once when a `healthy` or `status` changes, at most every 60 s while only the counters move,
-  and not at all while nothing changes. The integration calls it from the same timer as `Refresh`,
-  every 30 s.
+- **When it is sent.** The [agent flow](#the-agent-flow) builds the entry and sends it: at once
+  when a `healthy` or `status` changes (new exporters included), at most every 60 s while only the
+  counters move, and not at all while nothing changes. It looks every 30 s, on the wake it asks
+  for, with the counts the integration gives it.
 - **On the server.** The server core raises a health change when the condition (`healthy`,
   `status`, `last_error`) of the agent or of any component under it changes, so an exporter going
   `failing` is one; counters and times moving are not. The reference server keeps the whole report
@@ -534,17 +535,13 @@ the policy as a whole is wrong. It quotes at most 64 characters of a value or ke
 reports its **effective config**: the policy in force, as the only file, `logfire-sdk-policy.json`
 (`application/json`).
 
-**The client keeps the config applied.** A config is answered in two steps, the same in every
-language. The layer first decides what to keep (`Decide` returns a `Plan`: the policy to keep, or
-nothing when the config is refused). Then it gives the answer (`Commit`). With a state directory
-the integrations save nothing themselves. The client keeps the config that the application
-answered APPLIED in its own saved state, and tells the server APPLIED only once that save has
-landed. Until then, and while a save fails (the client tries again), the server hears APPLYING.
-Thus the integration commits it as saved. With no state directory there is nowhere to keep it. A
-policy that changes a next-start control is refused, and one that changes only live controls is
-APPLIED. A save that fails, for a host that makes one itself, refuses the config
-(`can't save the settings: …`) and changes nothing. The integration never rewrites the answer.
-Each language's binding runs the two steps, so the integration makes one call.
+**The client keeps the config applied.** With a state directory the integrations save nothing
+themselves. The client keeps the config that the application answered APPLIED in its own saved
+state, and tells the server APPLIED only once that save has landed. Until then, and while a save
+fails (the client tries again), the server hears APPLYING. With no state directory there is
+nowhere to keep it: a policy that changes a next-start control is refused, and one that changes
+only live controls is APPLIED. The integration never rewrites the answer: it hands the flow the
+remote config and sends the status the flow gives back.
 
 - The effective config lists every control, those the policy in force left out as `local`.
   Before any policy is applied, every control is local. It is written compact, its keys sorted.
@@ -557,8 +554,8 @@ Each language's binding runs the two steps, so the integration makes one call.
   `deactivate_instrumentations`).
 - A refused policy changes nothing, so the effective config still reports the policy in force
   before it. A restart reports the policy in force again.
-- The layer builds the effective config (`Load`, `Commit` and `Refresh` each return the whole of
-  it), so every language reports it the same way. The reference server's log shows an effective
+- The layer builds the effective config (the flow gives the whole of it with every change), so
+  every language reports it the same way. The reference server's log shows an effective
   config's JSON files on its `a2s` line, as `effective`.
 
 ## The description
@@ -575,7 +572,8 @@ them, the layer adds two attributes for the server:
   host declares the settings behind it ([the host](#the-host)). `debug` is listed only with a
   clock (`now_unix_ms` not 0). With no host, the list is empty.
 
-Thus every integration passes the same `host` and `now_unix_ms` to `Describe` as to `Load`.
+Thus every integration passes the same `host` and `now_unix_ms` to `Describe` as to the flow's
+start.
 
 ## The layer
 
@@ -584,37 +582,62 @@ language's client ships. It comes with the core, pinned by hash
 ([how-it-works.md](how-it-works.md#where-the-core-comes-from)), and `scripts/gen_sdk_settings.py`
 generates each language's types for it. It is separate from the client core: its own module and
 its own interface, `proto/opamp/sdk/v1/settings.proto`. The module keeps nothing between calls.
-The integration keeps the policies it is handed and passes them back.
+The integration keeps the agent's state it is handed and passes it back.
 
 | Call | When | Returns |
 |---|---|---|
-| `Load{core_state, saved, host, now_unix_ms}` | at start, before the SDK is built, with the client's saved state and the policy kept before ([at start](#at-start)) | the settings to start with (next-start ones included), the policy in force, the effective config, and a warning if the saved policy could not be used (the SDK then starts with its own); when to ask again (`refresh_at_unix_ms`) |
-| `Decide{config, current, at_start, host, now_unix_ms}` | a remote config arrived | a `Plan`: the policy to save before answering (none when the config is refused) |
-| `Commit{decide, saved, error}` | once the plan's policy is saved, or its save failed, or there is nowhere to save it ([the answer](#the-answer)) | the `RemoteConfigStatus` to send, the settings to put in force (only when APPLIED), the policy now in force, the effective config, the next-start settings pending a restart, and when to ask again |
-| `Refresh{current, at_start, host, now_unix_ms}` | at the time a `Load`, `Commit` or `Refresh` said to ask again (`refresh_at_unix_ms`, 0 for never): the end of debug mode | the settings to put in force now, the effective config, when to ask again, and a warning if the policy in force can no longer be used (one moved back a day, say). An override that the host no longer declares is set aside instead: reported `local`, the rest of the policy still in force ([the host](#the-host)) |
-| `Health{counts, previous, now_unix_ms, settings}` | every 30 s, from the `Refresh` timer, with what the gates counted since start, the report the last call answered, and the settings in force | whether to send now, and the `exporters` entry to put in the agent's health (when not sending, the one last sent): see [export health](#export-health) |
+| `AgentStart{host, state_dir, core_state, endpoint, instance_uid, hints, now_unix_ms, now_mono_ms}` | at start, before the SDK is built, with the client's saved state ([at start](#at-start)) | an `AgentOutput`: the agent's state, the effects to carry out (the settings to start with first) and when to wake it ([the agent flow](#the-agent-flow)) |
+| `AgentStep{agent, now_unix_ms, now_mono_ms, input}` | for each thing that happens: a remote config, a connection or a failed one, the timer, new exporters, a narrower host | an `AgentOutput` |
 | `Describe{resource, host, now_unix_ms}` | at start | the agent description, with the policy formats and the supported controls ([the description](#the-description)) |
 | `Components{inventory, host, now_unix_ms}` | once the SDK is built, and when what it lists changes | the instance's inventory as its available components, for `set_available_components`: the integration's and SDK's versions, its instrumentations and exporters, and the settings the host carries out ([available-components.md](available-components.md#what-the-sdk-integrations-report)) |
 | `Evaluate{settings, host, input}` | in tests only | what the layer's reference matchers make of one input under a policy: how a span is sampled, whether a log record passes the logs export and the levels, what redaction leaves of a list of attributes, what a rate cap lets through. Each language's tests hold its own matchers to it |
+
+### The agent flow
+
+What an integration does around the rules is the same in every language, so it is the layer's
+too: start from the config the client kept applied, answer each remote config, put the settings in
+force, end debug mode on time, send export health, and say whether the server can be reached. The
+integration is a loop. It tells the flow what happened and carries out what the flow says.
+
+- **State.** Each `AgentOutput` carries `agent`, the flow's state as bytes. The integration keeps
+  it and passes it back with the next step, and never reads it.
+- **Clocks.** Each call takes the wall clock (`now_unix_ms`, which only debug mode's time reads)
+  and a monotonic one (`now_mono_ms`, milliseconds from any start the integration picks, which
+  times the wakes). The flow reads no clock of its own.
+- **Inputs.** `remote_config`; `connected` and `connect_failed` (the endpoint in use, and the HTTP
+  status or 0); `instance_uid_changed` (one the server assigned), `uid_not_saved` (the
+  integration couldn't keep it) and `state_from_newer_version` (the client's saved state came
+  from a newer client); `stopped` (on its own, with why); `built` (the SDK is built: its
+  `service.name` and exporters) and `exporters` (they changed); `host` (it narrowed,
+  [the host](#the-host)); `timer`, at the wake asked for. `exporters` and `timer` carry what the
+  gates counted since start.
+- **Effects,** carried out in order: `apply` (put these settings in force), `effective` (give the
+  client this effective config), `status` (send this `RemoteConfigStatus`), `health` (send this
+  agent health, with the `exporters` entry), `save_uid` (keep this instance UID for the next
+  start; if that fails, step `uid_not_saved`), and `log` (say this line, at its level).
+- **Wake.** `wake_at_mono_ms` is when to step `timer` (0: only on an input). Each output replaces
+  the last one's wake, so the integration arms one timer.
+
+The lines it says are the same in every language: the first connection, a failure with the
+setting to check (`hints`, from the core's Setup), a connection back, a new instance UID that
+couldn't be kept.
 
 ### At start
 
 The settings to start with are those of the last config applied. The client keeps that config in
 its saved state (the state file in the state directory, beside the last config received, which it
 hands over again at start). It saves the config when the application answers APPLIED, and
-reports APPLIED only once that save has landed. `Load` takes the state as the client saved it
+reports APPLIED only once that save has landed. `AgentStart` takes the state as the client saved it
 (`core_state`) and reads the policy of the config from it. Thus a config that the application
 refused, received after the one applied, is never what a restart starts from.
 
-With no config applied in that state (none saved, a state saved by an earlier client that did not
-keep one, or one that does not read), `Load` reads `saved`: the policy that the integration kept
-itself before (`sdk-settings.json` in the state directory). Thus the settings carry over from an
-earlier release until a config is applied. The integrations no longer write that file.
+With no config applied in that state (none saved, or one that does not read), the SDK starts with
+its own settings, every control local.
 
 A saved policy that overrides a control the host does not declare now (the application changed
-its exporters, say) is not used. `Load` warns (`saved SDK settings ignored: …`) and the SDK starts
-with its own settings, every control local, until the server sends a policy that it can carry
-out.
+its exporters, say) is not used. The flow warns (`saved SDK settings ignored: …`) and the SDK
+starts with its own settings, every control local, until the server sends a policy that it can
+carry out.
 
 The config applied survives an endpoint change. The client drops the config received from the
 old server (the new server's config wins), but it keeps the applied one, as it keeps packages
@@ -623,8 +646,8 @@ applied. A new server then sees in the effective config what the agent actually 
 
 ### The host
 
-An integration **declares** every setting that it carries out, with a `Host` passed to `Load`,
-`Decide`, `Refresh` and `Describe`, from what it built. A policy that overrides a control whose
+An integration **declares** every setting that it carries out, with a `Host` given to the flow's
+start (and a `host` step when it narrows) and to `Describe`, from what it built. A policy that overrides a control whose
 setting is not declared is refused, so a host never answers APPLIED for an override that it does
 not carry out. Beside the host, each call takes `now_unix_ms`, the instance's clock in
 milliseconds since the Unix epoch, which only debug mode reads. The layer reads no clock of its
@@ -691,11 +714,11 @@ under declarative configuration, to the configuration model), and the agent's ex
   outcome: `settings.json` (how policies are read and refused), `sampling.json` (how a span is
   sampled), `logs.json` (whether a log record passes the levels), `redact.json` (what redaction
   leaves of a list of attributes), `caps.json` (what a rate cap lets through, event by event),
-  `debug.json` (debug mode over time: `Load`, `Decide` and `Refresh` in turn, and the exact
+  `debug.json` (debug mode over time: a start, remote configs and the timer in turn, and the exact
   effective config through them), `saving.json` (the answer from what became of the save: saved,
   failed, nowhere to save; the integrations, whose saves are the client's, run its saved and
-  nowhere cases), `start.json` (the policy `Load` starts from: the config applied in the client's
-  saved state, or the one kept before, and whether `Load` warns),
+  nowhere cases), `start.json` (the policy the flow starts from: the config applied in the
+  client's saved state, and whether it warns),
   `components.json` (what the inventory lists,
   [available-components.md](available-components.md#what-the-sdk-integrations-report)),
   `health.json` (export health call after call: what is reported, and when it is sent),
