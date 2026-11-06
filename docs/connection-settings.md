@@ -258,14 +258,15 @@ back with it at the next start, in every language.
 The saved state holds secrets: the headers of the connection settings in use and on trial (their
 credentials, bearer tokens typically), and the telemetry and other connection settings whole,
 their client certificates' private keys included ([telemetry-settings.md](telemetry-settings.md)).
-So each client writes the file, and the package files it downloads beside it
-(`<state file>.downloads`), for the agent's user alone:
+So each client writes the file (and Go the package files it downloads beside it,
+`<state file>.downloads`) for the agent's user alone:
 
 | Client | Linux, macOS | Windows |
 |---|---|---|
-| Go, Node, Python | file 0600; downloads a 0700 directory of 0600 files | nothing set: the directory's permissions apply |
-| Java | the same | an access-control list allowing only the user, set before anything is written (the file is opened unshared until then); the downloads directory's is inherited by its files |
-| .NET | the same | an access-control list allowing only the user, protected from inheritance, set as the file is created; likewise the downloads directory |
+| Go | file 0600; downloads a 0700 directory of 0600 files | nothing set: the directory's permissions apply |
+| Node, Python | file 0600 | nothing set: the directory's permissions apply |
+| Java | file 0600 | an access-control list allowing only the user, set before anything is written (the file is opened unshared until then) |
+| .NET | file 0600 | an access-control list allowing only the user, protected from inheritance, set as the file is created |
 
 The temporary file a save writes first (the state file's path and `.tmp`) is always created new with those permissions: one left behind is
 deleted, never reused.

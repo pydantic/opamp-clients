@@ -32,7 +32,7 @@ import javax.net.ssl.SSLParameters;
 import javax.net.ssl.SSLSession;
 
 /**
- * A {@link HttpClient} with no network under it, for schedule exploration: every request, download
+ * A {@link HttpClient} with no network under it, for schedule exploration: every request
  * and WebSocket the shell starts becomes a {@link Call} on {@link #calls}, and the test's own
  * threads (its "network") answer it, fail it, hold it or answer it late, as the plan says. The
  * client takes it as the application's own client ({@link OpampClient.Config.Builder#httpClient}),
@@ -49,11 +49,9 @@ final class FakeHttp extends HttpClient {
   final List<FakeWs> sockets = new CopyOnWriteArrayList<>();
   /** A socket with a new write outstanding, once per write: for the network's side to complete. */
   final LinkedBlockingQueue<Object> wire = new LinkedBlockingQueue<>();
-  /** Completed by a network that sees a download asked for (its own choice: a test's signal). */
-  final CompletableFuture<Void> downloadAsked = new CompletableFuture<>();
   final List<String> violations = new CopyOnWriteArrayList<>();
   /**
-   * Called with each request or download as it is sent, before {@code sendAsync} returns: a test
+   * Called with each request as it is sent, before {@code sendAsync} returns: a test
    * may complete it there, so that the shell attaches its continuation to a response already
    * complete.
    */
@@ -87,7 +85,7 @@ final class FakeHttp extends HttpClient {
     }
   }
 
-  /** A request or a download: its future is the response the shell waits for. */
+  /** A request: its future is the response the shell waits for. */
   static final class Request extends Call {
     final HttpRequest request;
     final byte[] body;

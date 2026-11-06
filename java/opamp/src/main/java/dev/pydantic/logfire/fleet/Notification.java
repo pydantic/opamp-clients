@@ -32,34 +32,6 @@ public sealed interface Notification {
     }
   }
 
-  /** A custom message from the server, for a custom capability the agent declared. */
-  record CustomMessage(Opamp.CustomMessage message) implements Notification {}
-
-  /** The custom capabilities the server supports changed. */
-  record ServerCustomCapabilities(java.util.List<String> capabilities) implements Notification {}
-
-  /** A custom message the application sent won't be, and why. */
-  record CustomMessageNotSent(Opamp.CustomMessage message, String reason) implements Notification {}
-
-  /**
-   * Install package {@code name} ({@code pkg}: version, hash, type, the file's signature) from the
-   * file at {@code path}; checking the signature is the application's job. Answer with {@link
-   * OpampClient#packageInstalled}; the client deletes the file after the answer.
-   */
-  record InstallPackage(String name, Opamp.PackageAvailable pkg, java.nio.file.Path path) implements Notification {
-    /** Every member, but the download's headers without their values and its URL without a password. */
-    @Override
-    public String toString() {
-      return "InstallPackage[name=" + name + ", pkg=" + Redacted.pkg(pkg) + ", path=" + path + "]";
-    }
-  }
-
-  /** Remove package {@code name}, no longer offered; answer with {@link OpampClient#packageRemoved}. */
-  record RemovePackage(String name) implements Notification {}
-
-  /** A command from the server. */
-  record Command(Opamp.ServerToAgentCommand command) implements Notification {}
-
   /** The server assigned a new instance UID; persist it if you persist the UID. */
   record InstanceUidChanged(byte[] instanceUid) implements Notification {}
 

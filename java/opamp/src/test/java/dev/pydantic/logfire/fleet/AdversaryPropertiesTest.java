@@ -271,10 +271,10 @@ class AdversaryPropertiesTest {
   }
 
   /** The cancel productions (RULE-SHELL-06), in every run's grammar. */
-  static final List<String> CANCELS = List.of("cancel_download", "cancel_http", "cancel_http_done", "cancel_store",
+  static final List<String> CANCELS = List.of("cancel_http", "cancel_http_done", "cancel_store",
       "cancel_twice", "cancel_ws_closing", "cancel_ws_opening", "stop_cancel");
   /** And those of the streams and their files, in a core mode run's. */
-  static final List<String> STREAM_CANCELS = List.of("cancel_file", "cancel_splice", "cancel_stream_open",
+  static final List<String> STREAM_CANCELS = List.of("cancel_stream_open",
       "cancel_stream_opening", "cancel_stream_resolving");
 
   /** The cancel productions of a run in {@code mode}. */
@@ -746,7 +746,9 @@ class AdversaryPropertiesTest {
       // seconds (5 s when it ran interpreted), during which the shell can feed it nothing (one core call at a
       // time). Its margin for lateness covers that, not the shell's own timing.
       String endpoint = "http://127.0.0.1:" + server.port() + "/opamp?seed=" + seed + "&margin=" + MARGIN_MS
-          + (query.isEmpty() ? "" : "&" + query);
+          + (query.isEmpty() ? "" : "&" + query)
+          // This client takes no packages, so the adversary, as the real core, hands it no download.
+          + "&downloads=0";
       Tls tls = null;
       if (mode == OpampClient.Mode.CORE) {
         // Core mode: the run has a raw server of its own, which the adversary opens streams to
@@ -807,8 +809,6 @@ class AdversaryPropertiesTest {
         rawMarker = returned ? new AdversaryRawTest.Marker(raw.port(), MARKER_BOUND_MS) : null;
         raw.release();
       }
-      Path downloads = Executor.downloadsDir(state);
-      Map<String, String> before = listing(downloads);
       if (returned) {
         long end = stoppedAt + AFTER_STOP_MS * 1_000_000L;
         while (server.open(run) > 0 && System.nanoTime() < end) {
@@ -845,10 +845,6 @@ class AdversaryPropertiesTest {
             failure("RULE-SHELL-07: " + open[0] + " stream connection(s) still open " + AFTER_STOP_MS
                 + " ms after stop returned (" + open[1] + " never said who they were)");
           }
-        }
-        Map<String, String> after = listing(downloads);
-        if (!after.equals(before)) {
-          failure("RULE-SHELL-07: the downloads changed after stop returned (S3): " + before + " -> " + after);
         }
       }
       Thread.sleep(20);
@@ -905,24 +901,6 @@ class AdversaryPropertiesTest {
       String head = new String(data, 0, Math.min(data.length, 80), StandardCharsets.ISO_8859_1);
       java.util.regex.Matcher m = java.util.regex.Pattern.compile("^opamp-adversary +seed " + seed + " store (\\d+) ").matcher(head);
       return m.find() ? Long.parseLong(m.group(1)) : -1;
-    }
-
-    /** The downloads directory: each file's size and time, by name. */
-    static Map<String, String> listing(Path dir) throws IOException {
-      Map<String, String> out = new TreeMap<>();
-      if (!Files.isDirectory(dir)) {
-        return out;
-      }
-      try (var files = Files.list(dir)) {
-        for (Path f : files.toList()) {
-          try {
-            out.put(f.getFileName().toString(), Files.size(f) + "@" + Files.getLastModifiedTime(f).toMillis());
-          } catch (IOException e) {
-            out.put(f.getFileName().toString(), "gone");
-          }
-        }
-      }
-      return out;
     }
   }
 

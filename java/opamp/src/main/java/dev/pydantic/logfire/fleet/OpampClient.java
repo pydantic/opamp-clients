@@ -39,8 +39,7 @@ public final class OpampClient {
     /**
      * The default: the shared core speaks HTTP/1.1, WebSocket, CONNECT and SOCKS5 itself,
      * over the JDK's sockets and TLS ({@code SSLEngine}, with {@link
-     * Config.Builder#tls}); the client only opens connections, starts TLS, picks the proxy and
-     * writes package files.
+     * Config.Builder#tls}); the client only opens connections, starts TLS and picks the proxy.
      */
     CORE,
     /**
@@ -69,14 +68,10 @@ public final class OpampClient {
     final Path stateFile;
     final boolean acceptConnectionSettings;
     final Duration verifyTimeout;
-    final boolean acceptPackages;
     final boolean requestInstanceUid;
-    final long maxPackageBytes;
-    final Duration downloadTimeout;
     final Duration stopTimeout;
     final Duration connectTimeout;
     final Mode mode;
-    final boolean spliceDownloads;
     /** Core mode's configured proxy, as given, or null. */
     final String coreProxy;
     final boolean proxyResolveLocally;
@@ -97,7 +92,6 @@ public final class OpampClient {
       httpClient = b.httpClient;
       tls = b.tls;
       mode = resolved;
-      spliceDownloads = b.spliceDownloads;
       proxyResolveLocally = b.proxyResolveLocally;
       // The proxy URL is read as the mode reads it: the JDK's client takes HTTP proxies only.
       proxy = b.proxyUrl == null || mode == Mode.CORE ? null : Transport.Proxy.parse(b.proxyUrl);
@@ -108,10 +102,7 @@ public final class OpampClient {
       stateFile = b.stateFile;
       acceptConnectionSettings = b.acceptConnectionSettings;
       verifyTimeout = b.verifyTimeout;
-      acceptPackages = b.acceptPackages;
       requestInstanceUid = b.requestInstanceUid;
-      maxPackageBytes = b.maxPackageBytes;
-      downloadTimeout = b.downloadTimeout;
       stopTimeout = b.stopTimeout;
       connectTimeout = b.connectTimeout;
     }
@@ -151,16 +142,12 @@ public final class OpampClient {
       private boolean direct;
       /** Null: none named ({@link #build} picks it). */
       private Mode mode;
-      private boolean spliceDownloads = true;
       private Map<String, String> environment;
       private Streams.Platform streamsPlatform = Streams.SOCKETS;
       private Path stateFile;
       private boolean acceptConnectionSettings;
       private Duration verifyTimeout = Duration.ZERO;
-      private boolean acceptPackages;
       private boolean requestInstanceUid;
-      private long maxPackageBytes;
-      private Duration downloadTimeout = Duration.ZERO;
       private Duration stopTimeout = Duration.ZERO;
       private Duration connectTimeout = Duration.ZERO;
 
@@ -171,8 +158,7 @@ public final class OpampClient {
 
       /**
        * Capabilities the agent supports (AgentCapabilities bits), fixed for the run. ReportsStatus is
-       * always added, and the core adds the bits of what it does itself (packages, connection
-       * settings). Declare ReportsHeartbeat for heartbeats, and the Reports* bit of each status you
+       * always added, and the core adds the bits of what it does itself (connection settings). Declare ReportsHeartbeat for heartbeats, and the Reports* bit of each status you
        * set: a status whose bit isn't declared isn't sent.
        */
       public Builder capabilities(long capabilities) {
@@ -216,8 +202,7 @@ public final class OpampClient {
       }
 
       /**
-       * TLS for {@code https://} and {@code wss://} servers and for package downloads: the CAs to
-       * trust, a client certificate, the versions allowed. Default: the system's CAs, no client
+       * TLS for {@code https://} and {@code wss://} servers: the CAs to trust, a client certificate, the versions allowed. Default: the system's CAs, no client
        * certificate, TLS 1.2 and 1.3.
        */
       public Builder tls(Tls tls) {
@@ -226,7 +211,7 @@ public final class OpampClient {
       }
 
       /**
-       * Reach the server, and package files, through this proxy: {@code http://}, {@code
+       * Reach the server through this proxy: {@code http://}, {@code
        * https://} (TLS to the proxy, with {@link #tls} too), {@code socks5://} or {@code
        * socks5h://} (the proxy resolves the server's name, unless {@link #proxyResolveLocally}),
        * each with {@code user:password@} if it needs them. The core speaks to the proxy itself:
@@ -278,16 +263,6 @@ public final class OpampClient {
         return this;
       }
 
-      /**
-       * {@link Mode#CORE}: package files go from the socket to the file without passing through
-       * the core, where the response says how long the body is; default true. It is core mode's:
-       * {@code false} in {@link Mode#PLATFORM} is refused by {@link #build}.
-       */
-      public Builder spliceDownloads(boolean splice) {
-        this.spliceDownloads = splice;
-        return this;
-      }
-
       /** Tests only: the environment core mode reads its proxy from (default: the process's). */
       Builder environment(Map<String, String> env) {
         this.environment = env == null ? null : Map.copyOf(env);
@@ -301,7 +276,7 @@ public final class OpampClient {
       }
 
       /**
-       * Connect straight to the server and to package files, ignoring the environment's proxy
+       * Connect straight to the server, ignoring the environment's proxy
        * (in {@link Mode#PLATFORM}, the platform's proxy settings). Not with {@link #proxy}.
        */
       public Builder directConnection() {
@@ -310,12 +285,12 @@ public final class OpampClient {
       }
 
       /**
-       * Your own HTTP client, used as it is for OpAMP and package downloads. Only {@link
+       * Your own HTTP client, used as it is for OpAMP. Only {@link
        * Mode#PLATFORM} (advanced) can use it, and it must be named: without {@code
        * mode(Mode.PLATFORM)} {@link #build} refuses it. It replaces {@link #tls} and {@link
        * #proxy}: set TLS and proxies on it instead (giving both is an error). It must not follow
        * redirects ({@code HttpClient.Redirect.NEVER}, the JDK's default): every 3xx goes to the
-       * core as it is, a download's too, and the core decides whether to follow it.
+       * core as it is.
        */
       public Builder httpClient(HttpClient client) {
         if (client != null && client.followRedirects() != HttpClient.Redirect.NEVER) {
@@ -352,17 +327,6 @@ public final class OpampClient {
       }
 
       /**
-       * Take packages from the server (docs/packages.md): the client downloads them beside the
-       * state file (its path and {@code .downloads}) and the application installs them ({@link
-       * Notification.InstallPackage}, {@link Notification.RemovePackage}). Only with a {@link
-       * #stateFile}: a restart would forget what the agent has.
-       */
-      public Builder acceptPackages(boolean accept) {
-        this.acceptPackages = accept;
-        return this;
-      }
-
-      /**
        * Ask the server to assign the instance UID (the RequestInstanceUid flag,
        * docs/instance-uid.md). The UID the client starts with (the core's, or the application's) is
        * the temporary value until the server assigns one. With a {@link #stateFile} the assigned
@@ -373,21 +337,6 @@ public final class OpampClient {
        */
       public Builder requestInstanceUid(boolean request) {
         this.requestInstanceUid = request;
-        return this;
-      }
-
-      /** The largest package file downloaded; default 1 GiB. */
-      public Builder maxPackageBytes(long bytes) {
-        this.maxPackageBytes = bytes;
-        return this;
-      }
-
-      /**
-       * How long a download may take (the core's deadline: it cancels a slower one); default 10
-       * minutes.
-       */
-      public Builder downloadTimeout(Duration timeout) {
-        this.downloadTimeout = timeout;
         return this;
       }
 
@@ -421,10 +370,6 @@ public final class OpampClient {
               + " use it, or leave httpClient out and set tls and proxy instead");
         }
         Mode resolved = mode != null ? mode : Mode.CORE;
-        if (resolved == Mode.PLATFORM && !spliceDownloads) {
-          throw new IllegalStateException("spliceDownloads is core mode's (the JDK's HTTP client writes package files itself):"
-              + " leave it out, or run in core mode (no httpClient, and mode(Mode.CORE) or none)");
-        }
         if (httpClient != null && (tls != null || proxyUrl != null || direct)) {
           throw new IllegalStateException("httpClient replaces tls, proxy and directConnection: set them on your HTTP client instead");
         }
@@ -453,30 +398,19 @@ public final class OpampClient {
       Opamp.ComponentHealth health,
       Opamp.EffectiveConfig effectiveConfig,
       Opamp.RemoteConfigStatus remoteConfigStatus,
-      Opamp.AvailableComponents availableComponents,
-      Opamp.CustomCapabilities customCapabilities) {
-    /** Without available components or custom capabilities. */
+      Opamp.AvailableComponents availableComponents) {
+    /** Without available components. */
     public Status(
         Opamp.AgentDescription description,
         Opamp.ComponentHealth health,
         Opamp.EffectiveConfig effectiveConfig,
         Opamp.RemoteConfigStatus remoteConfigStatus) {
-      this(description, health, effectiveConfig, remoteConfigStatus, null, null);
-    }
-
-    /** Without custom capabilities. */
-    public Status(
-        Opamp.AgentDescription description,
-        Opamp.ComponentHealth health,
-        Opamp.EffectiveConfig effectiveConfig,
-        Opamp.RemoteConfigStatus remoteConfigStatus,
-        Opamp.AvailableComponents availableComponents) {
-      this(description, health, effectiveConfig, remoteConfigStatus, availableComponents, null);
+      this(description, health, effectiveConfig, remoteConfigStatus, null);
     }
 
     /** Just the description. */
     public static Status of(Opamp.AgentDescription description) {
-      return new Status(description, null, null, null, null, null);
+      return new Status(description, null, null, null, null);
     }
   }
 
@@ -499,11 +433,8 @@ public final class OpampClient {
   /** When stop was first asked for (System.nanoTime), or null: all of stop shares one stop timeout from it. */
   private final java.util.concurrent.atomic.AtomicReference<Long> stopAsked = new java.util.concurrent.atomic.AtomicReference<>();
   /**
-   * Once the core has stopped, at least this for what it cancelled to unwind (a download's file
-   * deleted once the write in flight is over), however much of the stop timeout the core took: as
-   * Node's and Python's. 250 ms was too little on a loaded runner: a core that took all of its stop
-   * timeout left a download's file to be deleted after stop had returned (the nightly of
-   * 2026-10-23, seed 20749003).
+   * Once the core has stopped, at least this for what it cancelled to unwind (a save finishing, a
+   * connection closing), however much of the stop timeout the core took: as Node's and Python's.
    */
   private static final long STOP_GRACE_MS = 1000;
   /** The instance UID in use, as the core last said. */
@@ -543,9 +474,8 @@ public final class OpampClient {
     }
     Streams.Engines engines = coreMode ? Streams.originEngines(config.tls) : null;
     // The transport is the endpoint's, as the core reads it: this client carries out whichever
-    // effects come. The core keeps every effect's time (this client carries out its cancels),
-    // decides what a download's status means, and makes the backoff's jitter seed from the
-    // entropy (seed left 0: two clients started in the same tick don't retry in step).
+    // effects come. The core keeps every effect's time (this client carries out its cancels)
+    // and makes the backoff's jitter seed from the entropy (seed left 0: two clients started in the same tick don't retry in step).
     CoreProto.Config.Builder c = CoreProto.Config.newBuilder()
         .setEntropy(ByteString.copyFrom(entropy()))
         .setUnixMs(System.currentTimeMillis())
@@ -557,22 +487,17 @@ public final class OpampClient {
         .setMaxReceiveBytes(config.maxReceiveBytes)
         .setAcceptConnectionSettings(config.acceptConnectionSettings)
         .setVerifyTimeoutMs(ms(config.verifyTimeout))
-        .setAcceptPackages(config.acceptPackages)
         .setRequestInstanceUid(config.requestInstanceUid)
-        .setMaxPackageBytes(config.maxPackageBytes)
-        .setDownloadTimeoutMs(ms(config.downloadTimeout))
         .setStopTimeoutMs(ms(config.stopTimeout))
         .setConnectTimeoutMs(ms(config.connectTimeout))
         // Core mode: the core speaks HTTP and WebSocket over the streams this client opens.
-        .setStreams(coreMode)
-        .setSpliceDownloads(coreMode && config.spliceDownloads);
+        .setStreams(coreMode);
     if (coreMode) {
       // The core picks each connection's proxy from this.
       c.setProxy(proxyChoice(config));
     }
     if (config.stateFile != null) {
-      // A save or a download's file work of a client stopped before on this file may still be
-      // finishing: it lands before this client reads the file, not after.
+      // A save of a client stopped before on this file may still be finishing: it lands before this client reads the file, not after.
       StateFile.settled(config.stateFile);
       c.setPersistence(true).setSavedState(ByteString.copyFrom(StateFile.load(config.stateFile)));
     }
@@ -584,15 +509,13 @@ public final class OpampClient {
     this.instanceUid = core.initOutput().getInstanceUid().toByteArray();
     // All of stop takes the core's stop timeout, as given or by default: its start reports it.
     this.stopTimeoutMs = core.initOutput().getLimits().getStopTimeoutMs();
-    // The file operations of saves and downloads, journaled into the core tap if there is one.
+    // The file operations of saves, journaled into the core tap if there is one.
     Disk files = disk.apply(Disk.REAL);
     if (config.stateFile != null) {
       if (core.tap() != null) {
         Disk.Journal.state(core.tap(), config.stateFile);
         files = new Disk.Journal(files, core.tap(), config.stateFile);
       }
-      // Files downloaded before a restart: the core downloads again what it still needs.
-      Executor.deleteDownloads(files, config.stateFile);
     }
     this.notify = notify == null ? n -> {} : notify;
     ScheduledThreadPoolExecutor loop = new ScheduledThreadPoolExecutor(1, r -> {
@@ -610,7 +533,7 @@ public final class OpampClient {
           if (!finished) {
             step(in);
           }
-        }, config.streamsPlatform, engines, proxies(config), files, config.stateFile, executor::downloadPath)
+        }, config.streamsPlatform, engines, proxies(config))
         : null;
     // Nothing is stepped, so nothing is told, until start has returned the client.
     thread.execute(() -> {
@@ -643,7 +566,7 @@ public final class OpampClient {
 
   /**
    * Tests only: {@link #start}, the core tapped to {@code tapPath} (null: as {@code OPAMP_CORE_TAP}
-   * says) and the file operations of saves and downloads on {@code disk} applied to the real file
+   * says) and the file operations of saves on {@code disk} applied to the real file
    * system (faults injected there, under the journal).
    */
   static OpampClient start(Config config, Status status, Consumer<Notification> notify,
@@ -663,9 +586,6 @@ public final class OpampClient {
     }
     if (status.availableComponents() != null) {
       c.post(CoreProto.Input.newBuilder().setSetAvailableComponents(status.availableComponents()).build());
-    }
-    if (status.customCapabilities() != null) {
-      c.post(CoreProto.Input.newBuilder().setSetCustomCapabilities(status.customCapabilities()).build());
     }
     c.post(CoreProto.Input.newBuilder().setStart(CoreProto.Empty.getDefaultInstance()).build());
     c.returned.countDown();
@@ -769,20 +689,6 @@ public final class OpampClient {
     call(CoreProto.Input.newBuilder().setSetEffectiveConfig(value).build());
   }
 
-  /** Change the custom capabilities the agent supports. */
-  public void setCustomCapabilities(Opamp.CustomCapabilities value) {
-    call(CoreProto.Input.newBuilder().setSetCustomCapabilities(value).build());
-  }
-
-  /**
-   * Send a custom message, for one of the agent's custom capabilities. It goes with the next
-   * message the server takes, and again if that message is lost; if it can't be sent at all, a
-   * {@link Notification.CustomMessageNotSent} says why.
-   */
-  public void sendCustomMessage(Opamp.CustomMessage value) {
-    call(CoreProto.Input.newBuilder().setSendCustomMessage(value).build());
-  }
-
   /** Change the components the agent has (leave the hash empty: the core computes it). */
   public void setAvailableComponents(Opamp.AvailableComponents value) {
     call(CoreProto.Input.newBuilder().setSetAvailableComponents(value).build());
@@ -796,38 +702,6 @@ public final class OpampClient {
   /** Report on telemetry settings (the answer to a {@link Notification.ConnectionSettings}). */
   public void setConnectionSettingsStatus(Opamp.ConnectionSettingsStatus value) {
     call(CoreProto.Input.newBuilder().setSetConnectionSettingsStatus(value).build());
-  }
-
-  /**
-   * Answer {@link Notification.InstallPackage}: the package at {@code hash} is installed ({@code
-   * error} null), or why it isn't.
-   */
-  public void packageInstalled(String name, byte[] hash, String error) {
-    CoreProto.PackageInstalled.Builder p = CoreProto.PackageInstalled.newBuilder()
-        .setName(name).setHash(ByteString.copyFrom(hash)).setOk(error == null);
-    if (error != null) {
-      p.setDetail(error);
-    }
-    call(CoreProto.Input.newBuilder().setPackageInstalled(p).build());
-  }
-
-  /** Answer {@link Notification.RemovePackage}: the package is removed. */
-  public void packageRemoved(String name) {
-    packageRemoved(name, null);
-  }
-
-  /**
-   * Answer {@link Notification.RemovePackage}: the package is removed ({@code error} null), or why
-   * it isn't. One that isn't is reported failed, and not removed again until it is offered and
-   * dropped again.
-   */
-  public void packageRemoved(String name, String error) {
-    CoreProto.PackageRemoved.Builder p = CoreProto.PackageRemoved.newBuilder()
-        .setName(name).setFailed(error != null);
-    if (error != null) {
-      p.setDetail(error);
-    }
-    call(CoreProto.Input.newBuilder().setPackageRemoved(p).build());
   }
 
   /**
@@ -901,8 +775,7 @@ public final class OpampClient {
    * turn: where no callback calls the client, the order is the thread's, as it was.
    *
    * <p>In core mode this runs inside the turn that fed the core a stream's bytes ({@link Streams}
-   * names that stream as the source of the download_data the step makes): a call brings the core
-   * no bytes, so its step makes none.
+   * names that stream as the source of the step): a call brings the core no bytes.
    */
   private void answer() {
     if (answering) {
@@ -947,9 +820,8 @@ public final class OpampClient {
       if (!out.getInstanceUid().isEmpty()) {
         instanceUid = out.getInstanceUid().toByteArray();
       }
-      // stopped is told last: the core may emit a notification after it in the same output
-      // (install_package, in the step that answers a save after stop), and nothing reaches the
-      // application after stopped (RULE-SHELL-01).
+      // stopped is told last: the core may emit a notification after it in the same output, and
+      // nothing reaches the application after stopped (RULE-SHELL-01).
       Notification stopped = null;
       for (CoreProto.Effect e : out.getEffectsList()) {
         if (e.hasNotify()) {
@@ -1009,10 +881,10 @@ public final class OpampClient {
     answer();
   }
 
-  /** Whether {@code e} starts something: a request, a connection, a send, a download or a save. */
+  /** Whether {@code e} starts something: a request, a connection, a send or a save. */
   private static boolean starts(CoreProto.Effect e) {
     return switch (e.getKindCase()) {
-      case HTTP_REQUEST, WS_OPEN, WS_SEND, DOWNLOAD, STORE, STREAM_OPEN -> true;
+      case HTTP_REQUEST, WS_OPEN, WS_SEND, STORE, STREAM_OPEN -> true;
       default -> false;
     };
   }
@@ -1027,8 +899,7 @@ public final class OpampClient {
     // for, within the stop timeout.
     CompletableFuture<Void> over = executor.close();
     if (streams != null) {
-      // Core mode: every stream closed at once; files still being written are deleted once their
-      // write in flight is over.
+      // Core mode: every stream closed at once.
       over = CompletableFuture.allOf(over, streams.shutdown());
     }
     // What the core took of the stop timeout (the goodbye, a save it waited for) is not given
@@ -1075,15 +946,6 @@ public final class OpampClient {
           n.getErrorResponse().getKind(), n.getErrorResponse().getMessage());
       case REMOTE_CONFIG -> new Notification.RemoteConfig(n.getRemoteConfig());
       case CONNECTION_SETTINGS -> new Notification.ConnectionSettings(n.getConnectionSettings());
-      case CUSTOM_MESSAGE -> new Notification.CustomMessage(n.getCustomMessage());
-      case SERVER_CUSTOM_CAPABILITIES ->
-          new Notification.ServerCustomCapabilities(java.util.List.copyOf(n.getServerCustomCapabilities().getCapabilitiesList()));
-      case CUSTOM_MESSAGE_NOT_SENT -> new Notification.CustomMessageNotSent(
-          n.getCustomMessageNotSent().getMessage(), n.getCustomMessageNotSent().getReason());
-      case INSTALL_PACKAGE -> new Notification.InstallPackage(n.getInstallPackage().getName(),
-          n.getInstallPackage().getPackage(), executor.downloadPath(n.getInstallPackage().getDownload()));
-      case REMOVE_PACKAGE -> new Notification.RemovePackage(n.getRemovePackage().getName());
-      case COMMAND -> new Notification.Command(n.getCommand());
       case INSTANCE_UID_CHANGED -> new Notification.InstanceUidChanged(n.getInstanceUidChanged().toByteArray());
       case HEARTBEAT_INTERVAL_MS -> new Notification.HeartbeatInterval(
           Duration.ofMillis(n.getHeartbeatIntervalMs() < 0 ? Long.MAX_VALUE : n.getHeartbeatIntervalMs()));

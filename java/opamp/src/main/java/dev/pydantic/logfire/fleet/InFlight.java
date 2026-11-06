@@ -13,8 +13,7 @@ import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 
 /**
- * The effects in flight, by effect id: a request, a WebSocket being opened or open, a download, a
- * save. The one place that decides what reaches the core, what a cancel aborts and what stop
+ * The effects in flight, by effect id: a request, a WebSocket being opened or open, a save. The one place that decides what reaches the core, what a cancel aborts and what stop
  * releases; the {@link Executor} only does the I/O. Thread-safe: every decision is taken under its
  * lock.
  *
@@ -148,9 +147,6 @@ final class InFlight {
       case WS_LOST -> id = input.getWsLost().getId();
       case STORED -> id = input.getStored().getId();
       case STORE_FAILED -> id = input.getStoreFailed().getId();
-      case DOWNLOADED -> id = input.getDownloaded().getId();
-      case DOWNLOAD_RESPONSE -> id = input.getDownloadResponse().getId();
-      case DOWNLOAD_FAILED -> id = input.getDownloadFailed().getId();
       default -> {
         return true;
       }

@@ -39,24 +39,22 @@ import opamp.proto.v1.Opamp;
  *
  * <ul>
  *   <li>platform mode: the executor's HttpClient path over {@link FakeHttp} (bodies in pieces, resets,
- *       error statuses with headers, package downloads into the state file's directory; WebSocket
- *       upgrades taken or refused, messages, closes and drops);
+ *       error statuses with headers; WebSocket upgrades taken or refused, messages, closes and
+ *       drops);
  *   <li>core mode: the core's own HTTP over {@link Streams}, on {@link MemoryNet}, the server's
- *       bytes arriving in pieces (or any bytes at all, status line included), package files spliced
- *       or written by the streams' file writer.
+ *       bytes arriving in pieces (or any bytes at all, status line included).
  * </ul>
  *
  * <p>The server answers each request with any bytes, a ServerToAgent built from the bytes (remote
- * configs, packages with files it serves, connection settings, commands, custom messages, errors, a
- * new instance UID) and perhaps damaged, an error status, or a reset. Each notification makes the
- * callback call the client (statuses, remote config and package answers, custom messages, stop).
+ * configs, connection settings, errors, a new instance UID; and packages, commands and custom
+ * messages, which this client takes none of) and perhaps damaged, an error status, or a reset. Each
+ * notification makes the callback call the client (statuses, remote config answers, stop).
  * Then the application stops the client. What must hold, whatever came: the client never stops on
  * its own (the callback never throws, so an error is this shell's or the core's); callbacks one at
  * a time, never after Stopped; Stopped once, last; stop completes within its bound without an
  * error; every answer the server gave reaches the core unless the core gave up on it first
- * (platform mode, read from the core tap); install_package names a file under the state file's
- * downloads directory, there as the callback runs, whose SHA-256 is the offer's content hash when
- * it has one; a heartbeat interval is never negative; no temporary state file is left; nothing is
+ * (platform mode, read from the core tap); the core asks for no download (the client takes no
+ * packages); a heartbeat interval is never negative; no temporary state file is left; nothing is
  * started once stop has returned.
  *
  * <p>scripts/java_fuzz.sh runs it under Jazzer; {@link FuzzInputsTest} runs {@link #SEEDS} and every
@@ -193,12 +191,11 @@ public final class ClientFuzz {
           .capabilities(FuzzInput.CAPABILITIES)
           .heartbeatInterval(Duration.ofMillis(new long[] {1, 5, 30_000, 0}[flags >> 2 & 3]))
           .requestTimeout(Duration.ofMillis((flags & 16) != 0 ? 1000 : 0))
-          .stateFile(state).acceptPackages(true)
+          .stateFile(state)
           .acceptConnectionSettings((flags & 32) != 0).requestInstanceUid((flags & 64) != 0)
-          .downloadTimeout(Duration.ofSeconds(5)).maxPackageBytes((flags & 128) != 0 ? 1000 : 0)
           .stopTimeout(Duration.ofMillis(STOP_MS));
       if (coreMode) {
-        b.mode(OpampClient.Mode.CORE).streamsPlatform(net).directConnection().spliceDownloads((more & 1) != 0);
+        b.mode(OpampClient.Mode.CORE).streamsPlatform(net).directConnection();
       } else {
         b.mode(OpampClient.Mode.PLATFORM).httpClient(http);
       }
@@ -225,8 +222,6 @@ public final class ClientFuzz {
           problem("the client stopped on its own: " + s.error());
         } else if (n instanceof Notification.HeartbeatInterval h && h.interval().isNegative()) {
           problem("heartbeat interval " + h.interval());
-        } else if (n instanceof Notification.InstallPackage ip) {
-          checkPackage(ip);
         }
         if (n instanceof Notification.Stopped) {
           return;
@@ -239,25 +234,6 @@ public final class ClientFuzz {
         }
       } finally {
         active.decrementAndGet();
-      }
-    }
-
-    void checkPackage(Notification.InstallPackage ip) {
-      Path dir = Executor.downloadsDir(state);
-      if (ip.path() == null || !dir.equals(ip.path().getParent())) {
-        problem("install_package " + ip.name() + ": " + ip.path() + " is not in " + dir);
-        return;
-      }
-      byte[] got;
-      try {
-        got = Files.readAllBytes(ip.path());
-      } catch (IOException e) {
-        problem("install_package " + ip.name() + ": its file can't be read: " + e);
-        return;
-      }
-      byte[] want = ip.pkg().getFile().getContentHash().toByteArray();
-      if (want.length > 0 && !java.util.Arrays.equals(FuzzInput.sha256(got), want)) {
-        problem("install_package " + ip.name() + ": the file isn't the one offered (" + got.length + " bytes)");
       }
     }
 
@@ -568,6 +544,8 @@ public final class ClientFuzz {
                   k -> new ArrayList<>()).add(e.getHttpRequest().getId());
               case WS_OPEN -> opens.add(e.getWsOpen().getId());
               case CANCEL -> cancelled.add(e.getCancel().getId());
+              case DOWNLOAD, DOWNLOAD_DATA, DOWNLOAD_DONE, STREAM_SPLICE, DISCARD ->
+                  problem(e.getKindCase() + " for a client that takes no packages");
               default -> {}
             }
           }
@@ -600,8 +578,7 @@ public final class ClientFuzz {
     }
 
     void run() throws Exception {
-      OpampClient c = OpampClient.start(config, new OpampClient.Status(Opamp.AgentDescription.getDefaultInstance(), null,
-          null, null, null, Opamp.CustomCapabilities.newBuilder().addCapabilities(FuzzInput.CAPABILITY).build()), this::notify,
+      OpampClient c = OpampClient.start(config, OpampClient.Status.of(Opamp.AgentDescription.getDefaultInstance()), this::notify,
           null, tap.toString(), d -> d);
       client.complete(c);
       long begun = System.nanoTime();
@@ -674,7 +651,7 @@ public final class ClientFuzz {
       seed(1, 0),
       // Platform mode, 1 ms heartbeats: a remote config, answered from the callback.
       seed(0, 0, 5, 2, 0, 2, 'a', 'b', 1, 0, 4, 'c', 'o', 'n', 'f', 0, 0, 1, 3, 1),
-      // Core mode: a package offered, its file served.
+      // Core mode: a package offered, its file served (the core asks for none: no packages taken).
       seed(1, 0, 1, 5, 4, 0, 0, 1, 0, 0, 1, '1', 2, 'h', '1', 1, 0, 5, 'h', 'e', 'l', 'l', 'o', 0, 0, 0, 0, 0, 0, 1, 4, 1, 1, 0),
       // Connection settings offered, with a new endpoint.
       seed(0x24, 0, 6, 8, 0, 2, 'c', 's', 1, 1, 1, 0, 0, 0, 0),

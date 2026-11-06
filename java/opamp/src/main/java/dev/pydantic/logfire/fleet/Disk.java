@@ -11,16 +11,13 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.nio.file.StandardOpenOption;
-import java.util.Comparator;
 import java.util.HexFormat;
 import java.util.Locale;
-import java.util.stream.Stream;
 
 /**
- * The file operations of the client's saves and downloads, and nothing else: the real file system
- * ({@link #REAL}), journaled into the core tap when there is one ({@link Journal}), and replaced by
- * tests to inject faults. Every save and every download's file goes through one of these, so what
- * the tap says is what was done.
+ * The file operations of the client's saves, and nothing else: the real file system ({@link
+ * #REAL}), journaled into the core tap when there is one ({@link Journal}), and replaced by tests
+ * to inject faults. Every save goes through one of these, so what the tap says is what was done.
  */
 interface Disk {
   /** An open file, made new by {@link #create}. */
@@ -37,10 +34,9 @@ interface Disk {
 
   /**
    * A new file at {@code path}, created exclusively (never one already there), that only the user
-   * can open. {@code inherit}: it takes its directory's access list on an ACL file system (a
-   * download's, in the downloads directory); otherwise it gets one of its own.
+   * can open.
    */
-  Handle create(Path path, boolean inherit) throws IOException;
+  Handle create(Path path) throws IOException;
 
   /** Delete {@code path}: whether it was there. */
   boolean remove(Path path) throws IOException;
@@ -54,17 +50,11 @@ interface Disk {
    */
   boolean syncDir(Path dir) throws IOException;
 
-  /** Make directory {@code dir}, the user's only: whether it was made (false: it was there). */
-  boolean mkdir(Path dir) throws IOException;
-
-  /** Delete directory {@code dir} and everything under it: whether it was there. */
-  boolean clear(Path dir) throws IOException;
-
   /** The real file system. */
   Disk REAL = new Disk() {
     @Override
-    public Handle create(Path path, boolean inherit) throws IOException {
-      FileChannel ch = inherit ? StateFile.createInherited(path) : StateFile.createPrivate(path);
+    public Handle create(Path path) throws IOException {
+      FileChannel ch = StateFile.createPrivate(path);
       return new Handle() {
         @Override
         public void write(byte[] b, int off, int len) throws IOException {
@@ -103,33 +93,6 @@ interface Disk {
       }
       try (FileChannel ch = FileChannel.open(dir, StandardOpenOption.READ)) {
         ch.force(true);
-      }
-      return true;
-    }
-
-    @Override
-    public boolean mkdir(Path dir) throws IOException {
-      return StateFile.makePrivateDirectory(dir);
-    }
-
-    @Override
-    public boolean clear(Path dir) throws IOException {
-      if (!Files.isDirectory(dir)) {
-        return false;
-      }
-      // Everything that can go goes; the first failure is the error (then it isn't all gone).
-      IOException failed = null;
-      try (Stream<Path> files = Files.walk(dir)) {
-        for (Path p : (Iterable<Path>) files.sorted(Comparator.reverseOrder())::iterator) {
-          try {
-            Files.deleteIfExists(p);
-          } catch (IOException e) {
-            failed = failed == null ? e : failed;
-          }
-        }
-      }
-      if (failed != null) {
-        throw failed;
       }
       return true;
     }
@@ -195,20 +158,16 @@ interface Disk {
     }
 
     @Override
-    public Handle create(Path path, boolean inherit) throws IOException {
-      Handle h = inner.create(path, inherit);
+    public Handle create(Path path) throws IOException {
+      Handle h = inner.create(path);
       record("create", path);
       String name = quote(name(path));
-      // A save's temporary file: the bytes themselves (the checker compares them with the core's
-      // saves). A download's: how many.
-      boolean data = !inherit;
       return new Handle() {
         @Override
         public void write(byte[] b, int off, int len) throws IOException {
           h.write(b, off, len);
-          tap.file(data
-              ? "{\"op\":\"write\",\"path\":" + name + ",\"data\":\"" + HexFormat.of().formatHex(b, off, off + len) + "\"}"
-              : "{\"op\":\"write\",\"path\":" + name + ",\"len\":" + len + "}");
+          // The bytes themselves: the checker compares them with the core's saves.
+          tap.file("{\"op\":\"write\",\"path\":" + name + ",\"data\":\"" + HexFormat.of().formatHex(b, off, off + len) + "\"}");
         }
 
         @Override
@@ -246,24 +205,6 @@ interface Disk {
         record("syncdir", d);
       }
       return synced;
-    }
-
-    @Override
-    public boolean mkdir(Path d) throws IOException {
-      boolean made = inner.mkdir(d);
-      if (made) {
-        record("mkdir", d);
-      }
-      return made;
-    }
-
-    @Override
-    public boolean clear(Path d) throws IOException {
-      boolean was = inner.clear(d);
-      if (was) {
-        record("clear", d);
-      }
-      return was;
     }
 
     /** {@code s} as a JSON string. */

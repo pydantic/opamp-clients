@@ -168,69 +168,6 @@ class LifecycleTest {
   static final long CONNECT_TIMEOUT_MS = 500;
   static final long SECOND_ATTEMPT_S = 20;
 
-  // S3: a download of a client stopped while it waits for the file's headers, then a new client
-  // on the same state file downloading the same package (with the same effect id). The old
-  // download's response comes after: the file the new client hands over is still its own.
-  @Test
-  void anOldClientsDownloadLeavesTheNewClientsFileAlone(@TempDir Path dir) throws Exception {
-    byte[] file = "the package".repeat(20).getBytes(StandardCharsets.US_ASCII);
-    CountDownLatch release = new CountDownLatch(1);
-    CountDownLatch firstAsked = new CountDownLatch(1);
-    try (Raw files = new Raw(s -> {
-      InputStream in = new BufferedInputStream(s.getInputStream());
-      TransportTest.Head.read(in);
-      OutputStream out = s.getOutputStream();
-      byte[] body = file;
-      if (firstAsked.getCount() > 0) { // the first client's: held, then the wrong bytes
-        firstAsked.countDown();
-        release.await();
-        body = "WRONG".repeat(40).getBytes(StandardCharsets.US_ASCII);
-      }
-      out.write(("HTTP/1.1 200 OK\r\nContent-Length: " + body.length + "\r\nConnection: close\r\n\r\n").getBytes(StandardCharsets.US_ASCII));
-      out.write(body);
-      out.flush();
-      s.close();
-    })) {
-      Opamp.PackagesAvailable offer = Opamp.PackagesAvailable.newBuilder()
-          .putPackages("p", Opamp.PackageAvailable.newBuilder()
-              .setType(Opamp.PackageType.PackageType_TopLevel).setVersion("1")
-              .setHash(ByteString.copyFromUtf8("p1"))
-              .setFile(Opamp.DownloadableFile.newBuilder()
-                  .setDownloadUrl(files.url("http") + "/p")
-                  .setContentHash(ByteString.copyFrom(MessageDigest.getInstance("SHA-256").digest(file))))
-              .build())
-          .setAllPackagesHash(ByteString.copyFromUtf8("all1"))
-          .build();
-      HttpServer server = opamp(new CopyOnWriteArrayList<>(), m -> Opamp.ServerToAgent.newBuilder().setPackagesAvailable(offer));
-      Path state = dir.resolve("state");
-      OpampClient.Config config = OpampClient.Config.builder(endpoint(server)).mode(OpampClient.Mode.PLATFORM)
-          .heartbeatInterval(Duration.ofMillis(100)).stateFile(state).acceptPackages(true).build();
-      OpampClient a = OpampClient.start(config, OpampClient.Status.of(null), n -> {});
-      assertTrue(firstAsked.await(20, TimeUnit.SECONDS), "the first client downloads");
-      a.stop().get(10, TimeUnit.SECONDS);
-
-      CompletableFuture<byte[]> handed = new CompletableFuture<>();
-      OpampClient b = OpampClient.start(config, OpampClient.Status.of(null), n -> {
-        if (n instanceof Notification.InstallPackage ip) {
-          release.countDown(); // the old download's response comes now
-          try {
-            Thread.sleep(500);
-            handed.complete(Files.readAllBytes(ip.path()));
-          } catch (Exception e) {
-            handed.completeExceptionally(e);
-          }
-        }
-      });
-      try {
-        assertArrayEquals(file, handed.get(20, TimeUnit.SECONDS), "the file handed over");
-      } finally {
-        release.countDown();
-        b.stop().get(10, TimeUnit.SECONDS);
-        server.stop(0);
-      }
-    }
-  }
-
   // S4: a slow disk. A save that takes its time holds up neither heartbeats nor stop, and the
   // next client on the same state file starts only once it is over (here: given up on at stop,
   // so it doesn't land).
@@ -302,7 +239,7 @@ class LifecycleTest {
       OpampClient.Status status = new OpampClient.Status(
           Opamp.AgentDescription.getDefaultInstance(), Opamp.ComponentHealth.newBuilder().setHealthy(true).build(),
           Opamp.EffectiveConfig.getDefaultInstance(), Opamp.RemoteConfigStatus.getDefaultInstance(),
-          Opamp.AvailableComponents.getDefaultInstance(), Opamp.CustomCapabilities.getDefaultInstance());
+          Opamp.AvailableComponents.getDefaultInstance());
       for (int i = 0; i < 10; i++) {
         CompletableFuture<OpampClient> handle = new CompletableFuture<>();
         List<Throwable> errors = new CopyOnWriteArrayList<>();

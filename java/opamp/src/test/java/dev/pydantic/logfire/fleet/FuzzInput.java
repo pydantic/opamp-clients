@@ -29,10 +29,7 @@ final class FuzzInput {
   static final int[] STATUSES = {204, 301, 302, 400, 401, 403, 404, 429, 500, 503};
   static final long CAPABILITIES = Opamp.AgentCapabilities.AgentCapabilities_AcceptsRemoteConfig_VALUE
       | Opamp.AgentCapabilities.AgentCapabilities_ReportsRemoteConfig_VALUE
-      | Opamp.AgentCapabilities.AgentCapabilities_AcceptsPackages_VALUE
-      | Opamp.AgentCapabilities.AgentCapabilities_ReportsPackageStatuses_VALUE
       | Opamp.AgentCapabilities.AgentCapabilities_AcceptsOpAMPConnectionSettings_VALUE
-      | Opamp.AgentCapabilities.AgentCapabilities_AcceptsRestartCommand_VALUE
       | Opamp.AgentCapabilities.AgentCapabilities_ReportsHealth_VALUE
       | Opamp.AgentCapabilities.AgentCapabilities_ReportsEffectiveConfig_VALUE
       | Opamp.AgentCapabilities.AgentCapabilities_ReportsAvailableComponents_VALUE
@@ -402,8 +399,7 @@ final class FuzzInput {
   }
 
   static List<String> CALLS = List.of("setHealth", "setDescription", "setEffectiveConfig", "setRemoteConfigStatus",
-      "packageInstalled", "packageRemoved", "setConnectionSettingsStatus", "sendCustomMessage",
-      "setCustomCapabilities", "setAvailableComponents", "stop", "nothing");
+      "setConnectionSettingsStatus", "setAvailableComponents", "stop", "nothing");
 
   static List<Anyvalue.KeyValue> attributes(Reader r) {
     List<Anyvalue.KeyValue> out = new ArrayList<>();
@@ -441,34 +437,11 @@ final class FuzzInput {
         c.setRemoteConfigStatus(Opamp.RemoteConfigStatus.newBuilder().setLastRemoteConfigHash(h)
             .setStatusValue(r.u8() % 5).setErrorMessage(r.text(32)).build());
       }
-      case "packageInstalled" -> {
-        String name;
-        byte[] hash;
-        if (seen.get(Notification.InstallPackage.class) instanceof Notification.InstallPackage ip && r.u8() % 4 != 0) {
-          name = ip.name();
-          hash = r.u8() % 4 != 0 ? ip.pkg().getHash().toByteArray() : r.blob(16);
-        } else {
-          name = r.pick(List.of("pkg", "other", "", r.text(16)));
-          hash = r.blob(16);
-        }
-        c.packageInstalled(name, hash, r.bit() ? null : r.text(32));
-      }
-      case "packageRemoved" -> c.packageRemoved(
-          seen.get(Notification.RemovePackage.class) instanceof Notification.RemovePackage rp && r.bit() ? rp.name() : r.text(16));
       case "setConnectionSettingsStatus" -> {
         ByteString h = seen.get(Notification.ConnectionSettings.class) instanceof Notification.ConnectionSettings cs && r.bit()
             ? cs.settings().getHash() : r.bytes(16);
         c.setConnectionSettingsStatus(Opamp.ConnectionSettingsStatus.newBuilder().setLastConnectionSettingsHash(h)
             .setStatusValue(r.u8() % 4).setErrorMessage(r.text(32)).build());
-      }
-      case "sendCustomMessage" -> c.sendCustomMessage(Opamp.CustomMessage.newBuilder()
-          .setCapability(r.pick(List.of(CAPABILITY, r.text(24)))).setType(r.text(16)).setData(r.bytes(512)).build());
-      case "setCustomCapabilities" -> {
-        Opamp.CustomCapabilities.Builder cc = Opamp.CustomCapabilities.newBuilder();
-        for (int n = r.u8() % 3; n > 0; n--) {
-          cc.addCapabilities(r.pick(List.of(CAPABILITY, r.text(24))));
-        }
-        c.setCustomCapabilities(cc.build());
       }
       case "setAvailableComponents" -> {
         Opamp.AvailableComponents.Builder ac = Opamp.AvailableComponents.newBuilder();

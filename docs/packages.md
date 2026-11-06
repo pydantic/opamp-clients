@@ -89,7 +89,6 @@ reporting each package's status, resuming after a crash); the application instal
 | Client | Turn on | Install | Remove |
 |---|---|---|---|
 | Go | `Config.StateFile`, `Config.AcceptPackages` | kind `InstallPackage`: `PackageName`, `Package`, `Path`; answer `PackageInstalled` (an error wrapped by `FailedForNow` or `FailedLeavingUnknown` says how it failed) | kind `RemovePackage`; answer `PackageRemoved` (the same) |
-| Java | `stateFile`, `acceptPackages` | `Notification.InstallPackage`: `name`, `pkg`, `path`; answer `packageInstalled` | `Notification.RemovePackage`; answer `packageRemoved` |
 
 Downloads are limited by `max_package_bytes` (1 GiB) and `download_timeout_ms` (10 minutes). No
 client follows a redirect itself: the core decides (below).

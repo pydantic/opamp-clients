@@ -45,71 +45,42 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
 
 /**
- * The client's file operations: each save and each download's file is journaled into the core
- * tap (kind 5, opamp-tap's file records) as it is done, and the recipe holds when the disk fails:
- * errors, a write cut short, a slow disk, a rename that lands but whose directory flush fails, a
- * downloads directory that can't be made, a discard that can't delete. Faults are injected through
+ * The client's file operations: each save is journaled into the core tap (kind 5, opamp-tap's
+ * file records) as it is done, and the recipe holds when the disk fails: errors, a write cut
+ * short, a slow disk, a rename that lands but whose directory flush fails. Faults are injected through
  * the client's {@link Disk}, under the journal. OPAMP_PROP_RUNS sets the number of fault plans
  * (default 6); a failure prints its run's seed, and OPAMP_PROP_SEED replays that one run.
  */
 class FilesTest {
   private static final byte[] UID = new byte[16];
-  private static final byte[] PACKAGE = "the package, ".repeat(10_000).getBytes(java.nio.charset.StandardCharsets.US_ASCII);
   private static final String STATE = "state.bin";
   private static final String TMP = "state.bin.tmp";
-  private static final String DOWNLOADS = "state.bin.downloads";
 
   static {
     java.util.Arrays.fill(UID, (byte) 0x17);
   }
 
   // ---------------------------------------------------------------------------------------------
-  // The journal: a save's records and a download's, in the order the checker needs them.
+  // The journal: a save's records, in the order the checker needs them.
 
-  // In both modes: in core mode the download's file is Streams', through the same journaled Disk,
-  // and the core hears the client's downloaded (the shell makes the response of it).
   @ParameterizedTest
   @EnumSource(OpampClient.Mode.class)
-  void aSaveAndADownloadAreJournaled(OpampClient.Mode mode, @TempDir Path dir) throws Exception {
+  void aSaveIsJournaled(OpampClient.Mode mode, @TempDir Path dir) throws Exception {
     Path state = dir.resolve(STATE);
-    // Left by a run that crashed: a save's temporary file, and a download's file.
+    // Left by a run that crashed: a save's temporary file.
     Files.write(StateFile.tmp(state), new byte[] {9, 9});
-    Files.createDirectories(Executor.downloadsDir(state));
-    Files.write(Executor.downloadsDir(state).resolve("junk"), new byte[] {9});
     Path tap = dir.resolve("core.tap");
     try (Servers s = new Servers(1)) {
-      List<Notification.InstallPackage> installs = new CopyOnWriteArrayList<>();
-      List<byte[]> handed = new CopyOnWriteArrayList<>();
-      CompletableFuture<OpampClient> handle = new CompletableFuture<>();
-      OpampClient client = OpampClient.start(s.config(state, mode), OpampClient.Status.of(null), n -> {
-        if (n instanceof Notification.InstallPackage ip) {
-          try {
-            handed.add(Files.readAllBytes(ip.path()));
-          } catch (IOException e) {
-            handed.add(new byte[0]);
-          }
-          installs.add(ip);
-          handle.join().packageInstalled(ip.name(), ip.pkg().getHash().toByteArray(), null);
-        }
-      }, null, tap.toString(), d -> d);
-      handle.complete(client);
+      OpampClient client = OpampClient.start(s.config(state, mode), OpampClient.Status.of(null), n -> {}, null, tap.toString(), d -> d);
       String tapPath = client.tapPath();
-      LifecycleTest.waitFor(() -> {
-        List<Event> ev = eventsQuietly(Path.of(tapPath));
-        return !installs.isEmpty() && ev.stream().anyMatch(e -> e.in() != null && e.in().hasStored())
-            && ev.stream().anyMatch(e -> e.file() != null && e.file().get("op").equals("remove")
-                && e.file().get("path").startsWith(DOWNLOADS + "/"));
-      }, 30_000);
+      LifecycleTest.waitFor(() -> eventsQuietly(Path.of(tapPath)).stream().anyMatch(e -> e.in() != null && e.in().hasStored()), 30_000);
       client.stop().get(20, TimeUnit.SECONDS);
-      assertEquals(1, installs.size(), "the package is installed");
-      assertArrayEquals(sha(PACKAGE), sha(handed.get(0)), "the file handed over is the one offered");
 
       List<Event> ev = events(Path.of(tapPath));
       keep(Path.of(tapPath), "journal-" + mode);
-      // init in, init out, then the state file named, then the downloads of before cleared.
-      assertEquals(List.of(1, 2, 5, 5), ev.subList(0, 4).stream().map(Event::kind).toList());
+      // init in, init out, then the state file named.
+      assertEquals(List.of(1, 2, 5), ev.subList(0, 3).stream().map(Event::kind).toList());
       assertEquals(Map.of("op", "state", "path", STATE), ev.get(2).file());
-      assertEquals(Map.of("op", "clear", "path", DOWNLOADS), ev.get(3).file());
 
       // The first save: the leftover goes, then a new file, its data, flushed, renamed, the
       // directory flushed; only then stored.
@@ -118,8 +89,7 @@ class FilesTest {
           .filter(CoreProto.Effect::hasStore).findFirst().orElseThrow().getStore();
       List<Integer> saveAt = new ArrayList<>();
       for (int i = storeAt + 1; i < ev.size() && saveAt.size() < 6; i++) {
-        Map<String, String> f = ev.get(i).file();
-        if (f != null && !f.getOrDefault("path", "").startsWith(DOWNLOADS)) {
+        if (ev.get(i).file() != null) {
           saveAt.add(i);
         }
       }
@@ -133,21 +103,7 @@ class FilesTest {
           Map.of("op", "syncdir", "path", ".")), saveAt.stream().map(i -> ev.get(i).file()).toList());
       int stored = indexOf(ev, e -> e.in() != null && e.in().hasStored() && e.in().getStored().getId() == store.getId());
       assertTrue(stored > saveAt.get(5), "stored comes after the directory is flushed");
-
-      // The download: its directory made, its file made new, written, flushed; then the response;
-      // and once installed, discarded.
-      String file = DOWNLOADS + "/" + installs.get(0).path().getFileName();
-      List<Map<String, String>> download = ev.stream().map(Event::file)
-          .filter(f -> f != null && f.getOrDefault("path", "").startsWith(DOWNLOADS) && !f.get("op").equals("clear")).toList();
-      assertEquals(Map.of("op", "mkdir", "path", DOWNLOADS), download.get(0));
-      assertEquals(Map.of("op", "create", "path", file), download.get(1));
-      long written = download.stream().filter(f -> f.get("op").equals("write")).mapToLong(f -> Long.parseLong(f.get("len"))).sum();
-      assertEquals(PACKAGE.length, written, "every byte written is journaled");
-      assertEquals(List.of(Map.of("op", "sync", "path", file), Map.of("op", "remove", "path", file)),
-          download.subList(download.size() - 2, download.size()));
-      int synced = indexOf(ev, e -> Map.of("op", "sync", "path", file).equals(e.file()));
-      int response = indexOf(ev, e -> e.in() != null && (e.in().hasDownloadResponse() || e.in().hasDownloaded()));
-      assertTrue(response > synced, "the response comes after the file is flushed");
+      assertFalse(ev.stream().anyMatch(e -> e.file() != null && e.file().get("op").equals("mkdir")), "no directory is made");
       assertEquals(List.of(), problems(ev));
       opampTap(Path.of(tapPath));
     }
@@ -165,10 +121,6 @@ class FilesTest {
     SLOW,
     /** The rename lands, then the directory's flush fails. */
     LANDS_BUT_FAILS,
-    /** The downloads directory can't be made. */
-    NO_DOWNLOADS_DIR,
-    /** A download's file can't be deleted (a discard, say). */
-    REMOVE_FAILS,
   }
 
   /** A save's operations, in order. */
@@ -194,7 +146,7 @@ class FilesTest {
   }
 
   @Test
-  void savesAndDownloadsSurviveFaults(@TempDir Path root) throws Exception {
+  void savesSurviveFaults(@TempDir Path root) throws Exception {
     String runsEnv = System.getenv("OPAMP_PROP_RUNS");
     String seedEnv = System.getenv("OPAMP_PROP_SEED");
     int runs = seedEnv != null && !seedEnv.isEmpty() ? 1
@@ -233,24 +185,17 @@ class FilesTest {
     }
     try (Servers s = new Servers(plan.configs())) {
       List<Throwable> errors = new CopyOnWriteArrayList<>();
-      List<Notification.InstallPackage> installs = new CopyOnWriteArrayList<>();
       FaultDisk[] fd = new FaultDisk[1];
-      CompletableFuture<OpampClient> handle = new CompletableFuture<>();
       OpampClient a = OpampClient.start(s.config(state), OpampClient.Status.of(null), n -> {
         if (n instanceof Notification.Stopped st && st.error() != null) {
           errors.add(st.error());
-        } else if (n instanceof Notification.InstallPackage ip) {
-          installs.add(ip);
-          handle.join().packageInstalled(ip.name(), ip.pkg().getHash().toByteArray(), null);
         }
       }, null, dir.resolve("a.tap").toString(), d -> fd[0] = new FaultDisk(d, plan, state));
-      handle.complete(a);
       Path tapA = Path.of(a.tapPath());
       if (plan.stopEarly()) {
         fd[0].injected.await(15, TimeUnit.SECONDS);
       } else {
         LifecycleTest.waitFor(() -> s.served.get() >= plan.configs() + 4
-            && (plan.fault() == Fault.NO_DOWNLOADS_DIR || !installs.isEmpty())
             && (plan.fault() != Fault.SLOW || !fd[0].fired() || fd[0].slowTo > 0)
             && settled(eventsQuietly(tapA)), 20_000);
       }
@@ -324,7 +269,6 @@ class FilesTest {
     private final Disk inner;
     private final Plan plan;
     private final Path tmp;
-    private final Path downloads;
     /** Saves begun (each begins with the removal of a leftover), and where the current one is. */
     private int saves = -1;
     private boolean inSave;
@@ -338,7 +282,6 @@ class FilesTest {
       this.inner = inner;
       this.plan = plan;
       this.tmp = StateFile.tmp(state).toAbsolutePath();
-      this.downloads = Executor.downloadsDir(state).toAbsolutePath();
     }
 
     boolean fired() {
@@ -346,8 +289,7 @@ class FilesTest {
     }
 
     private boolean hit(int op) {
-      boolean saveFault = plan.fault() != Fault.NO_DOWNLOADS_DIR && plan.fault() != Fault.REMOVE_FAILS;
-      if (fired || !saveFault || saves != plan.save() || op != plan.op()) {
+      if (fired || saves != plan.save() || op != plan.op()) {
         return false;
       }
       fired = true;
@@ -377,17 +319,13 @@ class FilesTest {
       }
     }
 
-    private boolean under(Path p) {
-      return p.toAbsolutePath().startsWith(downloads);
-    }
-
     @Override
-    public Handle create(Path path, boolean inherit) throws IOException {
+    public Handle create(Path path) throws IOException {
       boolean save = path.toAbsolutePath().equals(tmp);
       if (save) {
         before(1);
       }
-      Handle h = inner.create(path, inherit);
+      Handle h = inner.create(path);
       return new Handle() {
         @Override
         public void write(byte[] b, int off, int len) throws IOException {
@@ -428,11 +366,6 @@ class FilesTest {
         } else {
           inSave = false;
         }
-      } else if (under(path) && plan.fault() == Fault.REMOVE_FAILS) {
-        fired = true;
-        firedAt = System.nanoTime();
-        injected.countDown();
-        throw new IOException("EIO deleting " + path + " (injected)");
       }
       return inner.remove(path);
     }
@@ -452,272 +385,6 @@ class FilesTest {
       }
       return inner.syncDir(dir);
     }
-
-    @Override
-    public boolean mkdir(Path dir) throws IOException {
-      if (plan.fault() == Fault.NO_DOWNLOADS_DIR) {
-        fired = true;
-        firedAt = System.nanoTime();
-        injected.countDown();
-        throw new IOException("EACCES making " + dir + " (injected)");
-      }
-      return inner.mkdir(dir);
-    }
-
-    @Override
-    public boolean clear(Path dir) throws IOException {
-      return inner.clear(dir);
-    }
-  }
-
-  // ---------------------------------------------------------------------------------------------
-  // Downloads' files are made new.
-
-  // A file already at a download's path (left by a run that crashed) is neither written over, nor
-  // handed over, nor deleted: the download fails.
-  @Test
-  void aFileAlreadyAtADownloadsPathIsLeftAlone(@TempDir Path dir) throws Exception {
-    HttpServer files = files();
-    try {
-      Path state = dir.resolve(STATE);
-      LinkedBlockingQueue<CoreProto.Input> got = new LinkedBlockingQueue<>();
-      Executor x = new Executor(Transport.of(HttpClient.newHttpClient()), got::add, state);
-      byte[] left = {7, 7, 7};
-      Files.createDirectories(Executor.downloadsDir(state));
-      Files.write(x.downloadPath(1), left);
-      x.run(download(1, files));
-      CoreProto.Input in = got.poll(20, TimeUnit.SECONDS);
-      assertEquals(CoreProto.Input.KindCase.DOWNLOAD_FAILED, in.getKindCase(), String.valueOf(in));
-      StateFile.settled(state);
-      assertTrue(Files.exists(x.downloadPath(1)), "the file left behind is not deleted");
-      assertArrayEquals(left, Files.readAllBytes(x.downloadPath(1)), "the file left behind is not written over");
-    } finally {
-      files.stop(0);
-    }
-  }
-
-  // A download cancelled while its file is being written: the file goes, and only once nothing
-  // more is written to it (a write after its removal is a write to a file not made new).
-  @Test
-  void aCancelledDownloadsFileIsRemovedAfterItsLastWrite(@TempDir Path dir) throws Exception {
-    CountDownLatch release = new CountDownLatch(1);
-    HttpServer files = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
-    files.setExecutor(java.util.concurrent.Executors.newCachedThreadPool());
-    files.createContext("/p", ex -> {
-      ex.sendResponseHeaders(200, 2L * PACKAGE.length);
-      try (OutputStream out = ex.getResponseBody()) {
-        out.write(PACKAGE);
-        out.flush();
-        Raw.await(release);
-        out.write(PACKAGE);
-      } catch (IOException e) {
-        // the client went
-      }
-    });
-    files.start();
-    Path state = dir.resolve(STATE);
-    Core.Tap tap = Core.Tap.open(dir.resolve("x.tap").toString());
-    try {
-      Disk.Journal.state(tap, state);
-      CountDownLatch writing = new CountDownLatch(1);
-      CountDownLatch cancelled = new CountDownLatch(1);
-      Disk slowWrites = new Disk() {
-        @Override
-        public Handle create(Path path, boolean inherit) throws IOException {
-          Handle h = REAL.create(path, inherit);
-          return new Handle() {
-            @Override
-            public void write(byte[] b, int off, int len) throws IOException {
-              writing.countDown();
-              Raw.await(cancelled);
-              h.write(b, off, len);
-            }
-
-            @Override
-            public void sync() throws IOException {
-              h.sync();
-            }
-
-            @Override
-            public void close() throws IOException {
-              h.close();
-            }
-          };
-        }
-
-        @Override
-        public boolean remove(Path path) throws IOException {
-          return REAL.remove(path);
-        }
-
-        @Override
-        public void rename(Path from, Path to) throws IOException {
-          REAL.rename(from, to);
-        }
-
-        @Override
-        public boolean syncDir(Path d) throws IOException {
-          return REAL.syncDir(d);
-        }
-
-        @Override
-        public boolean mkdir(Path d) throws IOException {
-          return REAL.mkdir(d);
-        }
-
-        @Override
-        public boolean clear(Path d) throws IOException {
-          return REAL.clear(d);
-        }
-      };
-      LinkedBlockingQueue<CoreProto.Input> got = new LinkedBlockingQueue<>();
-      Executor x = new Executor(Transport.of(HttpClient.newHttpClient()), got::add, state, new Disk.Journal(slowWrites, tap, state));
-      x.run(download(1, files));
-      assertTrue(writing.await(20, TimeUnit.SECONDS), "the file is being written");
-      x.run(CoreProto.Effect.newBuilder().setCancel(CoreProto.Id.newBuilder().setId(1)).build());
-      cancelled.countDown();
-      release.countDown();
-      StateFile.settled(state);
-      assertFalse(Files.exists(x.downloadPath(1)), "nothing is left");
-    } finally {
-      release.countDown();
-      tap.close();
-      files.stop(0);
-    }
-    List<Event> ev = events(Path.of(tap.path));
-    keep(Path.of(tap.path), "cancelled-download");
-    assertEquals(List.of(), problems(ev), String.valueOf(ev.stream().map(Event::file).toList()));
-    assertEquals("remove", ev.get(ev.size() - 1).file().get("op"), "the removal is the last word");
-  }
-
-  /**
-   * A download's file still being flushed when the core says stopped is the shell's to delete (the
-   * core gave up on it), once the flush is over; and by the time stop returns, however much of the
-   * stop timeout the core took (STOP_GRACE_MS at least, after it). With 250 ms, a loaded runner
-   * left the file to be deleted after stop had returned (the nightly of 2026-10-23, seed 20749003);
-   * here the flush takes 600 ms, as Node's test of the same.
-   */
-  // covers: RULE-SHELL-07
-  @ParameterizedTest
-  @EnumSource(OpampClient.Mode.class)
-  void aDownloadsFileBeingFlushedAsTheCoreStopsIsGoneWhenStopReturns(OpampClient.Mode mode, @TempDir Path dir)
-      throws Exception {
-    long flushMs = 600; // longer than the stop timeout, within the grace after it
-    long stopMs = 100;
-    Path state = dir.resolve(STATE);
-    Path downloads = Executor.downloadsDir(state).toAbsolutePath();
-    CountDownLatch flushing = new CountDownLatch(1);
-    CountDownLatch flushed = new CountDownLatch(1);
-    try (Servers s = new Servers(1)) {
-      OpampClient.Config config = OpampClient.Config.builder(LifecycleTest.endpoint(s.opamp), UID)
-          .mode(mode)
-          .environment(Map.of())
-          .heartbeatInterval(Duration.ofSeconds(60))
-          .stopTimeout(Duration.ofMillis(stopMs))
-          .stateFile(state)
-          .acceptPackages(true)
-          .build();
-      List<String> installed = new CopyOnWriteArrayList<>();
-      OpampClient c = OpampClient.start(config, OpampClient.Status.of(null), n -> {
-        if (n instanceof Notification.InstallPackage ip) {
-          installed.add(ip.name());
-        }
-      }, null, dir.resolve("f.tap").toString(), d -> new SlowFlush(d, downloads, flushMs, flushing, flushed));
-      assertTrue(flushing.await(20, TimeUnit.SECONDS), "the download's file is being flushed");
-      long t0 = System.nanoTime();
-      c.stop().get(20, TimeUnit.SECONDS);
-      long took = (System.nanoTime() - t0) / 1_000_000;
-      List<String> atReturn = listing(downloads);
-      assertTrue(flushed.await(flushMs + 5_000, TimeUnit.MILLISECONDS), "the flush ended");
-      Thread.sleep(500);
-      assertEquals(List.of(), atReturn, "stop returned with the file still there (deleted later: "
-          + listing(downloads).isEmpty() + ")");
-      assertEquals(List.of(), listing(downloads));
-      assertTrue(took < stopMs + 1_000 + 500, "stop took " + took + " ms");
-      assertEquals(List.of(), installed);
-    }
-  }
-
-  static List<String> listing(Path d) throws IOException {
-    if (!Files.isDirectory(d)) {
-      return List.of();
-    }
-    try (var files = Files.list(d)) {
-      return files.map(p -> p.getFileName().toString()).sorted().toList();
-    }
-  }
-
-  /** The real disk, but a download's file takes {@code flushMs} to flush. */
-  static final class SlowFlush implements Disk {
-    private final Disk inner;
-    private final Path downloads;
-    private final long flushMs;
-    private final CountDownLatch flushing;
-    private final CountDownLatch flushed;
-
-    SlowFlush(Disk inner, Path downloads, long flushMs, CountDownLatch flushing, CountDownLatch flushed) {
-      this.inner = inner;
-      this.downloads = downloads;
-      this.flushMs = flushMs;
-      this.flushing = flushing;
-      this.flushed = flushed;
-    }
-
-    @Override
-    public Handle create(Path path, boolean inherit) throws IOException {
-      Handle h = inner.create(path, inherit);
-      if (!path.toAbsolutePath().startsWith(downloads)) {
-        return h;
-      }
-      return new Handle() {
-        @Override
-        public void write(byte[] b, int off, int len) throws IOException {
-          h.write(b, off, len);
-        }
-
-        @Override
-        public void sync() throws IOException {
-          flushing.countDown();
-          try {
-            Thread.sleep(flushMs);
-          } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-          }
-          h.sync();
-          flushed.countDown();
-        }
-
-        @Override
-        public void close() throws IOException {
-          h.close();
-        }
-      };
-    }
-
-    @Override
-    public boolean remove(Path path) throws IOException {
-      return inner.remove(path);
-    }
-
-    @Override
-    public void rename(Path from, Path to) throws IOException {
-      inner.rename(from, to);
-    }
-
-    @Override
-    public boolean syncDir(Path d) throws IOException {
-      return inner.syncDir(d);
-    }
-
-    @Override
-    public boolean mkdir(Path d) throws IOException {
-      return inner.mkdir(d);
-    }
-
-    @Override
-    public boolean clear(Path d) throws IOException {
-      return inner.clear(d);
-    }
   }
 
   // ---------------------------------------------------------------------------------------------
@@ -725,32 +392,20 @@ class FilesTest {
 
   /**
    * An OpAMP server whose answers offer a remote config (each message the next one, up to {@code
-   * configs}: each is saved) and a package, served by a file server.
+   * configs}: each is saved).
    */
   static final class Servers implements AutoCloseable {
     final AtomicInteger configs = new AtomicInteger();
     final AtomicInteger served = new AtomicInteger();
     final List<Long> arrivals = new CopyOnWriteArrayList<>();
-    private final HttpServer files;
     private final HttpServer opamp;
 
     Servers(int configs) throws Exception {
       this.configs.set(configs);
-      files = files();
-      Opamp.PackagesAvailable offer = Opamp.PackagesAvailable.newBuilder()
-          .putPackages("p", Opamp.PackageAvailable.newBuilder()
-              .setType(Opamp.PackageType.PackageType_TopLevel).setVersion("1")
-              .setHash(ByteString.copyFromUtf8("p1"))
-              .setFile(Opamp.DownloadableFile.newBuilder()
-                  .setDownloadUrl("http://127.0.0.1:" + files.getAddress().getPort() + "/p")
-                  .setContentHash(ByteString.copyFrom(sha(PACKAGE))))
-              .build())
-          .setAllPackagesHash(ByteString.copyFromUtf8("all1"))
-          .build();
       opamp = LifecycleTest.opamp(new CopyOnWriteArrayList<>(), m -> {
         arrivals.add(System.nanoTime());
         int n = Math.min(served.incrementAndGet(), this.configs.get());
-        return Opamp.ServerToAgent.newBuilder().setPackagesAvailable(offer).setRemoteConfig(remote(n));
+        return Opamp.ServerToAgent.newBuilder().setRemoteConfig(remote(n));
       });
     }
 
@@ -766,14 +421,12 @@ class FilesTest {
           .heartbeatInterval(Duration.ofMillis(50))
           .stopTimeout(Duration.ofMillis(STOP_TIMEOUT_MS))
           .stateFile(state)
-          .acceptPackages(true)
           .build();
     }
 
     @Override
     public void close() {
       opamp.stop(0);
-      files.stop(0);
     }
   }
 
@@ -783,30 +436,6 @@ class FilesTest {
             .setBody(ByteString.copyFromUtf8("{\"n\":" + n + "}")).setContentType("application/json").build()))
         .setConfigHash(ByteString.copyFromUtf8("h" + n))
         .build();
-  }
-
-  /** A file server: /p is the package. */
-  static HttpServer files() throws IOException {
-    HttpServer files = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
-    files.setExecutor(java.util.concurrent.Executors.newCachedThreadPool());
-    files.createContext("/p", ex -> {
-      ex.sendResponseHeaders(200, PACKAGE.length);
-      try (OutputStream out = ex.getResponseBody()) {
-        out.write(PACKAGE);
-      }
-    });
-    files.start();
-    return files;
-  }
-
-  static CoreProto.Effect download(long id, HttpServer files) {
-    return CoreProto.Effect.newBuilder().setDownload(CoreProto.Download.newBuilder()
-        .setId(id).setUrl("http://127.0.0.1:" + files.getAddress().getPort() + "/p")
-        .setMaxBytes(1 << 24).setTimeoutMs(20_000)).build();
-  }
-
-  static byte[] sha(byte[] b) throws Exception {
-    return MessageDigest.getInstance("SHA-256").digest(b);
   }
 
   // ---------------------------------------------------------------------------------------------
@@ -1006,7 +635,6 @@ class FilesTest {
             }
           }
           case "remove" -> made.remove(p);
-          case "clear" -> made.removeIf(m -> m.equals(p) || m.startsWith(p + "/"));
           default -> {}
         }
       } else if (e.out() != null) {

@@ -318,38 +318,6 @@ class EffectsTest {
     assertEquals(java.util.List.of(), http.violations);
   }
 
-  // A download cancelled halfway: aborted, its partial file deleted (by the thread writing it, once
-  // the transfer is aborted: nothing is written to it after), never reported.
-  // covers: RULE-CLIENT-15
-  @Test
-  void aCancelledDownloadLeavesNothing(@TempDir Path dir) throws Exception {
-    try (Raw server = new Raw(s -> {
-      InputStream in = new BufferedInputStream(s.getInputStream());
-      TransportTest.Head.read(in);
-      OutputStream out = s.getOutputStream();
-      out.write("HTTP/1.1 200 OK\r\nContent-Length: 100000\r\n\r\n0123456789".getBytes(StandardCharsets.US_ASCII));
-      out.flush();
-      Raw.hold(s, in);
-    })) {
-      Path state = dir.resolve("state");
-      Rig r = new Rig(state);
-      r.run(CoreProto.Effect.newBuilder().setDownload(CoreProto.Download.newBuilder()
-          .setId(1).setUrl(server.url("http") + "/file").setMaxBytes(1 << 20).setTimeoutMs(30_000)));
-      Path file = r.x.downloadPath(1);
-      for (int i = 0; i < 1000 && !(Files.exists(file) && Files.size(file) >= 10); i++) {
-        Thread.sleep(10);
-      }
-      assertEquals(10, Files.size(file), "a partial file");
-      Socket s = server.held();
-      r.cancel(1);
-      assertTrue(Raw.closedWithin(s, 5000), "the download is aborted");
-      StateFile.settled(state); // its file work is over
-      assertFalse(Files.exists(file), "deleted");
-      r.nothingFor(300);
-      assertFalse(Files.exists(file));
-    }
-  }
-
   // A save the core gave up on before it landed doesn't land, and is never reported.
   // covers: RULE-CLIENT-15
   @Test
@@ -375,45 +343,6 @@ class EffectsTest {
       r.nothingFor(300);
     } finally {
       StateFile.beforeSave = p -> {};
-    }
-  }
-
-  // S3: a client ends while its download waits for the file's headers; the next client on the same
-  // state file downloads with the same effect id. The old download's response comes after: the
-  // next client's file is still its own.
-  @Test
-  void anEndedClientsDownloadLeavesTheNextClientsFileAlone(@TempDir Path dir) throws Exception {
-    byte[] body = "the package".repeat(20).getBytes(StandardCharsets.US_ASCII);
-    CountDownLatch release = new CountDownLatch(1);
-    CountDownLatch firstAsked = new CountDownLatch(1);
-    try (Raw server = new Raw(s -> {
-      InputStream in = new BufferedInputStream(s.getInputStream());
-      TransportTest.Head.read(in);
-      byte[] b = body;
-      if (firstAsked.getCount() > 0) {
-        firstAsked.countDown();
-        release.await();
-        b = "WRONG".repeat(40).getBytes(StandardCharsets.US_ASCII);
-      }
-      OutputStream out = s.getOutputStream();
-      out.write(("HTTP/1.1 200 OK\r\nContent-Length: " + b.length + "\r\nConnection: close\r\n\r\n").getBytes(StandardCharsets.US_ASCII));
-      out.write(b);
-      out.flush();
-      s.close();
-    })) {
-      Path state = dir.resolve("state");
-      CoreProto.Effect.Builder get = CoreProto.Effect.newBuilder().setDownload(CoreProto.Download.newBuilder()
-          .setId(1).setUrl(server.url("http") + "/p").setMaxBytes(1 << 20).setTimeoutMs(30_000));
-      Rig a = new Rig(state);
-      a.run(get);
-      assertTrue(firstAsked.await(10, TimeUnit.SECONDS));
-      a.x.close(); // the client ends
-      Rig b = new Rig(state);
-      b.run(get);
-      assertEquals(200, b.next().getDownloadResponse().getStatus());
-      release.countDown();
-      Thread.sleep(500);
-      assertArrayEquals(body, Files.readAllBytes(b.x.downloadPath(1)), "the next client's file");
     }
   }
 }

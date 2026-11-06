@@ -44,25 +44,24 @@ says which UID is in use.
 ## Timeouts and stop
 
 How long anything may take is the core's: a request (`requestTimeout`, 30 s), a WebSocket to open
-(`connectTimeout`, 30 s), a download (`downloadTimeout`, 10 minutes), and stop with its goodbye and
-closing handshake (`stopTimeout`, 5 s). When one passes, the core cancels the effect and the
+(`connectTimeout`, 30 s), and stop with its goodbye and closing handshake (`stopTimeout`, 5 s). When one passes, the core cancels the effect and the
 client aborts it at once; the client has no timeouts of its own. `stop()` completes when the core
 says it has stopped: nothing the client started is still running then. A save already writing
 finishes whole; a client started on the same state file waits for it.
 
-## Downloads
+## What this client leaves out
 
-Package files are downloaded beside the state file, through the same TLS settings and proxy as
-OpAMP, and follow no redirect: whatever the status, the body goes to the file and the response to
-the core, a redirect with its `Location` resolved by `java.net.URI` and that URL's origin. The core
-decides whether to follow it (`docs/packages.md`, "Redirects").
+It is an SDK's client: it takes no packages, sends and hears no custom messages, runs no server
+commands and has no header refresh. A server that offers any of them is refused, as the client
+never declared the capability. The Go Supervisor and the Collector extension are the clients for
+those.
 
 ## TLS and proxies
 
 `https://` and `wss://` endpoints use TLS 1.2 or 1.3 and trust the system's CAs (the JVM's default
 `SSLContext`). `tls(...)` changes that: the CAs to trust, a client certificate for servers that
 ask for one, and the versions allowed. `proxy(...)` sends everything through a proxy. Both apply
-to OpAMP over HTTP and WebSocket and to package downloads alike, in both modes.
+to OpAMP over HTTP and WebSocket alike, in both modes.
 
 ```java
 OpampClient.Config.builder("wss://opamp.example.com/v1/opamp")
@@ -111,21 +110,18 @@ asked for the platform's stack). An option only one mode honours is never silent
 selects that mode, or the client refuses to start with an error that says what to set instead.
 
 Here platform mode is `mode(OpampClient.Mode.PLATFORM)`, and `httpClient(...)` selects it too.
-`build()` refuses `mode(Mode.CORE)` with an `httpClient`, and in platform mode `proxyResolveLocally`,
-`spliceDownloads(false)` and a proxy URL that isn't `http://`.
+`build()` refuses `mode(Mode.CORE)` with an `httpClient`, and in platform mode `proxyResolveLocally`
+and a proxy URL that isn't `http://`.
 
 In core mode (`mode(OpampClient.Mode.CORE)`, or no `mode`) the core speaks HTTP/1.1 (chunked,
 keep-alive), WebSocket, CONNECT and SOCKS5 itself (inside the same WebAssembly module), over byte streams this library opens. The client then only opens TCP
 connections (blocking sockets, `TCP_NODELAY`), starts TLS on them (the JDK's `SSLEngine`, with the
 `tls(...)` settings: the certificate is verified for the server's name, or for its address when
 the endpoint is an IP literal; TLS to an `https://` proxy carries TLS to the server inside it),
-resolves names for a SOCKS5 proxy told to (`proxyResolveLocally`), picks the proxy, and writes
-package files.
+resolves names for a SOCKS5 proxy told to (`proxyResolveLocally`), and picks the proxy.
 
-- `spliceDownloads(false)` passes package bytes through the core instead of from the socket straight
-  to the file (where the response says how long the body is).
 - Stop is bounded: the core's stop (its goodbye and closing handshake), then every stream closed
-  at once and the files not complete deleted, within what is left of the stop timeout.
+  at once, within what is left of the stop timeout.
 
 Choose platform mode to bring your own `java.net.http.HttpClient`, or when the connection must be
 made by the JDK's HTTP client: with the JVM's proxy settings, say.
@@ -156,19 +152,17 @@ What differs there:
   It is the JVM's setting, read once when the first HTTP client is built, so the client doesn't
   change it for you. Without it, a proxy that needs credentials answers 407 to every connection
   but plain `http://`, and the client logs a warning at start.
-- `httpClient(...)` takes your own `java.net.http.HttpClient`. It is used as it is for OpAMP and
-  downloads, and replaces `tls`, `proxy` and `directConnection`: giving both is an error. It must
+- `httpClient(...)` takes your own `java.net.http.HttpClient`. It is used as it is for OpAMP, and replaces `tls`, `proxy` and `directConnection`: giving both is an error. It must
   not follow redirects.
 
 ## The state file
 
 With a state file (`stateFile(path)`) the client keeps what it needs across restarts: accepted
-connection settings, the instance UID, the last remote config, telemetry settings and packages.
+connection settings, the instance UID, the last remote config and telemetry settings.
 It holds secrets: the credentials of connection settings the server offered (bearer tokens in
 `Authorization` headers) and the private keys of telemetry settings' client certificates.
 The client writes it for the agent's user alone: mode 0600 on Linux and macOS, and on Windows
-an access-control list that allows only that user. Package files downloaded beside it
-(`<state file>.downloads`) are protected the same way.
+an access-control list that allows only that user.
 Keep it on a local disk, in a directory only the agent's user can read: not on a shared or
 network path, and not in backups or images copied anywhere less protected.
 

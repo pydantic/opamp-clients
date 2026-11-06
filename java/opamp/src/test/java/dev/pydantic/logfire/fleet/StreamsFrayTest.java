@@ -27,7 +27,7 @@ import org.junit.jupiter.api.Test;
 /**
  * Core mode's registry ({@link Streams.InFlight}) and executor under Fray: {@link RegistryFrayTest}
  * in core mode. A {@link Streams} on a loop of its own (as the client's thread has it), the test
- * playing the core (stream effects, closes, a download's file, then the end) and {@link MemoryNet}
+ * playing the core (stream effects, closes, then the end) and {@link MemoryNet}
  * the network on threads of its own: each connection made at once, refused, held until the shell
  * gives up and made anyway (then reset at once), its far end answering bytes and ending as the
  * plan says. Fray explores the interleavings; the plan comes from the schedule's seed.
@@ -36,8 +36,7 @@ import org.junit.jupiter.api.Test;
  * kind that can come then (data and an end only after it opened), at most one end each, nothing
  * about a stream after its close, nothing at all after the end (RULE-SHELL-04, -06); after the
  * end's wait (within the stop bound), every connection the client had is closed or reset and none
- * is still being made, the registry is empty, and no download file appears or changes after it
- * (S3) (RULE-SHELL-07). See {@link FrayRun} for the number of schedules, the seeds and replay.
+ * is still being made, and the registry is empty (RULE-SHELL-07). See {@link FrayRun} for the number of schedules, the seeds and replay.
  */
 // covers: RULE-SHELL-04, RULE-SHELL-06, RULE-SHELL-07
 class StreamsFrayTest {
@@ -62,30 +61,19 @@ class StreamsFrayTest {
         seed -> new Run(seed, Scenario.LATE_OPEN).run());
   }
 
-  /** A download spliced to its file as the shell ends: nothing of it is left, or changes, after. */
-  @Test
-  void aDownloadFinishingAfterTheEndLeavesNothing() throws Exception {
-    FrayRun.explore("StreamsFrayTest.aDownloadFinishingAfterTheEndLeavesNothing", RUNS, BUDGET_S,
-        seed -> new Run(seed, Scenario.DOWNLOAD).run());
-  }
-
-  enum Scenario { CLOSE, LATE_OPEN, DOWNLOAD }
+  enum Scenario { CLOSE, LATE_OPEN }
 
   /** How the network answers an attempt to connect. */
   enum Answer { NOW, FAIL, HOLD_THEN_ANSWER }
-
-  /** When the core ends the shell: at once, once the body is spliced, or once the file is downloaded. */
-  enum Until { NOW, SPLICED, DOWNLOADED }
 
   /** What the far end of a connection does: answer and wait for the end, answer and FIN, or reset. */
   enum Peer { TALK, END, RESET }
 
   /**
    * One schedule's plan: the core's effects in order (closes among them), how each attempt is
-   * answered and what each far end does, by stream id; the download (its stream, and its size).
+   * answered and what each far end does, by stream id.
    */
-  record Plan(Scenario scenario, List<CoreProto.Effect> effects, Map<Long, Answer> answers, Map<Long, Peer> peers,
-      int body, Until until) {
+  record Plan(Scenario scenario, List<CoreProto.Effect> effects, Map<Long, Answer> answers, Map<Long, Peer> peers) {
     static Plan of(Scenario scenario, SplittableRandom r) {
       List<CoreProto.Effect> effects = new ArrayList<>();
       Map<Long, Answer> answers = new TreeMap<>();
@@ -93,7 +81,6 @@ class StreamsFrayTest {
       int n = switch (scenario) {
         case CLOSE -> 2 + r.nextInt(3);
         case LATE_OPEN -> 1 + r.nextInt(2);
-        case DOWNLOAD -> 1;
       };
       List<Long> open = new ArrayList<>();
       for (long id = 1; id <= n; id++) {
@@ -106,10 +93,9 @@ class StreamsFrayTest {
         answers.put(id, switch (scenario) {
           case CLOSE -> Answer.values()[r.nextInt(3)];
           case LATE_OPEN -> r.nextInt(4) == 0 ? Answer.NOW : Answer.HOLD_THEN_ANSWER;
-          case DOWNLOAD -> Answer.NOW;
         });
-        peers.put(id, scenario == Scenario.DOWNLOAD ? Peer.TALK : Peer.values()[r.nextInt(3)]);
-        if (scenario != Scenario.DOWNLOAD && r.nextBoolean()) {
+        peers.put(id, Peer.values()[r.nextInt(3)]);
+        if (r.nextBoolean()) {
           effects.add(StreamsTest.write(id, ("req" + id).getBytes(java.nio.charset.StandardCharsets.US_ASCII)));
         }
         // The core gives up on something under way, now and then (the scenario's point).
@@ -118,17 +104,11 @@ class StreamsFrayTest {
           effects.add(StreamsTest.close(victim, r.nextBoolean()));
         }
       }
-      int body = 0;
-      if (scenario == Scenario.DOWNLOAD) {
-        body = 1 + r.nextInt(3 * WINDOW);
-        effects.add(StreamsTest.splice(1, 9, body));
-      }
-      Until until = scenario == Scenario.DOWNLOAD ? Until.values()[r.nextInt(3)] : Until.NOW;
-      return new Plan(scenario, effects, answers, peers, body, until);
+      return new Plan(scenario, effects, answers, peers);
     }
   }
 
-  /** The window of the pipes: small, so that a body is many reads, and writes wait for them. */
+  /** The window of the pipes: small, so that writes wait for reads. */
   static final int WINDOW = 512;
 
   /** One schedule. */
@@ -145,12 +125,7 @@ class StreamsFrayTest {
     final Set<Long> ended = new HashSet<>();
     final Set<Long> closed = new HashSet<>();
     boolean over;
-    /** The body went to the file (1), and the file was answered (2). */
-    final CompletableFuture<Void> spliced = new CompletableFuture<>();
-    final CompletableFuture<Void> downloaded = new CompletableFuture<>();
     Streams x;
-    Path dir;
-    Path state;
 
     Run(long seed, Scenario scenario) {
       this.seed = seed;
@@ -165,27 +140,16 @@ class StreamsFrayTest {
       ScheduledExecutorService loop = Executors.newSingleThreadScheduledExecutor();
       Thread network = new Thread(this::network, "network");
       try {
-        dir = Files.createTempDirectory("fray-streams");
-        state = dir.resolve("state");
         net.names.put("proxy.example", List.of("192.0.2.1"));
         x = new Streams(loop, this::admitted, net, (host, serverOrigin) -> {
           throw new IllegalStateException("no TLS here");
-        }, url -> CoreProto.ProxyAnswer.newBuilder(), Disk.REAL, state, id -> Executor.downloadsDir(state).resolve("d" + id));
+        }, url -> CoreProto.ProxyAnswer.newBuilder());
         network.start();
         // The core: its effects, in order, then the end.
         for (CoreProto.Effect e : plan.effects()) {
           loop.execute(() -> effect(e));
         }
         Thread.yield();
-        try {
-          switch (plan.until()) {
-            case SPLICED -> spliced.get(10, TimeUnit.SECONDS);
-            case DOWNLOADED -> downloaded.get(10, TimeUnit.SECONDS);
-            case NOW -> {}
-          }
-        } catch (TimeoutException e) {
-          // the end comes anyway
-        }
         CompletableFuture<CompletableFuture<Void>> end = new CompletableFuture<>();
         loop.execute(() -> {
           over = true;
@@ -195,10 +159,6 @@ class StreamsFrayTest {
           end.get().get(STOP_MS, TimeUnit.MILLISECONDS);
         } catch (TimeoutException e) {
           violation("RULE-SHELL-07: what the end waits for wasn't over within " + STOP_MS + " ms");
-        }
-        Map<String, String> downloads = listing();
-        if (!downloads.isEmpty()) {
-          FrayRun.saw("a download file there at the end");
         }
         String left = net.leftOpen();
         if (!left.isEmpty()) {
@@ -215,14 +175,10 @@ class StreamsFrayTest {
         }
         loop.shutdown();
         loop.awaitTermination(1, TimeUnit.MINUTES);
-        if (!listing().equals(downloads)) {
-          violation("RULE-SHELL-07: the downloads changed after the end's wait (S3): " + downloads + " -> " + listing());
-        }
-      } catch (InterruptedException | ExecutionException | IOException e) {
+      } catch (InterruptedException | ExecutionException e) {
         throw new IllegalStateException(e);
       } finally {
         loop.shutdownNow();
-        RegistryFrayTest.Run.delete(dir);
       }
       if (!violations.isEmpty()) {
         throw new AssertionError(violations + "\n  plan: " + plan);
@@ -259,18 +215,6 @@ class StreamsFrayTest {
         case STREAM_DATA -> id = in.getStreamData().getId();
         case STREAM_EOF -> id = in.getStreamEof().getId();
         case STREAM_FAILED -> id = in.getStreamFailed().getId();
-        case STREAM_SPLICED -> id = in.getStreamSpliced().getId();
-        case DOWNLOADED, DOWNLOAD_FAILED -> {
-          FrayRun.saw(in.getKindCase().toString());
-          downloaded.complete(null);
-          if (in.hasDownloaded()) {
-            // The core has it: done with the file, now and then.
-            if (seed % 2 == 0) {
-              x.run(StreamsTest.discard(9));
-            }
-          }
-          return;
-        }
         default -> {
           violation("an input nothing asked for: " + in.getKindCase());
           return;
@@ -294,14 +238,6 @@ class StreamsFrayTest {
       if (in.hasStreamFailed()) {
         ended.add(id);
         FrayRun.saw("failed" + (opened.contains(id) ? "" : " connecting"));
-      }
-      if (in.hasStreamSpliced()) {
-        // The core: the body is all in the file; then the shell closes the stream.
-        FrayRun.saw("spliced");
-        spliced.complete(null);
-        x.run(StreamsTest.done(9));
-        closed.add(id);
-        x.run(StreamsTest.close(id, false));
       }
     }
 
@@ -352,13 +288,7 @@ class StreamsFrayTest {
             e.abort();
             return;
           }
-          byte[] say;
-          if (plan.scenario() == Scenario.DOWNLOAD) {
-            say = new byte[plan.body()];
-            new SplittableRandom(seed).nextBytes(say);
-          } else {
-            say = ("hello " + stream).getBytes(java.nio.charset.StandardCharsets.US_ASCII);
-          }
+          byte[] say = ("hello " + stream).getBytes(java.nio.charset.StandardCharsets.US_ASCII);
           e.write(say);
           if (p == Peer.END) {
             e.finish();
@@ -375,23 +305,6 @@ class StreamsFrayTest {
       }, "peer-" + stream);
       threads.add(t);
       t.start();
-    }
-
-    Map<String, String> listing() throws IOException {
-      Map<String, String> out = new TreeMap<>();
-      if (!Files.isDirectory(Executor.downloadsDir(state))) {
-        return out;
-      }
-      try (var files = Files.list(Executor.downloadsDir(state))) {
-        for (Path f : files.toList()) {
-          try {
-            out.put(f.getFileName().toString(), Long.toString(Files.size(f)));
-          } catch (IOException e) {
-            out.put(f.getFileName().toString(), "gone");
-          }
-        }
-      }
-      return out;
     }
   }
 
