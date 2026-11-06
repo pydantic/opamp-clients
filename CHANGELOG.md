@@ -140,6 +140,23 @@ and date. Tests, CI and docs alone don't need a line.
   (Python), ip-address 10.7.4 (Node.js), jackson-databind 2.22.3 (Java tests). Every lockfile is
   now checked against OSV on every change and nightly (`scripts/deps_scan.py`).
 
+## Supervisor 0.10.1 (unreleased)
+
+`go/opampsupervisor/v0.10.1`: 0.10.0 and one packaging fix, cut from the 0.10.0 tag so it carries
+nothing else from main. Same Collector (otelcol-contrib v0.164.0) and core as 0.10.0.
+
+### Fixed
+
+- Supervisor installers and container image: a remote config naming a component the Collector
+  doesn't have (or a setting a component doesn't know) is refused before it runs. The packaged
+  configs set upstream's `agent.validate_config`, so `otelcol validate` checks it first; the running
+  config stays and the new one is FAILED with the Collector's reason. Before, the Collector was
+  given the config and exited, and a host went back to its last config about half a second later;
+  the container image, whose configs also left rollback off, crash-looped. The container configs
+  now also set `automatic_config_rollback` and `collector_crash_log_snippet_kib: 4`, as the host
+  installers do. Upgraded hosts pick it up: the package's after-upgrade step writes the config
+  again (#137).
+
 ## Supervisor 0.9.0 (2026-11-04)
 
 `go/opampsupervisor/v0.9.0`, on core 0.14.0. The Go modules are not released with it.

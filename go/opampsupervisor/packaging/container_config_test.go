@@ -42,6 +42,13 @@ func TestContainerConfigs(t *testing.T) {
 	assert.True(t, open.Capabilities.ReportsOwnMetrics)
 	assert.True(t, open.Capabilities.ReportsOwnLogs)
 	assert.False(t, open.Agent.RemoteConfigPolicy.Enabled(), "a policy in the default image config")
+	// As the host packages: a config the Collector can't load is refused before it runs, and one
+	// it fails on is replaced by the last that ran healthy, the log's tail in the FAILED status.
+	for _, cfg := range []config.Supervisor{open, loadContainerConfig(t, "supervisor-restricted.yaml")} {
+		assert.True(t, cfg.Agent.ValidateConfig)
+		assert.True(t, cfg.Agent.AutomaticConfigRollback)
+		assert.Equal(t, 4, cfg.Agent.CollectorCrashLogSnippetKiB)
+	}
 	require.NoError(t, open.Agent.RemoteConfigPolicy.Check("", []byte(`exporters: {datadog: {api: {key: "${env:DD_API_KEY}"}}}`)))
 
 	restricted := loadContainerConfig(t, "supervisor-restricted.yaml")

@@ -72,7 +72,10 @@ echo "$ENROLLMENT_TOKEN" | sudo pydantic-opamp-enroll --endpoint wss://opamp.exa
   `storage.state_key: systemd-creds` and `agent.automatic_config_rollback` (a remote config the
   Collector fails on is replaced by the last one that ran healthy, and stays FAILED), and
   `agent.collector_crash_log_snippet_kib: 4` (the FAILED status carries the end of the Collector's
-  log, so the server can show why), and limits what the server's remote config may do (see
+  log, so the server can show why), and `agent.validate_config` (a remote config the Collector can't
+  load, such as one naming a component this Collector isn't built with, is checked with
+  `otelcol validate` first and refused, FAILED with the Collector's reason, while the running
+  config stays), and limits what the server's remote config may do (see
   [What the server can do to this host](#what-the-server-can-do-to-this-host)).
 - **Starts the service and waits for it to connect.** It enables and starts
   `pydantic-opamp-supervisor.service`, then waits up to 30 seconds for the Supervisor to connect

@@ -75,6 +75,8 @@ func TestMacEnroll(t *testing.T) {
 	assert.True(t, loaded.Capabilities.ReportsOwnMetrics)
 	assert.True(t, loaded.Capabilities.ReportsOwnLogs)
 	assert.True(t, loaded.Agent.AutomaticConfigRollback)
+	// One naming a component the Collector doesn't have is refused before it runs.
+	assert.True(t, loaded.Agent.ValidateConfig)
 	// Without --restricted, any config the server sends runs.
 	assert.False(t, loaded.Agent.RemoteConfigPolicy.Enabled(), "a policy without --restricted")
 	require.NoError(t, loaded.Agent.RemoteConfigPolicy.Check("", hostLogsConfig(t, "macos")))

@@ -38,6 +38,14 @@ agent:
   # container reaches the collector too.
   connection_env:
     logfire/otlp: LOGFIRE_TOKEN
+  # A remote config the Collector fails on is replaced by the last one that ran healthy, and stays FAILED.
+  automatic_config_rollback: true
+  # The Collector's last 4 KiB of log goes with a FAILED config's status, so the server shows why.
+  collector_crash_log_snippet_kib: 4
+  # A remote config the Collector can't load (a component this Collector doesn't have, a setting a
+  # component doesn't know) is refused before it runs: `otelcol validate` checks it first, the
+  # running config stays, and the new one is FAILED with the Collector's reason.
+  validate_config: true
 
   # What the server's remote config may do in this container, as the packages' enroll scripts
   # write it with --restricted (packaging/README.md, "What the server can do to this host").
