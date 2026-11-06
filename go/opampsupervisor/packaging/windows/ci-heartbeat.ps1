@@ -39,6 +39,13 @@ function Report {
         '## Services'
         (Get-Service pydantic-opamp-supervisor, msiserver -ErrorAction SilentlyContinue | ForEach-Object { "$($_.Name) $($_.Status)" })
         ''
+        '## Defender'
+        (Get-MpComputerStatus -ErrorAction SilentlyContinue | ForEach-Object { "real-time $($_.RealTimeProtectionEnabled), on access $($_.OnAccessProtectionEnabled), behavior $($_.BehaviorMonitorEnabled), network inspection $($_.NISEnabled)" })
+        (Get-MpThreatDetection -ErrorAction SilentlyContinue | ForEach-Object { "detected $($_.InitialDetectionTime.ToUniversalTime().ToString('HH:mm:ss')) threat $($_.ThreatID) action $($_.ActionSuccess): $($_.Resources -join ', ')" })
+        (Get-MpThreat -ErrorAction SilentlyContinue | ForEach-Object { "threat $($_.ThreatID) $($_.ThreatName) severity $($_.SeverityID)" })
+        (Get-WinEvent -LogName 'Microsoft-Windows-Windows Defender/Operational' -MaxEvents 10 -ErrorAction SilentlyContinue |
+            Sort-Object TimeCreated | ForEach-Object { "$($_.TimeCreated.ToUniversalTime().ToString('HH:mm:ss')) $($_.Id) $(($_.Message -split "`n")[0..6] -join ' | ')" })
+        ''
         '## The Supervisor, last 15 events'
         (Get-WinEvent -FilterHashtable @{LogName = 'Application'; ProviderName = 'pydantic-opamp-supervisor'} -MaxEvents 15 -ErrorAction SilentlyContinue |
             Sort-Object TimeCreated | ForEach-Object { "$($_.TimeCreated.ToUniversalTime().ToString('HH:mm:ss')) $($_.Message)" })

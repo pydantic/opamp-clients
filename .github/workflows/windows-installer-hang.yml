@@ -5,9 +5,12 @@ name: Windows installer hang
 # run of its own every 30 s, from outside the runner. About a third of CI's runs of that job stop
 # answering in the install or upgrade test and end with no log; the heartbeat's last report shows
 # what took the runner down. It runs only on pull requests in this repository (it needs to write
-# check runs, which a caller of ci.yml doesn't grant). Half the runs write the tests' output straight
-# to the runner, as CI does, and half through tee into the log the heartbeat reports: four of four
-# runs through tee passed. Remove it once the cause is fixed.
+# check runs, which a caller of ci.yml doesn't grant). Remove it once the cause is fixed.
+#
+# Seen so far: the runner and the heartbeat both stop reaching GitHub about a minute after the .msi is
+# built, whatever step is running then (even `touch`); with tee or without. Half the runs here keep
+# Defender off the built and installed files, to see whether its scan of the bundled Collector is
+# what cuts the machine off.
 on:
   pull_request:
     paths:
@@ -24,7 +27,7 @@ concurrency:
 
 jobs:
   installer:
-    name: Windows installer, run ${{ matrix.run }}${{ matrix.tee && ' (tee)' || '' }}
+    name: Windows installer, run ${{ matrix.run }}${{ matrix.exclude && ' (Defender excluded)' || '' }}
     if: github.repository == 'pydantic/opamp-clients'
     runs-on: windows-latest
     timeout-minutes: 30
@@ -32,7 +35,7 @@ jobs:
       fail-fast: false
       matrix:
         run: [1, 2, 3, 4]
-        tee: [true, false]
+        exclude: [true, false]
     defaults:
       run:
         shell: bash
@@ -51,6 +54,12 @@ jobs:
         with:
           go-version: "1.26"
           cache-dependency-path: go/opampsupervisor/go.sum
+      - name: Defender kept off the built and installed files
+        if: matrix.exclude
+        shell: pwsh
+        run: |
+          Add-MpPreference -ExclusionPath $env:GITHUB_WORKSPACE, $env:RUNNER_TEMP, $env:TEMP, "$env:ProgramFiles\pydantic-opamp", "$env:ProgramData\pydantic-opamp", (go env GOCACHE)
+          (Get-MpPreference).ExclusionPath
       - name: The packaging tests (the enroll script), as CI runs them
         working-directory: go/opampsupervisor/packaging
         run: |
@@ -66,7 +75,7 @@ jobs:
         env:
           HEARTBEAT_TOKEN: ${{ github.token }}
           SHA: ${{ github.event.pull_request.head.sha }}
-          RUN: ${{ matrix.run }}${{ matrix.tee && ' (tee)' || '' }}
+          RUN: ${{ matrix.run }}${{ matrix.exclude && ' (Defender excluded)' || '' }}
         run: |
           $script = "$PWD\go\opampsupervisor\packaging\windows\ci-heartbeat.ps1"
           # Start-Process joins ArgumentList with spaces and no quoting, so every value is quoted here.
@@ -76,31 +85,24 @@ jobs:
           Start-Process -WindowStyle Hidden -FilePath powershell.exe -ArgumentList ($arguments -join ' ')
       - name: The .msi installed, enrolled with a server that issues a token, and restarted
         working-directory: go/opampsupervisor/packaging
-        env:
-          TEE: ${{ matrix.tee }}
         run: |
-          # Without tee, the test writes straight to the runner, as in CI.
-          t() { if [ "$TEE" = true ]; then "$@" 2>&1 | tee -a "$RUNNER_TEMP/install-test.log"; else "$@"; fi; }
           echo "compiling at $(date -u +%T)" > "$RUNNER_TEMP/install-test.log"
           go test -c -tags=install -o "$RUNNER_TEMP/install.test.exe" .
           echo "running at $(date -u +%T)" >> "$RUNNER_TEMP/install-test.log"
-          OPAMP_MSI="$(cygpath -w "$PWD/dist/pydantic-opamp-supervisor-255.0.0-windows-amd64.msi")" t "$RUNNER_TEMP/install.test.exe" -test.run Install -test.v -test.timeout 12m
+          OPAMP_MSI="$(cygpath -w "$PWD/dist/pydantic-opamp-supervisor-255.0.0-windows-amd64.msi")" "$RUNNER_TEMP/install.test.exe" -test.run Install -test.v -test.timeout 12m
       - name: The released .msi, enrolled, then upgraded in place to this one
         working-directory: go/opampsupervisor/packaging
         timeout-minutes: 18
         env:
-          TEE: ${{ matrix.tee }}
           RELEASED: https://github.com/pydantic/opamp-clients/releases/download/go/opampsupervisor/v0.9.0/pydantic-opamp-supervisor-0.9.0-windows-amd64.msi
           RELEASED_SHA256: 2a7181195790180e507fc8edab4833e79f6e6575fd42ce05343b025194f19ad8
         run: |
-          # Without tee, the test writes straight to the runner, as in CI.
-          t() { if [ "$TEE" = true ]; then "$@" 2>&1 | tee -a "$RUNNER_TEMP/install-test.log"; else "$@"; fi; }
           echo "downloading at $(date -u +%T)" >> "$RUNNER_TEMP/install-test.log"
           curl -fsSL --retry 3 --max-time 300 -o "$RUNNER_TEMP/released.msi" "$RELEASED"
           echo "$RELEASED_SHA256  $RUNNER_TEMP/released.msi" | sha256sum -c -
           echo "upgrading at $(date -u +%T)" >> "$RUNNER_TEMP/install-test.log"
           OPAMP_MSI="$(cygpath -w "$RUNNER_TEMP/released.msi")" OPAMP_UPGRADE="$(cygpath -w "$PWD/dist/pydantic-opamp-supervisor-255.0.0-windows-amd64.msi")" \
-            t "$RUNNER_TEMP/install.test.exe" -test.run Upgrade -test.v -test.timeout 12m
+            "$RUNNER_TEMP/install.test.exe" -test.run Upgrade -test.v -test.timeout 12m
       - name: The heartbeat, stopped
         if: always()
         run: touch "$RUNNER_TEMP/heartbeat.stop"
