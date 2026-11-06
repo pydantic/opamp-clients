@@ -911,6 +911,18 @@ internal sealed class SdkAgent
         }
     }
 
+    /// <summary>
+    /// For tests: <paramref name="action"/> under the gate, so no step of the client's thread (a
+    /// connect failure's, say) arms a new timer meanwhile: the timer armed last is the current one.
+    /// </summary>
+    internal void UnderGateForTest(Action action)
+    {
+        lock (this.gate)
+        {
+            action();
+        }
+    }
+
     /// <summary>For tests: the timer goes off now (whenever it is armed for).</summary>
     internal void TickForTest()
     {

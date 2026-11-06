@@ -28,13 +28,17 @@ public class HealthTests
         return handle;
     });
 
-    /// <summary>Fire the timer armed last, as it would go off.</summary>
-    private void Fire()
+    /// <summary>
+    /// Fire the timer armed last, as it would go off. Under the agent's gate: the client, failing to
+    /// connect on its own thread, tells the agent, whose step arms a new timer; between taking the
+    /// last timer and firing it, that made it stale, and the tick did nothing (a flake in CI).
+    /// </summary>
+    private void Fire(Agent agent) => agent.Sdk.UnderGateForTest(() =>
     {
         var (fire, handle) = this.timers[^1];
         Assert.False(handle.Disposed);
         fire();
-    }
+    });
 
     private Agent Prepared(string stateDir = "none") => Agent.Prepare(
         n => n switch { "OTEL_OPAMP_ENDPOINT" => "http://127.0.0.1:1/v1/opamp", "OTEL_OPAMP_STATE_DIR" => stateDir, _ => null },
@@ -252,7 +256,7 @@ public class HealthTests
                     }
                     else
                     {
-                        this.Fire();
+                        this.Fire(agent);
                     }
 
                     // What went out this step; the flow keeps the report it last made, so what a step
@@ -324,7 +328,7 @@ public class HealthTests
             agent.Sdk.SetHealth(new ComponentHealth { Healthy = true });
             agent.Controls.Tally.Failed(Signal.Traces, 5, "connection refused");
             this.nanos += 30 * Second;
-            this.Fire();
+            this.Fire(agent);
             Assert.True(agent.Sdk.HealthSent.Healthy);
             Assert.False(agent.Sdk.HealthSent.ComponentHealthMap["exporters"].Healthy);
             Assert.Equal("traces: connection refused", agent.Sdk.HealthSent.ComponentHealthMap["exporters"].LastError);
