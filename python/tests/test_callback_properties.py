@@ -178,6 +178,7 @@ class Run:
         self.stops: list[asyncio.Future] = []  # stops requested from inside the callback
         self.stop_returned = False
         self.described = 0
+        self.answered: set[bytes] = set()  # the remote config hashes the application answered
 
     @property
     def stopped(self) -> list[Notification]:
@@ -250,6 +251,7 @@ class CallbackModel(RuleBasedStateMachine):
         else:
             configs = [n for n in run.notes if n.kind == "remote_config"]
             h = configs[-1].remote_config.config_hash if configs else b"none"
+            run.answered.add(h)
             c.set_remote_config_status(pb.RemoteConfigStatus(
                 last_remote_config_hash=h, status=pb.RemoteConfigStatuses_APPLIED))
 
@@ -292,11 +294,21 @@ class CallbackModel(RuleBasedStateMachine):
                 run.problems.append(f"no stopped within 2 s of the callback raising {run.thrown!r}")
 
     async def _nudge(self, run: Run, until) -> None:
-        """Have the server send something (so the callback is called), until `until()`."""
+        """Have the server send something (so the callback is called), until `until()`: a remote
+        config. The core hands over the next config only once the application has answered the one
+        it holds, so one left unanswered is answered first, from the loop; unless the step waits for
+        an answer from inside a callback, when a heartbeat interval calls the callback instead."""
         for i in range(300):
             if until() or run.stopped:
                 return
             if i % 10 == 0:
+                configs = [n.remote_config.config_hash for n in run.notes if n.kind == "remote_config"]
+                if configs and configs[-1] not in run.answered:
+                    if "answer_config" in run.inside:
+                        self.server.offer_heartbeat()
+                        await asyncio.sleep(0.01)
+                        continue
+                    self._call(run, "answer_config")
                 self.server.offer_config()
             await asyncio.sleep(0.01)
 
