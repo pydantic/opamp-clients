@@ -332,7 +332,9 @@ def test_a_clients_saves_are_journaled_in_its_tap(mode: str, tmp_path, monkeypat
         try:
             client = Client.start(config(server, state, mode), Status())
             tap = tap_path(tmp_path)
-            await until("three saves", lambda: len([a for a in read_tap(str(tap)).answers() if a[0] == "stored"]) >= 3)
+            # The core takes in what comes while a save is under way at once, so the three configs
+            # (coming one a message, fast) may make as few as two saves.
+            await until("two saves", lambda: len([a for a in read_tap(str(tap)).answers() if a[0] == "stored"]) >= 2)
             await asyncio.wait_for(client.stop(), 10)
         finally:
             await server.close()

@@ -106,6 +106,11 @@ def test_calls_from_anywhere_arrive_once_and_in_order(plan: list[tuple[str, bool
             if n.kind == "stopped" and n.error is not None:
                 errors.append(n.error)
             try:
+                # Answered, so the core hands over the next remote config (and calls back again).
+                if n.kind == "remote_config" and client is not None:
+                    client.set_remote_config_status(pb.RemoteConfigStatus(
+                        last_remote_config_hash=n.remote_config.config_hash,
+                        status=pb.RemoteConfigStatuses_APPLIED))
                 while client is not None and done < len(plan) and plan[done][1]:
                     carry_out()
             except BaseException as e:  # noqa: BLE001
