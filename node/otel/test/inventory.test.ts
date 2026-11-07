@@ -24,7 +24,6 @@ import type { NodeSDK } from "@opentelemetry/sdk-node";
 import { Agent, hostFromEnv, inventory, managedSdk } from "../src/index.js";
 
 const LAYER = new SdkSettings();
-const text = (s: string) => new TextEncoder().encode(s);
 const config = (body: string) => policyConfig(body, body);
 /** 2026-10-14T12:00:00Z. */
 const NOW = 1_791_979_200_000;

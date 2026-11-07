@@ -9,14 +9,13 @@ The installers are a deb and an rpm for Linux, a [.pkg for macOS](#macos), and a
 [.msi for Windows](#windows). Each installs the Supervisor and a collector for it to run.
 The enrollment helper enrolls it with one command.
 
-The bundled Collector includes host metrics, file logs, Windows event logs, macOS unified logs,
-and file storage. Windows event logs and macOS unified logs run on their native operating systems.
-Configure `storage: file_storage` on file and event log receivers to keep their positions across
-restarts. Enable the extension under `service.extensions`. macOS unified logs do not have a saved
-cursor. Bound their startup history with `max_log_age`.
-
-The packages include these components from version 0.2.0. Version 0.1.0 did not include the
-Windows and macOS log receivers or the file storage extension.
+The bundled Collector is upstream's OpenTelemetry Collector Contrib, unchanged (see
+[The bundled Collector](#the-bundled-collector)): host metrics, file logs, Windows event logs, macOS
+unified logs, file storage and every other contrib component. Windows event logs and macOS unified
+logs run on their native operating systems. Configure `storage: file_storage` on file and event log
+receivers to keep their positions across restarts, and enable the extension under
+`service.extensions`. macOS unified logs do not have a saved cursor: bound their startup history
+with `max_log_age`.
 
 The release installers are unsigned. The macOS package is not notarized. GitHub build
 provenance and the checksums verify their source and contents, but do not replace platform
@@ -34,9 +33,9 @@ OpAMP:
 - `pydantic-opamp-enroll`.
 
 Download the deb or rpm for your architecture from the GitHub Release. On Debian or Ubuntu,
-install the local deb with `sudo apt install ./pydantic-opamp-supervisor_0.9.0_amd64.deb`.
+install the local deb with `sudo apt install ./pydantic-opamp-supervisor_0.10.0_amd64.deb`.
 On RHEL or Fedora, install the unsigned local rpm with
-`sudo dnf install --nogpgcheck ./pydantic-opamp-supervisor-0.9.0-1.x86_64.rpm`.
+`sudo dnf install --nogpgcheck ./pydantic-opamp-supervisor-0.10.0-1.x86_64.rpm`.
 The host needs systemd 250 or later. Verify the download against `SHA256SUMS.installers` first.
 
 Once a signed apt and yum repository is published (none is yet, see [Publishing](#publishing)),
@@ -113,7 +112,7 @@ Other options:
 ### Telemetry credentials for managed Collectors
 
 The enrollment helpers can supply a separate telemetry token to a managed
-Collector. This support is unreleased. Pass `--telemetry-token-stdin` on Linux
+Collector. Pass `--telemetry-token-stdin` on Linux
 or macOS, or `-TelemetryTokenStdin` on Windows. Standard input must contain the
 enrollment token on the first line and the telemetry token on the second line.
 Terminate both lines with a newline. Do not put either token in arguments.
@@ -242,8 +241,7 @@ more than three tags are pushed at once. Select `installers-only` to add install
 existing release. This mode keeps its archives and `SHA256SUMS`. A rerun replaces the installer
 assets and their checksums.
 
-From version 0.2.0, each archive is also signed with Cosign (keyless, from the
-workflow's GitHub identity), as
+Each archive is also signed with Cosign (keyless, from the workflow's GitHub identity), as
 `<archive>.sigstore.json`: what a Supervisor that accepts packages checks before it installs a
 collector the server offers.
 
@@ -252,11 +250,11 @@ Check a download with either:
 ```sh
 sha256sum --check --ignore-missing SHA256SUMS
 sha256sum --check --ignore-missing SHA256SUMS.installers
-gh attestation verify pydantic-opamp-supervisor_0.9.0_linux_amd64.tar.gz --repo pydantic/opamp-clients
-cosign verify-blob --bundle pydantic-opamp-supervisor_0.9.0_linux_amd64.tar.gz.sigstore.json \
+gh attestation verify pydantic-opamp-supervisor_0.10.0_linux_amd64.tar.gz --repo pydantic/opamp-clients
+cosign verify-blob --bundle pydantic-opamp-supervisor_0.10.0_linux_amd64.tar.gz.sigstore.json \
   --certificate-oidc-issuer https://token.actions.githubusercontent.com \
   --certificate-identity-regexp '^https://github\.com/pydantic/opamp-clients/\.github/workflows/release\.yml@' \
-  pydantic-opamp-supervisor_0.9.0_linux_amd64.tar.gz
+  pydantic-opamp-supervisor_0.10.0_linux_amd64.tar.gz
 ```
 
 ## macOS
@@ -269,7 +267,7 @@ The `.pkg` installs everything under `/opt/pydantic-opamp`:
   root and logs to `/opt/pydantic-opamp/var/log/supervisor.log`.
 
 ```sh
-sudo installer -pkg pydantic-opamp-supervisor-0.9.0-darwin-arm64.pkg -target /
+sudo installer -pkg pydantic-opamp-supervisor-0.10.0-darwin-arm64.pkg -target /
 echo "$ENROLLMENT_TOKEN" | sudo /opt/pydantic-opamp/bin/pydantic-opamp-enroll --endpoint wss://opamp.example.com/v1/opamp
 ```
 
@@ -299,7 +297,7 @@ administrator (`/norestart` keeps a quiet install that finds a file in use from 
 Windows on the spot; msiexec exits 3010 to say a restart is due instead):
 
 ```powershell
-msiexec /i pydantic-opamp-supervisor-0.9.0-windows-amd64.msi /qn /norestart
+msiexec /i pydantic-opamp-supervisor-0.10.0-windows-amd64.msi /qn /norestart
 $env:ENROLLMENT_TOKEN | & "$env:ProgramFiles\pydantic-opamp\pydantic-opamp-enroll.ps1" -Endpoint wss://opamp.example.com/v1/opamp
 ```
 
@@ -343,7 +341,7 @@ scripts' `--restricted` policy:
 docker run -d --name opamp-supervisor \
   -e OPAMP_ENDPOINT=wss://opamp.example.com/v1/opamp -e OPAMP_TOKEN="$ENROLLMENT_TOKEN" \
   -v opamp-state:/var/lib/pydantic-opamp -p 4318:4318 \
-  ghcr.io/pydantic/opamp-supervisor:0.9.0
+  ghcr.io/pydantic/opamp-supervisor:0.10.0
 ```
 
 Mount a volume at `/var/lib/pydantic-opamp`. It keeps the agent's instance UID, the credentials

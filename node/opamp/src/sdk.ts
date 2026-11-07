@@ -26,7 +26,7 @@ import {
   RequestSchema,
 } from "./gen/opamp/sdk/v1/settings_pb.js";
 import type { KeyValue } from "./gen/opamp/v1/anyvalue_pb.js";
-import type { AgentDescription, AgentRemoteConfig, AvailableComponents } from "./gen/opamp/v1/opamp_pb.js";
+import type { AgentDescription, AvailableComponents } from "./gen/opamp/v1/opamp_pb.js";
 
 export * from "./gen/opamp/sdk/v1/settings_pb.js";
 

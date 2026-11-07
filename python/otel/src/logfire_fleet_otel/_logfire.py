@@ -263,11 +263,8 @@ class LogfireFleet:
 
     def start(self, resource: Resource, *, tracer_provider: Any = None, meter_provider: Any = None,
               logger_provider: Any = None) -> None:
-        agent = self._agent
-        if agent.client is not None or agent._loop is not None:  # noqa: SLF001 - its own package
-            agent.rebuilt(tracer_provider, meter_provider, logger_provider)
-            return
-        agent.start(resource, tracer_provider, meter_provider, logger_provider)
+        # Called again once started: the new providers are governed under the same client.
+        self._agent.start(resource, tracer_provider, meter_provider, logger_provider)
 
 
 def logfire_fleet(*, endpoint: str | None = None, headers: Mapping[str, str] | None = None,

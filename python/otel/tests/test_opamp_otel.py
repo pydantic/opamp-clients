@@ -5,6 +5,7 @@ import io
 import logging
 import json
 import os
+import tempfile
 import subprocess
 import sys
 import textwrap
@@ -66,6 +67,11 @@ def prepared(tmp_path, **extra) -> tuple[Agent, dict]:
     env = {"OTEL_OPAMP_ENDPOINT": "http://server/v1/opamp", "OTEL_OPAMP_STATE_DIR": str(tmp_path), **extra}
     agent = Agent()
     agent.prepare(env)
+    # Each call is a start of its own process: its state directory's lock is let go at once, as that
+    # process ending would, so the next call is the restart that takes it back.
+    if agent.setup is not None and agent.setup.state_lock is not None:
+        os.close(agent.setup.state_lock)
+        agent.setup.state_lock = None
     return agent, env
 
 
@@ -757,6 +763,48 @@ def test_a_forked_worker_follows_the_live_settings_its_parent_is_given(server, t
     assert {m.instance_uid for m in server.got} == {agent.uid.bytes}
 
 
+def test_a_forked_worker_never_waits_on_a_lock_its_parent_held(tmp_path):
+    """A thread of the parent's that held a gate's or the sampler's lock as the parent forked (an
+    export, a capped sampling decision) isn't in the worker: the worker's locks are its own, and
+    the trace cap, the log cap, the counts and the application's settings go on working there.
+    They used to be the parent's, held for ever in the worker: its first capped span waited."""
+    if not hasattr(os, "fork"):
+        pytest.skip("no fork")
+    controls = Controls(clock=lambda: 0)
+    controls.apply(settings_pb2.Settings(sampling_traces_per_second=5, send_logs_per_second=5))
+    held = [controls.sampler._cap._lock, controls.logs_cap._lock, controls.traces._lock, controls.app._telling]
+    taken, release = threading.Event(), threading.Event()
+
+    def hold():
+        for lock in held:
+            lock.acquire()
+        taken.set()
+        release.wait()
+        for lock in reversed(held):
+            lock.release()
+
+    threading.Thread(target=hold, daemon=True).start()
+    taken.wait()
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", DeprecationWarning)  # forking with threads
+        pid = os.fork()
+    if pid == 0:
+        done = threading.Event()
+
+        def use():
+            controls.sampler._cap.take(1)
+            controls.logs_cap.admitted([object()], object())
+            controls.traces.exported(1, None)
+            controls.app.put({"flag": "on"})
+            done.set()
+
+        threading.Thread(target=use, daemon=True).start()
+        os._exit(0 if done.wait(5) else 1)
+    _, status = os.waitpid(pid, 0)
+    release.set()
+    assert os.waitstatus_to_exitcode(status) == 0
+
+
 def test_a_worker_keeps_its_settings_when_the_relay_is_gone(tmp_path):
     agent = Agent()
     relay = tmp_path / "live-settings.pb"
@@ -803,6 +851,24 @@ def test_settings_another_configurator_would_not_carry_out_are_refused(server, t
     finally:
         ours.stop()
     assert effective(ours) == {"head_sampling": {"ratio": 0.5}, "signal_exports": off("traces")}
+
+
+def test_built_again_by_this_package_the_host_is_what_it_carries_out_now(server, tmp_path, monkeypatch):
+    # manage() under the application's own SDK, then configure_logfire(): the second build's
+    # sampler is the package's, so a rate the server sends is carried out. The host used to stay
+    # the first build's, and the rate was refused for as long as the process ran.
+    sdk_globals(monkeypatch)
+    agent, _ = prepared(tmp_path, OTEL_OPAMP_ENDPOINT=server.endpoint)
+    agent.start(Resource.create({"service.name": "checkout"}), tracer_provider=TracerProvider())
+    try:
+        before = agent.remote_config(config(policy(head_sampling={"ratio": 0.5})))
+        agent.configured = True  # as configure_logfire() sets it, before building its SDK
+        agent.start(Resource.create({"service.name": "checkout"}), tracer_provider=TracerProvider())
+        after = agent.remote_config(config(policy(head_sampling={"ratio": 0.5})))
+    finally:
+        agent.stop()
+    assert before.status == FAILED and after.status == APPLIED, after.error_message
+    assert set(logfire_fleet_otel.SAMPLER) <= set(agent.host.live)
 
 
 def test_with_a_configuration_file_the_instance_is_managed_and_gated_but_the_sampler_isnt_ours(server, tmp_path,
@@ -1280,6 +1346,9 @@ def _released(setup: Setup | None) -> None:
 # The server given in code (configure()'s arguments, through Setup.from_env), against the
 # OTEL_OPAMP_* variables. DEFAULT_DIR: the user's own default state directory.
 DEFAULT_DIR = object()
+# Named state directories it can make and lock (it does both, as a process starting would).
+_NAMED = Path(tempfile.mkdtemp(prefix="opamp-otel-named-"))
+CODE_DIR, ENV_DIR = str(_NAMED / "code" / "opamp"), str(_NAMED / "env" / "opamp")
 OPTIONS = {
     # option: (its variable, a value in code, a value of the variable, read from code, read from the variable,
     #          the default)
@@ -1288,8 +1357,7 @@ OPTIONS = {
     # In code the values are sent as given, not percent-decoded as the variable's are.
     "headers": ("OTEL_OPAMP_HEADERS", {"Authorization": "Bearer code%20k"}, "Authorization=Bearer%20env,X-Env=1",
                 {"Authorization": "Bearer code%20k"}, {"Authorization": "Bearer env", "X-Env": "1"}, {}),
-    "state_dir": ("OTEL_OPAMP_STATE_DIR", "/srv/code/opamp", "/srv/env/opamp",
-                  Path("/srv/code/opamp"), Path("/srv/env/opamp"), DEFAULT_DIR),
+    "state_dir": ("OTEL_OPAMP_STATE_DIR", CODE_DIR, ENV_DIR, Path(CODE_DIR), Path(ENV_DIR), DEFAULT_DIR),
     "heartbeat_interval": ("OTEL_OPAMP_HEARTBEAT_INTERVAL", timedelta(seconds=2), "5s", 2000, 5000, 0),
 }
 
@@ -1336,8 +1404,8 @@ def test_each_option_in_code_wins_over_its_variable_and_either_over_the_default(
     # In place of the variable's, not merged with it: none at all, too.
     ("headers", {}, {}),
     ("headers", MappingProxyType({"a": "1", "b": "x=y,z"}), {"a": "1", "b": "x=y,z"}),
-    ("state_dir", Path("/srv/code/opamp"), Path("/srv/code/opamp")),
-    ("state_dir", " /srv/code/opamp ", Path("/srv/code/opamp")),
+    ("state_dir", Path(CODE_DIR), Path(CODE_DIR)),
+    ("state_dir", f" {CODE_DIR} ", Path(CODE_DIR)),
     # "none" wins over the variable too: no state directory, not even the default one.
     ("state_dir", "none", None),
     ("state_dir", " NONE ", None),
@@ -1439,6 +1507,61 @@ def test_by_default_an_instance_keeps_its_uid_across_restarts(tmp_path):
     _released(elsewhere.setup)
 
 
+def test_set_up_again_in_one_process_is_the_same_instance(tmp_path):
+    # manage() before the SDK is set up, then again once it is (as its docs say), or
+    # configure_logfire() called twice: the second call keeps the first one's slot, UID and flow.
+    # It used to take the next slot of the default state directory, so another instance UID.
+    env = {"OTEL_OPAMP_ENDPOINT": "http://s/v1/opamp", "OTEL_SERVICE_NAME": "checkout", "XDG_STATE_HOME": str(tmp_path),
+           "HOME": str(tmp_path), "LOCALAPPDATA": str(tmp_path)}
+    agent = Agent()
+    agent.prepare(dict(env))
+    setup, uid, layer = agent.setup, agent.uid, agent.layer
+    agent.prepare(dict(env), endpoint="http://elsewhere/v1/opamp")
+    assert (agent.setup, agent.uid, agent.layer) == (setup, uid, layer)
+    assert sorted(p.name for p in setup.state_dir.parent.iterdir()) == [setup.state_dir.name]
+    _released(setup)
+
+
+def test_processes_sharing_a_named_state_directory_each_keep_their_own_instance(tmp_path, caplog):
+    # Workers a server spawns (uvicorn --workers, a multiprocessing pool) inherit
+    # OTEL_OPAMP_STATE_DIR. They used to read and write one state, so joined the fleet as one
+    # instance UID. Now the first keeps the directory and the UID already in it; the others take
+    # numbered folders in it, each its own UID, taken back at their next start.
+    named = tmp_path / "mine"
+    env = {"OTEL_OPAMP_ENDPOINT": "http://s/v1/opamp", "OTEL_SERVICE_NAME": "checkout",
+           "OTEL_OPAMP_STATE_DIR": str(named)}
+    before = Agent()
+    before.prepare(dict(env))
+    assert before.setup.state_dir == named
+    _released(before.setup)
+    first, second, third = Agent(), Agent(), Agent()
+    for a in (first, second, third):
+        a.prepare(dict(env))
+    assert [a.setup.state_dir for a in (first, second, third)] == [named, named / "2", named / "3"]
+    assert first.uid == before.uid and len({first.uid, second.uid, third.uid}) == 3
+    _released(second.setup)
+    again = Agent()
+    again.prepare(dict(env))
+    assert (again.setup.state_dir, again.uid) == (named / "2", second.uid)
+    for a in (first, third, again):
+        _released(a.setup)
+    # Every slot taken: a new instance each start, said once at INFO.
+    held = [Setup.from_env(dict(env)) for _ in range(16)]
+    with caplog.at_level(logging.INFO, logger="logfire_fleet_otel"):
+        assert Setup.from_env(dict(env)).state_dir is None
+    assert caplog.messages == [f"OpAMP: 16 processes already keep their identity in {named}: this one is a new "
+                               "instance each start"]
+    for h in held:
+        _released(h)
+    # One that can't be used: said at WARNING (the default one's only at DEBUG), a new instance each start.
+    (tmp_path / "file").write_text("")
+    caplog.clear()
+    with caplog.at_level(logging.INFO, logger="logfire_fleet_otel"):
+        assert Setup.from_env({**env, "OTEL_OPAMP_STATE_DIR": str(tmp_path / "file")}).state_dir is None
+    assert [r.levelno for r in caplog.records] == [logging.WARNING]
+    assert caplog.messages[0].startswith(f"OpAMP: the state directory {tmp_path / 'file'} can't be used (")
+
+
 def test_a_service_instance_id_that_isnt_a_uuid_keeps_the_default_state_directory(tmp_path):
     # It can't be the instance UID, so it is replaced by one: kept in the default directory, the
     # same at every start, rather than a new one each time.
@@ -1461,9 +1584,10 @@ def test_the_default_state_directory_gives_way(tmp_path):
     assert Setup.from_env({**base, "OTEL_OPAMP_STATE_DIR": "none"}).state_dir is None
     chosen = f"service.instance.id={uuid.uuid4()}"
     assert Setup.from_env({**base, "OTEL_RESOURCE_ATTRIBUTES": chosen}).state_dir is None
-    # Named: that one, unlocked as before.
+    # Named: that one, locked as the default one is.
     named = Setup.from_env({**base, "OTEL_OPAMP_STATE_DIR": str(tmp_path / "mine")})
-    assert named.state_dir == tmp_path / "mine" and named.state_lock is None
+    assert named.state_dir == tmp_path / "mine" and named.state_lock is not None
+    _released(named)
     # Nowhere to keep it: none, and no error.
     assert Setup.from_env({"OTEL_OPAMP_ENDPOINT": "http://s"}).state_dir is None
     (tmp_path / "file").write_text("")

@@ -17,7 +17,7 @@ Download the extension jar from Maven Central, `dev.pydantic:logfire-fleet-javaa
 next to the upstream agent:
 
 ```bash
-V=0.2.0
+V=0.2.1
 curl -sSfLo logfire-fleet-javaagent-extension.jar https://repo1.maven.org/maven2/dev/pydantic/logfire-fleet-javaagent-extension/$V/logfire-fleet-javaagent-extension-$V.jar
 curl -sSfLo opentelemetry-javaagent.jar https://repo1.maven.org/maven2/io/opentelemetry/javaagent/opentelemetry-javaagent/2.31.1/opentelemetry-javaagent-2.31.1.jar
 ```
@@ -41,7 +41,7 @@ java -javaagent:opentelemetry-javaagent.jar \
 | `otel.sdk.disabled` | OpenTelemetry's own: `true` turns OpAMP off too, read as `otel.opamp.disabled` is (here `1` is taken as `true` as well). What the agent does with it is upstream's. |
 | `otel.opamp.endpoint` | The OpAMP server: `http(s)://.../v1/opamp` polls, `ws(s)://...` keeps a connection open. Without it the extension does nothing. |
 | `otel.opamp.headers` | Headers for every request, as `OTEL_EXPORTER_OTLP_HEADERS`: `name=value,...`, values percent-encoded (`+` is a plus). A header whose value has an escape it can't decode, or that HTTP can't carry, is left out, with a warning naming the header. The key the server gave you goes here. |
-| `otel.opamp.state.dir` | Where to keep state across restarts: the instance UID, the settings for the next start, the client's own state (written readable by the application's user only). Without it, the extension keeps one of the user's own, one per JVM of the program running at once ([default-state-dir.md](default-state-dir.md)); `none` turns that off. A directory named here is one per process: two JVMs given the same one would share an instance UID and overwrite each other's state. With `none`, settings that take effect at the next start are refused; live ones still apply. With `none`, or a directory that can't be written (checked at start), each start is a new instance; in a directory that can't be written, a settings change fails, as it can't be saved, as in every language. |
+| `otel.opamp.state.dir` | Where to keep state across restarts: the instance UID, the settings for the next start, the client's own state (written readable by the application's user only). Without it, the extension keeps one of the user's own, one per JVM of the program running at once ([default-state-dir.md](default-state-dir.md)); `none` turns that off. JVMs given the same directory each keep their own identity: the first takes the directory, the others numbered folders in it ([default-state-dir.md](default-state-dir.md#a-directory-named)). With `none`, settings that take effect at the next start are refused; live ones still apply. With `none`, or a directory that can't be made or locked (checked at start, with a warning), each start is a new instance. |
 | `otel.opamp.heartbeat.interval` | How often to check in until the server offers an interval (default 30 s): milliseconds, or `500ms`, `30s`, `2m`. A value it can't read is warned about and the default used; longer than a day is a day; it never stops the SDK. |
 
 The core reads these, by the same rules in every language: whether OpAMP is off, the endpoint, the headers, the interval, which state directory, and the instance UID kept there. The extension keeps only the I/O: reading the settings, making and locking the state directory's slot, reading and writing its `instance-uid` file, and logging the warnings, which name the system property.

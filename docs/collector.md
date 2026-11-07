@@ -70,13 +70,12 @@ service, and enroll the host with one command, `pydantic-opamp-enroll`:
 
 | Platform | Package | Service |
 |---|---|---|
-| Linux | `pydantic-opamp-supervisor`, a deb and an rpm, from signed apt and yum repositories | a systemd unit; the token and the state key sealed with `systemd-creds` |
+| Linux | `pydantic-opamp-supervisor`, a deb and an rpm | a systemd unit; the token and the state key sealed with `systemd-creds` |
 | macOS | a `.pkg` | a LaunchDaemon; the state key in the System Keychain |
 | Windows | an `.msi` | a Windows service; the state key protected with DPAPI |
 
-None is published yet: build them with the scripts in
-[packaging/](../go/opampsupervisor/packaging/). Each `go/opampsupervisor/vX.Y.Z` tag publishes
-archives instead (see [Release archives](#release-archives)). The
+Each `go/opampsupervisor/vX.Y.Z` tag publishes them on its GitHub Release, beside the
+[release archives](#release-archives); no apt or yum repository is hosted yet. The
 [packaging README](../go/opampsupervisor/packaging/README.md) covers installing, enrolling,
 running a collector without a server, building, signing and publishing, for
 [Linux](../go/opampsupervisor/packaging/README.md#linux),
@@ -87,27 +86,27 @@ running a collector without a server, building, signing and publishing, for
 
 Each `go/opampsupervisor/vX.Y.Z` tag has a
 [GitHub Release](https://github.com/pydantic/opamp-clients/releases) with an archive for Linux,
-macOS and Windows on amd64 and arm64: `opampsupervisor`, `otelcol` (the collector above, with this
-extension), the licenses and a README. `SHA256SUMS` and a build provenance attestation
+macOS and Windows on amd64 and arm64: `opampsupervisor`, `otelcol` (upstream's `otelcol-contrib`, as the
+packages carry it), the licenses and a README. `SHA256SUMS` and a build provenance attestation
 (`gh attestation verify <file> --repo pydantic/opamp-clients`) check a download.
 
 ```bash
-curl -fsSLO https://github.com/pydantic/opamp-clients/releases/download/go%2Fopampsupervisor%2Fv0.9.0/pydantic-opamp-supervisor_0.9.0_linux_amd64.tar.gz
-tar -xzf pydantic-opamp-supervisor_0.9.0_linux_amd64.tar.gz
-cd pydantic-opamp-supervisor_0.9.0_linux_amd64
+curl -fsSLO https://github.com/pydantic/opamp-clients/releases/download/go%2Fopampsupervisor%2Fv0.10.0/pydantic-opamp-supervisor_0.10.0_linux_amd64.tar.gz
+tar -xzf pydantic-opamp-supervisor_0.10.0_linux_amd64.tar.gz
+cd pydantic-opamp-supervisor_0.10.0_linux_amd64
 ./opampsupervisor --config supervisor.yaml
 ```
 
 ### Container image
 
 Each release also publishes `ghcr.io/pydantic/opamp-supervisor:<version>` for amd64 and arm64:
-the Supervisor and this collector, configured with environment variables, with its state on a
+the Supervisor and the same `otelcol-contrib`, configured with environment variables, with its state on a
 volume. The [packaging README](../go/opampsupervisor/packaging/README.md#container) has the
 variables and how to run it.
 
 ```bash
 docker run -d -e OPAMP_ENDPOINT=wss://opamp.example.com/v1/opamp -e OPAMP_TOKEN="$ENROLLMENT_TOKEN" \
-  -v opamp-state:/var/lib/pydantic-opamp ghcr.io/pydantic/opamp-supervisor:0.9.0
+  -v opamp-state:/var/lib/pydantic-opamp ghcr.io/pydantic/opamp-supervisor:0.10.0
 ```
 
 ### From source

@@ -190,8 +190,15 @@ func serverFromEnv(getenv func(string) string, opts ...Option) *server {
 	for _, h := range s.GetHeaders() {
 		srv.header.Add(h.GetName(), h.GetValue())
 	}
-	if srv.stateDir == "" {
-		srv.stateDir, srv.stateLock = slot(s.GetDefaultSlots(), s.GetAllSlotsTaken())
+	switch {
+	case srv.stateDir == "":
+		srv.stateDir, srv.stateLock = slot(s.GetDefaultSlots(), s.GetAllSlotsTaken(), "")
+	case canLock:
+		// A directory named is locked as the default one is, so processes sharing it never join as
+		// one instance. Without a lock on this system it is used as named.
+		named := srv.stateDir
+		srv.stateDir, srv.stateLock = slot(namedSlots(named), strconv.Itoa(stateSlots)+
+			" processes already keep their identity in "+named+": this one is a new instance each start", named)
 	}
 	return srv
 }

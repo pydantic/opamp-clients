@@ -62,7 +62,7 @@ from opentelemetry.sdk.trace.sampling import (ALWAYS_ON, Decision, ParentBased, 
                                               TraceIdRatioBased)
 
 from . import app_settings
-from ._match import Bucket, Redactor, Scrubber, attribute_text, glob, level_keeps, rebucket, threshold
+from ._match import Bucket, Redactor, Scrubber, attribute_text, fork_safe, glob, level_keeps, rebucket, threshold
 from .app_settings import AppSettings
 
 __all__ = ["LOGFIRE_FLEET_CONTRACT", "Configurator", "Distro", "GatedMetricExporter", "LogfireFleet", "app_settings", "configure",
@@ -163,18 +163,35 @@ def _lock(fd: int) -> bool:
         return False
 
 
-def slot(slots, all_taken: str) -> tuple[Path, int] | None:
-    """The first of the default state directory's slots (docs/default-state-dir.md, as the core's
-    Setup names them) this process can make and lock, and its lock's descriptor, held until the
-    process ends; None where there's none to be had (not writable, every slot taken: all_taken is
-    the line to say then): each start is then a new instance. Never an error."""
+#: How many processes running at once keep their own identity in one state directory: the default
+#: one's slots, and a named one's (named_slots).
+SLOTS = 16
+
+
+def named_slots(directory: str) -> list[str]:
+    """A named state directory's slots (docs/default-state-dir.md): itself, then its folders 2 to
+    16. The first process keeps the directory and its UID, as before slots; one sharing it (a
+    spawned worker inherits OTEL_OPAMP_STATE_DIR) takes a folder of its own instead of its UID."""
+    return [directory] + [os.path.join(directory, str(n)) for n in range(2, SLOTS + 1)]
+
+
+def slot(slots, all_taken: str, named: str | None = None) -> tuple[Path, int] | None:
+    """The first of a state directory's slots (the default one's as the core's Setup names them,
+    or the one ``named``'s) this process can make and lock, and its lock's descriptor, held until
+    the process ends; None where there's none to be had (not writable, every slot taken: all_taken
+    is the line to say then): each start is then a new instance. Never an error; a directory named
+    that can't be used is said at WARNING, the default one's at DEBUG."""
     for name in slots:
         d = Path(name)
         try:
             d.mkdir(mode=0o700, parents=True, exist_ok=True)
             fd = os.open(d / setup.LOCK_FILE, os.O_RDWR | os.O_CREAT, 0o600)
         except OSError as e:
-            _log.debug("OpAMP: no state directory of its own (%s): each start is a new instance", e)
+            if named is not None:
+                _log.warning("OpAMP: the state directory %s can't be used (%s): each start is a new instance",
+                             named, e)
+            else:
+                _log.debug("OpAMP: no state directory of its own (%s): each start is a new instance", e)
             return None
         if _lock(fd):
             return d, fd
@@ -193,7 +210,7 @@ class Setup:
     headers: dict[str, str] = field(default_factory=dict)
     state_dir: Path | None = None
     heartbeat_ms: int = 0
-    #: The lock on the default state directory, held while the process runs.
+    #: The lock on the state directory, held while the process runs.
     state_lock: int | None = None
     #: The endpoint as it is safe to log.
     shown: str = ""
@@ -281,11 +298,14 @@ class Setup:
         out = Setup(started.endpoint, {h.name: h.value for h in started.headers},
                     heartbeat_ms=started.heartbeat_interval_ms, shown=started.shown_endpoint, hints=started.hints)
         if started.state_dir:
-            out.state_dir = Path(started.state_dir)
+            # Locked as the default one is, so processes sharing it never join as one instance.
+            claimed = slot(named_slots(started.state_dir),
+                           f"{SLOTS} processes already keep their identity in {started.state_dir}: "
+                           "this one is a new instance each start", named=started.state_dir)
         else:
             claimed = slot(started.default_slots, started.all_slots_taken)
-            if claimed is not None:
-                out.state_dir, out.state_lock = claimed
+        if claimed is not None:
+            out.state_dir, out.state_lock = claimed
         return out
 
 
@@ -435,8 +455,12 @@ class Counts:
     FAILURE = "the exporter answered FAILURE (its own log says why)"
 
     def __init__(self) -> None:
-        self._lock = threading.Lock()
+        self._new_locks()
+        fork_safe(self)
         self._c = settings_pb2.SignalCounts()
+
+    def _new_locks(self) -> None:
+        self._lock = threading.Lock()
 
     def exported(self, items: int, result) -> None:
         """An export of `items` came back with `result`: failed when it is FAILURE."""
@@ -814,11 +838,49 @@ class _RedactedSpan(ReadableSpan):
         return self._original.dropped_links
 
 
+#: A Logfire span's message template, and its message: the template with the arguments' values in it.
+_LOGFIRE_TEMPLATE = "logfire.msg_template"
+_LOGFIRE_MESSAGE = "logfire.msg"
+
+
+def _template_fields(template: str) -> set[str] | None:
+    """The attributes a Logfire message template puts in its message: each field's name, and the
+    name before its first `.` or `[`; None if it can't be read (then it may hold any)."""
+    import re  # noqa: PLC0415
+    import string  # noqa: PLC0415
+
+    try:
+        names = [f for _, f, _, _ in string.Formatter().parse(template) if f]
+    except ValueError:
+        return None
+    return {n for f in names for n in (f, re.split(r"[.\[]", f, maxsplit=1)[0])}
+
+
+def _message_redacted(attributes, redacted: dict) -> dict:
+    """`redacted` (a Logfire span's attributes as redaction left them), its message held to the
+    same: the Logfire SDK renders the arguments' values into `logfire.msg`, so an argument the
+    policy dropped, masked or scrubbed is in it too. Such a message becomes its template, which
+    holds no value (where the Logfire SDK scrubs an argument itself, it renders the message with
+    the scrubbed text in its place)."""
+    template, message = attributes.get(_LOGFIRE_TEMPLATE), redacted.get(_LOGFIRE_MESSAGE)
+    if not isinstance(template, str) or not isinstance(message, str) or message != attributes.get(_LOGFIRE_MESSAGE) \
+            or message == template:
+        return redacted
+    changed = {k for k, v in attributes.items() if k not in redacted or redacted[k] is not v}
+    fields = _template_fields(template)
+    if fields is None or changed & fields:
+        redacted = {**redacted, _LOGFIRE_MESSAGE: template}
+    return redacted
+
+
 def _redacted_span(span: ReadableSpan, redactor: Redactor) -> ReadableSpan:
     """The span with its attributes, its events' and its links' redacted and scrubbed; the span
-    itself when nothing in it changes. A new span, never the original changed."""
+    itself when nothing in it changes. A new span, never the original changed. A Logfire span's
+    message is held to what redaction did to the arguments in it (_message_redacted)."""
     events, links = span.events or (), span.links or ()
     own = redactor.apply(span.attributes)
+    if own is not None:
+        own = _message_redacted(span.attributes, own)
     of_events = [redactor.apply(e.attributes) for e in events]
     of_links = [redactor.apply(link.attributes) for link in links]
     if own is None and all(r is None for r in of_events) and all(r is None for r in of_links):
@@ -1226,7 +1288,16 @@ class Agent:
         """Before the SDK is built: name the instance, start the flow and put the settings it
         starts with in force (next-start ones through the instrumentation's own switch, which only
         opentelemetry-instrument reads: not `auto_instrumented`, they aren't carried out). `given`
-        is the server as the application gave it in code (Setup.from_env)."""
+        is the server as the application gave it in code (Setup.from_env).
+
+        Once on, it is on for the process: a second call (``configure_logfire()`` or ``manage()``
+        called again) keeps the instance, its state directory, its flow and the settings in force:
+        the server is set once per process. Starting over would take another slot of the default
+        state directory (another instance UID than the client's) and put the SDK's own settings
+        back in force under a client the server has already given its policy."""
+        if self.setup is not None:
+            _log.debug("OpAMP: set up again: the instance, its server and its settings stay as they are")
+            return
         self.setup = Setup.from_env(env, **given)
         if self.setup is None:
             return
@@ -1346,7 +1417,12 @@ class Agent:
     def start(self, resource: Resource, tracer_provider=None, meter_provider=None, logger_provider=None) -> None:
         """Once the SDK is built: join the fleet, on a thread of the client's own. The providers
         are the SDK's (the global ones where not given)."""
-        if self.setup is None or self.layer is None or self.uid is None or self._loop is not None:
+        if self.setup is None or self.layer is None or self.uid is None:
+            return
+        if self._loop is not None:
+            # Built again (configure_logfire() or manage() called again): the new providers'
+            # exporters get the gates under the same client.
+            self.rebuilt(tracer_provider, meter_provider, logger_provider)
             return
         # What was built is known now: the gates go in front of every exporter on its providers,
         # what can't be gated is reported (never refused), and the host is what this package can
@@ -1355,25 +1431,7 @@ class Agent:
                        layer=self.layer, listed_as=self._listed_as)
         self.found, self.exporters = found.found, found.exporters
         self._warn(found.warnings)
-        built = sdk_host(configured=self.configured, auto_instrumented=self._auto_instrumented,
-                         governed=any(found.sdk.values()))
-        if built != self.host:
-            self.host = built
-            lost = ", ".join(_undeclared(built))
-            if not any(found.sdk.values()):
-                _log.warning("OpAMP: the global providers aren't the OpenTelemetry SDK's, so nothing they "
-                             "export passes this package's gates: %s can't be carried out", lost)
-            elif self.managed:
-                _log.warning("OpAMP: manage() keeps the application's own sampler, so %s can't be carried "
-                             "out (configure() or opentelemetry-instrument set up one the server changes)", lost)
-            elif os.environ.get("OTEL_CONFIG_FILE"):
-                _log.warning("OpAMP: the SDK was built from OTEL_CONFIG_FILE, so its sampler isn't this "
-                             "package's: %s can't be carried out", lost)
-            else:
-                _log.warning("OpAMP: the SDK wasn't built by this package's configurator "
-                             "(OTEL_PYTHON_CONFIGURATOR=opamp picks it): %s can't be carried out", lost)
-            with self._lock:
-                self._step(host=built)
+        self._settle_host(found)
         loop = _loop_thread("opamp")
         self._loop = loop
         s = self.setup
@@ -1446,15 +1504,42 @@ class Agent:
                 self._warned.add(warning)
                 _log.warning("OpAMP: %s", warning)
 
+    def _settle_host(self, found: Governed) -> None:
+        """What was built is known: the host is what this package can carry out of it, and the flow
+        decides again under it when that changed, saying what can't be carried out."""
+        built = sdk_host(configured=self.configured, auto_instrumented=self._auto_instrumented,
+                         governed=any(found.sdk.values()))
+        if built != self.host:
+            self.host = built
+            lost = ", ".join(_undeclared(built))
+            if not lost:
+                pass  # all of it carried out: nothing to say
+            elif not any(found.sdk.values()):
+                _log.warning("OpAMP: the global providers aren't the OpenTelemetry SDK's, so nothing they "
+                             "export passes this package's gates: %s can't be carried out", lost)
+            elif self.managed:
+                _log.warning("OpAMP: manage() keeps the application's own sampler, so %s can't be carried "
+                             "out (configure() or opentelemetry-instrument set up one the server changes)", lost)
+            elif os.environ.get("OTEL_CONFIG_FILE"):
+                _log.warning("OpAMP: the SDK was built from OTEL_CONFIG_FILE, so its sampler isn't this "
+                             "package's: %s can't be carried out", lost)
+            else:
+                _log.warning("OpAMP: the SDK wasn't built by this package's configurator "
+                             "(OTEL_PYTHON_CONFIGURATOR=opamp picks it): %s can't be carried out", lost)
+            with self._lock:
+                self._step(host=built)
+
     def rebuilt(self, tracer_provider=None, meter_provider=None, logger_provider=None) -> None:
         """The SDK was built again once the client had started (``logfire.configure()`` called a
         second time): the new providers' exporters get the gates and replace the old ones in the
-        inventory. The client and its settings stay as they are."""
+        inventory, and the host is what the new build carries out. The client stays as it is."""
         with self._lock:
             found = govern(self.controls, tracer_provider, meter_provider, logger_provider, log_spans=self.logfire,
                            layer=self.layer, listed_as=self._listed_as)
             self.found, self.exporters = found.found, found.exporters
             self._warn(found.warnings)
+            # Built by this package now (configure_logfire() after manage(), say), or no longer.
+            self._settle_host(found)
             self._report_exporters()
 
     def processor_added(self, processor, signal: str) -> None:
@@ -1520,6 +1605,11 @@ class Agent:
         if self._relay is not None and self._relay_owner == os.getpid():
             shutil.rmtree(self._relay.parent, ignore_errors=True)
             self._relay = None
+        if self.setup is not None and self.setup.state_lock is not None:
+            # Done with the state directory: the next process to start takes it back, as Go and
+            # Node.js let it go. A forked process closes only its copy: its parent keeps the lock.
+            os.close(self.setup.state_lock)
+            self.setup.state_lock = None
 
     def _timer(self) -> None:
         """The timer's thread: wait for the flow's next wake, or a step that moves it."""

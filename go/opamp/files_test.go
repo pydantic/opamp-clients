@@ -622,7 +622,6 @@ func saveFaultRun(t *testing.T, seed uint64) error {
 		maxSlow = max(maxSlow, f.slow)
 	}
 	injected := append([]string(nil), fsys.injected...)
-	windows := append([][2]time.Time(nil), fsys.windows...)
 	fsys.mu.Unlock()
 	t.Logf("injected %v; stop took %v", injected, took)
 	if bound := stopTimeout + maxSlow + 3*time.Second; took > bound {
@@ -631,7 +630,7 @@ func saveFaultRun(t *testing.T, seed uint64) error {
 	// What a stopped client left finishing ends before the next reads the file.
 	workOn(state).settle()
 	fsys.mu.Lock()
-	windows = append([][2]time.Time(nil), fsys.windows...)
+	windows := append([][2]time.Time(nil), fsys.windows...)
 	fsys.mu.Unlock()
 	// Heartbeats went on while a save was slow (one that ended before stop was asked for).
 	msgs := srv.messages()

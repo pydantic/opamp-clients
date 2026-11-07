@@ -4,7 +4,7 @@
 config, then a bad one, and tells the example to send its traces to the server's own OTLP/HTTP
 receiver with a token; print what the server saw.
 
-    python3 examples/try.py go|node|python|java|dotnet http|ws   (and rust, where examples/rust is)
+    python3 examples/try.py go|node|python|java|dotnet http|ws
 
 Java and .NET build and run in Docker, as the conformance suite does.
 """
@@ -43,10 +43,6 @@ EXAMPLES = {
                DOCKER_RUN + ["-v", f"{HERE}/dotnet/out:/ex", "mcr.microsoft.com/dotnet/runtime:8.0",
                              "dotnet", "/ex/Example.dll"], True),
 }
-
-# The Rust client's example is kept beside the core's sources, where examples/rust is.
-if (HERE / "rust").is_dir():
-    EXAMPLES["rust"] = ([["cargo", "build", "--quiet"]], ["target/debug/example"], False)
 
 
 def main() -> int:

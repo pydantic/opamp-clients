@@ -1,4 +1,4 @@
-# opamp-javaagent
+# logfire-fleet-javaagent-extension
 
 An extension for the upstream OpenTelemetry Java agent that puts the agent under an OpAMP server.
 
@@ -8,7 +8,7 @@ Download the extension jar from Maven Central (`dev.pydantic:logfire-fleet-javaa
 the upstream agent, then start the application with both, with the server's address and key:
 
 ```bash
-V=0.2.0   # the latest: https://central.sonatype.com/artifact/dev.pydantic/logfire-fleet-javaagent-extension
+V=0.2.1   # the latest: https://central.sonatype.com/artifact/dev.pydantic/logfire-fleet-javaagent-extension
 curl -sSfLO https://repo1.maven.org/maven2/dev/pydantic/logfire-fleet-javaagent-extension/$V/logfire-fleet-javaagent-extension-$V.jar
 curl -sSfLo opentelemetry-javaagent.jar https://repo1.maven.org/maven2/io/opentelemetry/javaagent/opentelemetry-javaagent/2.31.1/opentelemetry-javaagent-2.31.1.jar
 OTEL_SERVICE_NAME=checkout \
@@ -41,5 +41,5 @@ if (AppSettings.get("checkout.new_flow", "off").equals("on")) { ... }
 AutoCloseable subscription = AppSettings.onChange((settings, changed) -> queue.add(changed));
 ```
 
-Everything else is in [docs/javaagent.md](../../docs/javaagent.md), this in
-[its own section](../../docs/javaagent.md#the-applications-own-settings).
+Everything else is in [docs/javaagent.md](https://github.com/pydantic/opamp-clients/blob/main/docs/javaagent.md),
+this in [its own section](https://github.com/pydantic/opamp-clients/blob/main/docs/javaagent.md#the-applications-own-settings).

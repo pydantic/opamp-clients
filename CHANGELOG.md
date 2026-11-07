@@ -117,6 +117,26 @@ and date. Tests, CI and docs alone don't need a line.
 
 ### Fixed
 
+- Python, Node.js: setting the SDK up again in one process (Python's `configure_logfire()` or
+  `manage()`, Node.js's `manage()`, called a second time) keeps the instance it joined the fleet
+  as. It used to start over: another instance UID (a second slot of the default state directory)
+  beside the client's, in Node.js a second client with the first never stopped, and the SDK's own
+  settings back in force, so a policy's redaction stopped applying until the server sent it again
+  (#138).
+- Python, Node.js: an argument of a Logfire SDK span that the policy drops, masks or scrubs is out
+  of the span's message (`logfire.msg`) too, which is exported as its template. The message kept
+  the argument's value as the application gave it (#138).
+- Python: a worker forked while a thread of its parent's held a lock of the gates, the sampler's
+  trace cap or the application settings no longer waits on it for ever; the worker's locks are
+  its own (#138).
+- Python, Node.js, .NET, Java, Go: processes sharing a state directory named by
+  `OTEL_OPAMP_STATE_DIR` (uvicorn or gunicorn workers, a multiprocessing pool, a Node.js cluster or
+  PM2, a child process) each keep their own instance. They used to join the fleet as one instance
+  UID, each reading and writing the other's state; in .NET all but the first ran unmanaged. The
+  directory is now locked as the default one is: the first process keeps it and its UID, as
+  before, and the others take numbered folders in it (`2` to `16`). A named directory that can't be
+  made or locked is now said as a warning, and each start is then a new instance; in .NET the SDK
+  used to run unmanaged. Python also lets the lock go when the SDK is shut down (#138).
 - Supervisor on Windows: `pydantic-opamp-enroll.ps1` (and so an upgrade's refresh) sets the service
   to start again when the Supervisor stops with an error (a start that failed, such as a Collector
   slow to answer at boot), after 5 seconds, then 5, then every 30, as systemd and launchd already

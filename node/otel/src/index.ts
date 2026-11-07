@@ -324,13 +324,26 @@ export function release(path: string): void {
   }
 }
 
+/** How many processes running at once keep their own identity in one state directory. */
+export const SLOTS = 16;
+
 /**
- * The first of the default state directory's slots (docs/default-state-dir.md, as the core names
- * them) this process can make and lock: the directory and its lock file, or undefined where
- * there's none to be had (not writable, every slot taken: `allTaken` is the line to say then):
- * then each start is a new instance. Never throws.
+ * A named state directory's slots (docs/default-state-dir.md): itself, then its folders 2 to 16.
+ * The first process keeps the directory and its UID, as before slots; one sharing it (a cluster
+ * worker inherits OTEL_OPAMP_STATE_DIR) takes a folder of its own instead of its UID.
  */
-function slot(slots: readonly string[], allTaken: string): { dir: string; lock: string } | undefined {
+export function namedSlots(dir: string): string[] {
+  return [dir, ...Array.from({ length: SLOTS - 1 }, (_, i) => join(dir, String(i + 2)))];
+}
+
+/**
+ * The first of a state directory's slots (the default one's as the core names them, or the one
+ * `named`'s) this process can make and lock: the directory and its lock file, or undefined where
+ * there's none to be had (not writable, every slot taken: `allTaken` is the line to say then):
+ * then each start is a new instance. Never throws; a directory named that can't be used is said
+ * as a warning, the default one's at debug.
+ */
+function slot(slots: readonly string[], allTaken: string, named?: string): { dir: string; lock: string } | undefined {
   if (slots.length === 0) return undefined;
   try {
     for (const dir of slots) {
@@ -339,7 +352,12 @@ function slot(slots: readonly string[], allTaken: string): { dir: string; lock: 
       if (lock(path)) return { dir, lock: path };
     }
   } catch (e) {
-    diag.debug(`OpAMP: no state directory of its own (${String(e)}): each start is a new instance`);
+    // A directory named that can't be used is the user's to hear of; the default one's isn't.
+    if (named !== undefined) {
+      say.warn(`OpAMP: the state directory ${named} can't be used (${String(e)}): each start is a new instance`);
+    } else {
+      diag.debug(`OpAMP: no state directory of its own (${String(e)}): each start is a new instance`);
+    }
     return undefined;
   }
   diag.info(`OpAMP: ${allTaken}`);
@@ -352,7 +370,7 @@ export interface Setup {
   headers: Record<string, string>;
   stateDir?: string;
   heartbeatMs: number;
-  /** The lock file on the default state directory, held while the process runs. */
+  /** The lock file on the state directory, held while the process runs. */
   stateLock?: string;
   /** The endpoint as it is safe to log, and what to check when the server can't be reached
    * (naming what gave the endpoint and the headers): the core's. */
@@ -505,14 +523,14 @@ export function setupFromEnv(env: NodeJS.ProcessEnv = process.env, code: Options
     shown: s.shownEndpoint,
     ...(s.hints ? { hints: s.hints } : {}),
   };
-  if (s.stateDir) {
-    setup.stateDir = s.stateDir;
-  } else {
-    const claimed = slot(s.defaultSlots, s.allSlotsTaken);
-    if (claimed) {
-      setup.stateDir = claimed.dir;
-      setup.stateLock = claimed.lock;
-    }
+  // A directory named is locked as the default one is, so processes sharing it never join as one instance.
+  const claimed = s.stateDir
+    ? slot(namedSlots(s.stateDir), `${SLOTS} processes already keep their identity in ${s.stateDir}: this one is a ` +
+      "new instance each start", s.stateDir)
+    : slot(s.defaultSlots, s.allSlotsTaken);
+  if (claimed) {
+    setup.stateDir = claimed.dir;
+    setup.stateLock = claimed.lock;
   }
   return setup;
 }
@@ -867,7 +885,7 @@ export class Redaction {
    * are the span's own.
    */
   span(span: ReadableSpan): ReadableSpan {
-    const attributes = this.attributes(span.attributes);
+    const attributes = messageRedacted(span.attributes, this.attributes(span.attributes));
     let events: ReadableSpan["events"] = span.events;
     for (const [i, e] of span.events.entries()) {
       const a = this.attributes(e.attributes);
@@ -900,6 +918,42 @@ export class Redaction {
       body: { value: body, enumerable: true },
     }) as ReadableLogRecord;
   }
+}
+
+/** A Logfire span's message template, and its message: the template with the arguments' values in it. */
+const LOGFIRE_TEMPLATE = "logfire.msg_template";
+const LOGFIRE_MESSAGE = "logfire.msg";
+
+/**
+ * The attributes a Logfire message template puts in its message: each `{field}`'s name, and the
+ * name before its first `.` or `[`.
+ */
+function templateFields(template: string): Set<string> {
+  const out = new Set<string>();
+  for (const m of template.matchAll(/\{([^{}]+)\}/g)) {
+    const field = m[1]!.split(/[:!]/, 1)[0]!.trim();
+    out.add(field);
+    out.add(field.split(/[.[]/, 1)[0]!);
+  }
+  return out;
+}
+
+/**
+ * `redacted` (a Logfire span's attributes as redaction left them), its message held to the same:
+ * the Logfire SDK renders the arguments' values into `logfire.msg`, so an argument the policy
+ * dropped, masked or scrubbed is in it too. Such a message becomes its template, which holds no
+ * value (where the Logfire SDK scrubs an argument itself, it renders the message with the
+ * scrubbed text in its place).
+ */
+function messageRedacted(attributes: Attributes, redacted: Attributes): Attributes {
+  if (redacted === attributes) return redacted;
+  const template = attributes[LOGFIRE_TEMPLATE];
+  const message = redacted[LOGFIRE_MESSAGE];
+  if (typeof template !== "string" || typeof message !== "string" || message !== attributes[LOGFIRE_MESSAGE]
+    || message === template) return redacted;
+  const fields = templateFields(template);
+  const changed = Object.keys(attributes).some((k) => fields.has(k) && (!(k in redacted) || redacted[k] !== attributes[k]));
+  return changed ? { ...redacted, [LOGFIRE_MESSAGE]: template } : redacted;
 }
 
 /** What a signal's gate counted since start (the layer's SignalCounts). */
@@ -1683,8 +1737,18 @@ export class Agent {
     return this.setup !== undefined;
   }
 
-  /** Before the SDK is built: name the instance, start the flow, put its settings in force. */
+  /**
+   * Before the SDK is built: name the instance, start the flow, put its settings in force. Once
+   * on, and until stopped, it is on for the process: a second call (manage() called again) keeps
+   * the instance, its state directory, its client and the settings in force. Starting over would
+   * take another slot of the default state directory (another instance UID), and leave the first
+   * client running, unstopped, as a second instance.
+   */
   prepare(env: NodeJS.ProcessEnv = process.env, options: Options = {}): void {
+    if (this.setup !== undefined && this.#stopping === undefined) {
+      diag.debug("OpAMP: set up again: the instance, its server and its settings stay as they are");
+      return;
+    }
     // A register after an earlier one's shutdown: that run's client stopped, this one's starts.
     this.#stopping = undefined;
     this.client = undefined;
@@ -1994,8 +2058,9 @@ export class Agent {
     const s = this.setup;
     const layer = this.layer;
     const uid = this.uid;
-    // Stopped first (a SIGTERM while the resource was being detected): don't start at all.
-    if (!s || !layer || !uid || this.#stopping) return;
+    // Stopped first (a SIGTERM while the resource was being detected): don't start at all. Started
+    // already (manage() called again): the client goes on; govern listed the exporters again.
+    if (!s || !layer || !uid || this.#stopping || this.client) return;
     const heartbeat = s.heartbeatMs;
     try {
       const availableComponents = this.components();

@@ -22,13 +22,11 @@ import * as standalone from "../src/app-settings.js";
 import { keepApplied } from "./kept.js";
 import { config as policyConfig, decide, FILE, overridden, type Overrides, policy, reported } from "./policy.js";
 import {
-  Agent, AppSettings, type AppSettingsMap, appSettings, Controls, hostFromEnv, preparing, say, settingsKeptOnFailure,
+  Agent, AppSettings, type AppSettingsMap, appSettings, Controls, hostFromEnv, preparing, release, say, settingsKeptOnFailure,
 } from "../src/index.js";
 
 const LAYER = new SdkSettings();
 const text = (s: string) => new TextEncoder().encode(s);
-/** The policy with every control local: what the SDK starts with when nothing was kept. */
-const EMPTY = text(policy());
 const APPLIED = RemoteConfigStatuses.RemoteConfigStatuses_APPLIED;
 const FAILED = RemoteConfigStatuses.RemoteConfigStatuses_FAILED;
 /** 2026-10-14T12:00:00Z. */
@@ -94,6 +92,9 @@ class TestAgent extends Agent {
       clear: (t) => void ((t as { cleared: boolean }).cleared = true),
     };
     if (prepare) this.prepare(TestAgent.env(dir, env));
+    // Each agent is a start of its own process: its state directory's lock is let go at once, as
+    // that process ending would, so the next one is the restart that takes it back.
+    if (this.setup?.stateLock) release(this.setup.stateLock);
     this.client = {
       setEffectiveConfig: (e: never) => this.reported.push(overridden(e)),
       setRemoteConfigStatus: () => {},

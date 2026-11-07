@@ -246,15 +246,15 @@ final class Extension {
       for (CoreProto.Header h : s.getHeadersList()) {
         headers.put(h.getName(), h.getValue());
       }
-      Path stateDir = s.getStateDir().isEmpty() ? null : Path.of(s.getStateDir());
-      FileLock lock = null;
-      if (stateDir == null) {
-        Claimed claimed = slot(s.getDefaultSlotsList(), s.getAllSlotsTaken());
-        if (claimed != null) {
-          stateDir = claimed.dir();
-          lock = claimed.lock();
-        }
-      }
+      // A directory named is locked as the default one is, so processes sharing it never join as
+      // one instance.
+      String named = s.getStateDir();
+      Claimed claimed = named.isEmpty()
+          ? slot(s.getDefaultSlotsList(), s.getAllSlotsTaken(), null)
+          : slot(namedSlots(named), SLOTS + " processes already keep their identity in " + named
+              + ": this one is a new instance each start", named);
+      Path stateDir = claimed == null ? null : claimed.dir();
+      FileLock lock = claimed == null ? null : claimed.lock();
       return new Setup(s.getEndpoint(), headers, stateDir, Duration.ofMillis(s.getHeartbeatIntervalMs()), lock,
           s.getShownEndpoint(), Extension.hints(s.getHints()));
     }
@@ -343,7 +343,7 @@ final class Extension {
    */
   private static final Set<Path> HELD = new HashSet<>();
 
-  /** A default state directory and the lock that makes it this JVM's. */
+  /** A state directory and the lock that makes it this JVM's. */
   record Claimed(Path dir, FileLock lock) {}
 
   /**
@@ -359,13 +359,31 @@ final class Extension {
     return name.isEmpty() ? "java" : name;
   }
 
+  /** How many processes running at once keep their own identity in one state directory. */
+  static final int SLOTS = 16;
+
   /**
-   * The first of the default state directory's slots (docs/default-state-dir.md, as the core's
-   * Setup names them) this JVM can make and lock, and its lock, held for the JVM's lifetime; null
-   * where there's none to be had (not writable, every slot taken: {@code allTaken} is the line to
-   * say then): each start is then a new instance. Never throws.
+   * A named state directory's slots (docs/default-state-dir.md): itself, then its folders 2 to 16.
+   * The first process keeps the directory and its UID, as before slots; one sharing it (a process
+   * started with the same {@code OTEL_OPAMP_STATE_DIR}) takes a folder of its own instead of its UID.
    */
-  static Claimed slot(List<String> slots, String allTaken) {
+  static List<String> namedSlots(String dir) {
+    List<String> slots = new java.util.ArrayList<>();
+    slots.add(dir);
+    for (int n = 2; n <= SLOTS; n++) {
+      slots.add(Path.of(dir, Integer.toString(n)).toString());
+    }
+    return slots;
+  }
+
+  /**
+   * The first of a state directory's slots (the default one's as the core's Setup names them, or
+   * the one {@code named}'s) this JVM can make and lock, and its lock, held for the JVM's lifetime;
+   * null where there's none to be had (not writable, every slot taken: {@code allTaken} is the line
+   * to say then): each start is then a new instance. Never throws; a directory named that can't be
+   * used is said as a warning, the default one's at FINE.
+   */
+  static Claimed slot(List<String> slots, String allTaken, String named) {
     if (slots.isEmpty()) {
       return null;
     }
@@ -390,7 +408,7 @@ final class Extension {
             Files.createDirectories(d, dirAttrs);
             ch = FileChannel.open(lockFile, Set.of(StandardOpenOption.CREATE, StandardOpenOption.WRITE), fileAttrs);
           } catch (IOException | RuntimeException e) {
-            LOG.log(Level.FINE, "OpAMP: no state directory of its own (" + e + "): each start is a new instance");
+            unusable(named, e);
             return null;
           }
           FileLock lock = null;
@@ -409,12 +427,20 @@ final class Extension {
       LOG.info("OpAMP: " + allTaken);
       return null;
     } catch (Exception e) {
-      LOG.log(Level.FINE, "OpAMP: no state directory of its own (" + e + "): each start is a new instance");
+      unusable(named, e);
       return null;
     }
   }
 
-  /** For tests: let a default state directory go, as the JVM's end does. */
+  private static void unusable(String named, Exception e) {
+    if (named != null) {
+      LOG.warning("OpAMP: the state directory " + named + " can't be used (" + e + "): each start is a new instance");
+    } else {
+      LOG.log(Level.FINE, "OpAMP: no state directory of its own (" + e + "): each start is a new instance");
+    }
+  }
+
+  /** For tests: let a state directory go, as the JVM's end does. */
   static void release(Setup setup) throws IOException {
     if (setup != null && setup.stateLock() != null) {
       synchronized (HELD) {
@@ -1227,9 +1253,13 @@ final class Extension {
     return inUse == null || inUse.isEmpty() ? configured : shown(inUse, configured);
   }
 
-  /** For tests: stop the client, as the shutdown hook does (the server hears the agent go). */
+  /**
+   * For tests: stop the client, as the shutdown hook does (the server hears the agent go), and let
+   * the state directory go, as the JVM's end then does.
+   */
   void stopForTest() throws Exception {
     client.join().stop().get();
+    release(setup);
   }
 
   /** For tests: a fresh instance with {@code setup}. */

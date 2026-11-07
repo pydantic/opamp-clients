@@ -47,7 +47,7 @@ the spec's OpAMP messages. Each language generates its types with its usual prot
 | `http_request{id, url, headers, body, timeout}`: POST `body` to `url` with exactly `headers`, reading at most `max_response_bytes` | `http_response{id, status, headers, body}` (any status) or `http_failed{id, detail}` |
 | `ws_open{id, url, headers}` / `ws_send{id, bytes}` / `ws_close{id}` | `ws_opened` / `ws_failed{status, headers}` / `ws_message` (binary only) / `ws_closed{code}` / `ws_lost` |
 | `store{id, data}`: persistent state, replaced atomically, private to the agent ([state-file.md](state-file.md)) | `stored` / `store_failed{detail}` |
-| `download{id, url, headers, max_bytes}`: to a local file, hashed as it goes, following no redirect | `download_response{id, status, sha256, location}` (whatever the status) / `download_failed{detail}` |
+| `download{id, url, headers, max_bytes}` (Go's `go/opamp/collector` only, for packages): to a local file, hashed as it goes, following no redirect | `download_response{id, status, sha256, location}` (whatever the status) / `download_failed{detail}` |
 | `cancel{id}`: give up on that effect at once | nothing more about it |
 | `notify{...}`: a remote config to apply, a package to install, ... | the application's own calls |
 | `wake_at` | `timer` |
@@ -116,7 +116,8 @@ It does:
 - cancel: abort the effect named at once and report nothing more about it;
 - storage: write the state atomically, read it back at start, and report the outcome
   ([state-file.md](state-file.md));
-- downloads: stream to a file, compute the SHA-256, and report the status and digest whatever the
+- downloads (Go's `go/opamp/collector`, the one client that takes packages): stream to a file,
+  compute the SHA-256, and report the status and digest whatever the
   status, and for a redirect its `Location` resolved and its origin, by the client's own URL
   library ([packages.md](packages.md#redirects));
 - stop: carry out effects until the core says it has stopped, then release everything.

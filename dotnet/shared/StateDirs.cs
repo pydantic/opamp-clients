@@ -11,15 +11,20 @@ namespace Logfire.Fleet.Otel;
 /// Where the agent keeps its state: the directory named (<c>OTEL_OPAMP_STATE_DIR</c>, or the hosting
 /// package's <c>OpAmp:StateDirectory</c>), none (<c>none</c>), or by default one of the user's own,
 /// so an instance keeps its UID across restarts with no setup (docs/default-state-dir.md). Which,
-/// and the default one's slots, are the core's Setup call's to say; this takes the lock.
+/// and the default one's slots, are the core's Setup call's to say; this takes the lock, on a named
+/// one too, so processes sharing it each keep their own identity.
 /// </summary>
 internal static class StateDirs
 {
+    /// <summary>How many processes running at once keep their own identity in one state directory.</summary>
+    public const int Slots = 16;
+
     /// <summary>
     /// Settle <paramref name="server"/>'s state directory and take its lock (held while the process
-    /// runs). False when a directory named is another process's, or can't be locked: the SDK runs
-    /// unmanaged. Without one named, the first of the default one's slots it can have, if any;
-    /// never an error.
+    /// runs): the first of its slots this process can have, the named one's (<see cref="NamedSlots"/>)
+    /// or the default one's. None to be had (not writable, every slot taken): no state directory, so
+    /// each start is a new instance; a directory named that can't be used is said as a warning.
+    /// Always true: the SDK runs managed either way.
     /// </summary>
     public static bool Claim(ref Server server, AgentLog log, out FileStream? stateLock)
     {
@@ -33,20 +38,23 @@ internal static class StateDirs
 
         // The directory locked is the one the state is kept in: trimmed, and blank is none named.
         server = server with { StateDir = string.IsNullOrEmpty(named) ? null : named };
-        if (server.StateDir is { } dir)
-        {
-            stateLock = SdkAgent.Lock(dir, log);
-            return stateLock is not null;
-        }
-
-        if (Slot(server.DefaultSlots, server.AllSlotsTaken, log) is { } claimed)
-        {
-            server = server with { StateDir = claimed.Dir };
-            stateLock = claimed.Lock;
-        }
-
+        // A directory named is locked as the default one is, so processes sharing it never join as one instance.
+        var claimed = server.StateDir is { } dir
+            ? Slot(NamedSlots(dir), $"{Slots} processes already keep their identity in {dir}: this one is a new instance each start", log, named: dir)
+            : Slot(server.DefaultSlots, server.AllSlotsTaken, log);
+        server = server with { StateDir = claimed?.Dir };
+        stateLock = claimed?.Lock;
         return true;
     }
+
+    /// <summary>
+    /// A named state directory's slots (docs/default-state-dir.md): itself, then its folders 2 to
+    /// 16. The first process keeps the directory and its UID, as before slots; one sharing it (a
+    /// child process inherits <c>OTEL_OPAMP_STATE_DIR</c>) takes a folder of its own instead of
+    /// running unmanaged.
+    /// </summary>
+    public static IReadOnlyList<string> NamedSlots(string dir) =>
+        [dir, .. Enumerable.Range(2, Slots - 1).Select(n => Path.Combine(dir, n.ToString(System.Globalization.CultureInfo.InvariantCulture)))];
 
     /// <summary>
     /// The default state directory, for <paramref name="program"/> in <paramref name="cwd"/> (null:
@@ -72,9 +80,10 @@ internal static class StateDirs
     /// <summary>
     /// The first of <paramref name="slots"/> this process can make and lock, and its lock; null where
     /// there's none to be had (not writable, every slot taken: <paramref name="allTaken"/> is the
-    /// line to say then). Never an error.
+    /// line to say then). Never an error; when the slots are those of the directory
+    /// <paramref name="named"/>, one that can't be used is said as a warning.
     /// </summary>
-    public static (string Dir, FileStream Lock)? Slot(IReadOnlyList<string>? slots, string? allTaken, AgentLog log)
+    public static (string Dir, FileStream Lock)? Slot(IReadOnlyList<string>? slots, string? allTaken, AgentLog log, string? named = null)
     {
         if (slots is not { Count: > 0 })
         {
@@ -98,9 +107,14 @@ internal static class StateDirs
             log.Info(allTaken ?? string.Empty);
             return null;
         }
-        catch (Exception)
+        catch (Exception e)
         {
             // A base that can't be written: each start is a new instance, as before.
+            if (named is not null)
+            {
+                log.Warn($"the state directory {named} can't be used ({e.Message}): each start is a new instance");
+            }
+
             return null;
         }
     }

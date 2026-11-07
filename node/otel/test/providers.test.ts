@@ -32,7 +32,6 @@ const POLICY = policy({
   head_sampling: { ratio: 1 }, signal_exports: off("traces", "metrics", "logs"), log_levels: { level: "warn" },
   attribute_redaction: { drop: ["x"] }, instrumentations: { all_disabled: true },
 });
-const UNSUPPORTED = "this SDK cannot apply the requested override";
 
 /** An agent as the register prepares one, with every exporter its own; its client keeps what it is handed. */
 function agent() {
