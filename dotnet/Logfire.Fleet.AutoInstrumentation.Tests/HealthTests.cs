@@ -316,9 +316,11 @@ public class HealthTests
         var agent = this.Started();
         try
         {
-            // Export health went with the first message, and the timer is armed for 30 s on.
+            // Export health went with the first message, and the timer is armed for 30 s on. Read
+            // under the agent's gate, as Fire does: the client failing to connect on its own thread
+            // steps the flow, which lets the last timer go before it arms the next.
             Assert.True(agent.Sdk.HealthSent!.ComponentHealthMap.ContainsKey("exporters"));
-            Assert.False(this.timers[^1].Handle.Disposed);
+            agent.Sdk.UnderGateForTest(() => Assert.False(this.timers[^1].Handle.Disposed));
             agent.Sdk.SetHealth(new ComponentHealth { Healthy = false, Status = "degraded" });
             Assert.False(agent.Sdk.HealthSent.Healthy);
             Assert.Equal("degraded", agent.Sdk.HealthSent.Status);
