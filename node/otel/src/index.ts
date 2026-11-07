@@ -924,7 +924,8 @@ function templateFields(template: string): Set<string> {
  * `redacted` (a Logfire span's attributes as redaction left them), its message held to the same:
  * the Logfire SDK renders the arguments' values into `logfire.msg`, so an argument the policy
  * dropped, masked or scrubbed is in it too. Such a message becomes its template, which holds no
- * value; the Logfire SDK's own scrubbing does the same to the values it scrubs.
+ * value (where the Logfire SDK scrubs an argument itself, it renders the message with the
+ * scrubbed text in its place).
  */
 function messageRedacted(attributes: Attributes, redacted: Attributes): Attributes {
   if (redacted === attributes) return redacted;
