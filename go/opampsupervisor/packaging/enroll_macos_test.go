@@ -10,6 +10,7 @@ import (
 	"runtime"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -75,6 +76,7 @@ func TestMacEnroll(t *testing.T) {
 	assert.True(t, loaded.Capabilities.ReportsOwnMetrics)
 	assert.True(t, loaded.Capabilities.ReportsOwnLogs)
 	assert.True(t, loaded.Agent.AutomaticConfigRollback)
+	assert.Equal(t, 30*time.Second, loaded.Agent.BootstrapTimeout)
 	// One naming a component the Collector doesn't have is refused before it runs.
 	assert.True(t, loaded.Agent.ValidateConfig)
 	// Without --restricted, any config the server sends runs.

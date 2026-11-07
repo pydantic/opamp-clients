@@ -277,6 +277,7 @@ func TestEnrollBindsTheExporterCredential(t *testing.T) {
 	assert.True(t, loaded.Capabilities.ReportsOwnLogs)
 	// A remote config the Collector fails on doesn't leave the host collecting nothing.
 	assert.True(t, loaded.Agent.AutomaticConfigRollback)
+	assert.Equal(t, 30*time.Second, loaded.Agent.BootstrapTimeout)
 	// One naming a component the Collector doesn't have is refused before it runs.
 	assert.True(t, loaded.Agent.ValidateConfig)
 	// Its comment is written as it reads: the heredoc runs nothing.
