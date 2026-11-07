@@ -97,8 +97,27 @@ def loopback():
         srv.close()
 
 
+def spawn():
+    subprocess.run(['cmd.exe' if os.name == 'nt' else 'true'] + (['/c', 'exit'] if os.name == 'nt' else []), timeout=10, check=True)
+    return ''
+
+
+def scm():
+    # The Service Control Manager, asked about one service: a wedged services.exe shows here.
+    return psutil.win_service_get('EventLog').status() if os.name == 'nt' else ''
+
+
+def disk_write():
+    with open(os.path.join(os.environ.get('TEMP', '/tmp'), 'probe-write'), 'w') as f:
+        f.write(now())
+        f.flush()
+        os.fsync(f.fileno())
+    return ''
+
+
 CHECKS = [Check('dns', dns), Check('tcp github', tcp('api.github.com', 443)),
-          Check('tcp wireserver', tcp('168.63.129.16', 80)), Check('loopback', loopback)]
+          Check('tcp wireserver', tcp('168.63.129.16', 80)), Check('loopback', loopback),
+          Check('spawn', spawn), Check('scm', scm), Check('fsync', disk_write)]
 
 
 class Sampler:
@@ -109,7 +128,23 @@ class Sampler:
         self.changes: collections.deque[str] = collections.deque(maxlen=40)
         self.last_net = psutil.net_io_counters()
         self.last_t = time.monotonic()
+        self.stage = ('start', time.monotonic())
+        self.latest: tuple[str, list[str]] = ('', [])
         psutil.cpu_percent()
+
+    def at(self, stage):
+        self.stage = (stage, time.monotonic())
+
+    def loop(self, stop):
+        # Its own thread: a system call that hangs (the Service Control Manager, a process's
+        # details) stops this, not the reports, which then say where it stopped.
+        while not stop.is_set():
+            try:
+                self.latest = self.sample(True)
+            except Exception as e:  # noqa: BLE001
+                self.latest = (f'{now()} sample FAILED {type(e).__name__}: {e}', [])
+            self.at('sleep')
+            time.sleep(2)
 
     @staticmethod
     def service_states():
@@ -128,8 +163,10 @@ class Sampler:
         t = time.monotonic()
         dt = max(t - self.last_t, 0.001)
         self.last_t = t
+        self.at('memory')
         vm = psutil.virtual_memory()
         sw = psutil.swap_memory()
+        self.at('disk and net counters')
         disk = psutil.disk_io_counters(perdisk=True)
         net = psutil.net_io_counters()
         disks = []
@@ -144,6 +181,7 @@ class Sampler:
         nr = (net.bytes_recv - self.last_net.bytes_recv) / dt / 1e3
         ns = (net.bytes_sent - self.last_net.bytes_sent) / dt / 1e3
         self.last_disk, self.last_net = disk, net
+        self.at('services')
         services = self.service_states()
         for name, (status, pid) in services.items():
             old = self.services.get(name)
@@ -158,6 +196,7 @@ class Sampler:
         for name, (status, pid) in services.items():
             if pid:
                 svc_by_pid[pid].append(name)
+        self.at('processes')
         rows = []
         seen = set()
         for p in psutil.process_iter(['name', 'ppid', 'memory_info', HANDLES, 'num_threads', 'cmdline']):
@@ -173,6 +212,7 @@ class Sampler:
         for pid in list(self.procs):
             if pid not in seen:
                 del self.procs[pid]
+        self.at('tcp connections')
         try:
             conns = psutil.net_connections('tcp')
         except psutil.Error as e:
@@ -214,6 +254,7 @@ class Sampler:
         detail.append('## Most handles')
         hnd = sorted(rows, key=lambda r: -(r[1].info[HANDLES] or 0))[:6]
         detail += [f'{p.pid} {p.info["name"]} {p.info[HANDLES]}' for _, p in hnd]
+        self.at('nics')
         try:
             for nic, st in psutil.net_if_stats().items():
                 detail.append(f'nic {nic}: up {st.isup} speed {st.speed}')
@@ -444,37 +485,46 @@ def main():
     rep = Reporter(a.repo, a.sha, a.name, token, a.dry_run)
     sampler = Sampler()
     ring: collections.deque[str] = collections.deque(maxlen=60)
-    checks: collections.deque[str] = collections.deque(maxlen=15)
+    checks: collections.deque[str] = collections.deque(maxlen=25)
     out = open(a.out, 'a', encoding='utf-8') if a.out else None
     deadline = time.monotonic() + 60 * a.minutes
+    stop = threading.Event()
+    threading.Thread(target=sampler.loop, args=(stop,), daemon=True).start()
     tick = 0
+    last_line = ''
     while time.monotonic() < deadline and not os.path.exists(a.stop):
         tick += 1
-        report = tick % 2 == 1  # every 6 s or so
-        line, detail = sampler.sample(report)
-        ring.append(line)
+        time.sleep(3)
+        line, detail = sampler.latest
+        stage, since = sampler.stage
+        stuck = time.monotonic() - since
+        if line != last_line:
+            ring.append(line)
+            last_line = line
+            if out:
+                out.write(line + '\n')
+                out.flush()
+        results = [c.run() for c in CHECKS]
+        sampler_state = f'sampler: {stage} for {stuck:.0f}s' + (' STUCK' if stage != 'sleep' and stuck > 10 else '')
+        checks.append(f'{now()} {sampler_state} | ' + ' | '.join(results))
         if out:
-            out.write(line + '\n')
+            out.write(checks[-1] + '\n')
             out.flush()
-        if report:
-            results = [c.run() for c in CHECKS]
-            checks.append(f'{now()} ' + ' | '.join(results))
-            text = '\n'.join([f'booted {boot}', '## Network checks (every report)', *checks,
-                              '## Reporting', *rep.log, '## Now', *detail,
+        if tick % 2 == 1:
+            text = '\n'.join([f'booted {boot}', '## Checks (every 3 s)', *checks,
+                              '## Reporting', *rep.log, '## Latest sample', *detail,
                               '## Every 2 s (last 3 min)', *ring, '## Newest MSI log', *[l[:300] for l in msi_tail()],
                               '## The test, last 40 lines', *[l.rstrip() for l in tail(a.log, 40)]])
-            if out:
-                out.write('\n'.join(['--- ' + checks[-1], *detail]) + '\n')
-                out.flush()
-            rep.post_async('in_progress', f'alive at {now()} UTC', text)
+            title = f'alive at {now()} UTC' + (f', sampler stuck in {stage} {stuck:.0f}s' if 'STUCK' in sampler_state else '')
+            rep.post_async('in_progress', title, text)
         if a.dark and rep.id is not None and time.monotonic() - rep.last_ok > 45:
             if rep.thread:
                 rep.thread.join(30)
             go_dark(a, rep, ring, checks, out)
             rep.last_ok = time.monotonic()
-        if tick % 20 == 0 and not (rep.thread and rep.thread.is_alive()):
+        if tick % 15 == 0 and not (rep.thread and rep.thread.is_alive()):
             rep.keepalive()
-        time.sleep(2)
+    stop.set()
     done = os.path.exists(a.stop)
     rep.post('completed', 'the job finished' if done else f"the job didn't finish in {a.minutes} minutes",
              '\n'.join([*checks, *rep.log, *ring]), 'success' if done else 'failure')

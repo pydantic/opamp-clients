@@ -7,7 +7,9 @@ name: Windows installer hang probe
 # throughput and latency, service state changes, and the newest msiexec log (the Logging policy is
 # set for it). Rounds 2 and 3 had 4 of 6 and 4 of 8 go dark, idle controls 0 of 4. When its reports stop
 # getting through, the probe looks at the network locally, tries to bring it back, and failing that
-# restarts the machine to report after boot. Remove before merging.
+# restarts the machine to report after boot. Round 4: 3 of 8 dark, and none of them did any of that,
+# so the probe's own sampling (the Service Control Manager, process details) may have hung: it now
+# samples in a thread of its own and checks process start, the SCM and an fsync every 3 s. Remove before merging.
 on:
   push:
     branches: [claude/project-thread-9rmm5t]
