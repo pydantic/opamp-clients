@@ -140,7 +140,21 @@ and date. Tests, CI and docs alone don't need a line.
   (Python), ip-address 10.7.4 (Node.js), jackson-databind 2.22.3 (Java tests). Every lockfile is
   now checked against OSV on every change and nightly (`scripts/deps_scan.py`).
 
-## Supervisor 0.10.2 (unreleased)
+## Supervisor 0.10.3
+
+0.10.2 plus one macOS packaging fix, cut from the 0.10.2 tag so it carries nothing else from main.
+Same Collector (otelcol-contrib v0.164.0) and core as 0.10.0.
+
+### Fixed
+
+- Supervisor on macOS: upgrading the `.pkg` over an installed Supervisor waits for launchd to
+  finish unloading the old service (up to 30 seconds) before replacing its files. `launchctl
+  bootout` can return while launchd still holds the service, so the upgrade's restart could fail
+  and leave the Supervisor stopped. A failed stop, a failed check or the timeout now aborts the
+  installation instead of replacing files under a service that may still be running. Fresh
+  installs, Linux and Windows are unchanged (#142).
+
+## Supervisor 0.10.2
 
 0.10.1 plus one packaging fix.
 
