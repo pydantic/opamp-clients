@@ -152,7 +152,7 @@ FAILED ([troubleshooting.md](../troubleshooting.md#a-policy-is-failed)).
    one command:
 
    ```bash
-   uvx --from 'logfire-cli>=0.1.16' logfire-cli --beta --base-url <...> --org <org> collector install \
+   uvx --from 'logfire-cli>=0.1.19' logfire-cli --beta --base-url <...> --org <org> collector install \
      --project <project> --token-stdin --yes
    ```
 
