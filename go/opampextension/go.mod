@@ -13,7 +13,7 @@ require (
 	github.com/open-telemetry/opamp-go v0.25.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/extension/opampcustommessages v0.164.1
 	github.com/open-telemetry/opentelemetry-collector-contrib/pkg/status v0.164.1
-	github.com/pydantic/opamp-clients/go v0.2.0
+	github.com/pydantic/opamp-clients/go v0.2.1
 	github.com/shirou/gopsutil/v4 v4.26.9
 	github.com/stretchr/testify v1.12.1
 	go.opentelemetry.io/collector/component v1.70.0
