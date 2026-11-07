@@ -72,7 +72,7 @@ func TestWindowsUninstallRetainsAndPurges(t *testing.T) {
 				if readErr != nil {
 					t.Fatal(readErr)
 				}
-				for _, expected := range []string{"stop", "msiexec.exe", "/x", "{11111111-1111-1111-1111-111111111111}", "/norestart"} {
+				for _, expected := range []string{"stop", "msiexec.exe", "/x", "{11111111-1111-1111-1111-111111111111}", "/norestart", "MSIRESTARTMANAGERCONTROL=DisableShutdown"} {
 					if !strings.Contains(string(calls), expected) {
 						t.Fatalf("missing %s: %s", expected, calls)
 					}

@@ -49,7 +49,10 @@ func install(t *testing.T) {
 	log := filepath.Join(t.TempDir(), "msiexec.log")
 	// /norestart: a quiet install that wants a restart (a file in use) otherwise restarts the
 	// machine at once, which takes the CI runner down with no word of why.
-	out, err := timed(t, "", "msiexec", "/i", msi, "/qn", "/norestart", "/l*v", log)
+	// MSIRESTARTMANAGERCONTROL: what this build's package sets, given here for the released one the
+	// upgrade starts from. Without it the Restart Manager shuts down a hosted runner's provjobd.exe
+	// when it holds one of the files open, and the runner's VM goes dark for good.
+	out, err := timed(t, "", "msiexec", "/i", msi, "/qn", "/norestart", "MSIRESTARTMANAGERCONTROL=DisableShutdown", "/l*v", log)
 	if err != nil {
 		t.Fatalf("msiexec: %v: %s\n%s", err, out, notable(msiLog(log)))
 	}
