@@ -61,27 +61,11 @@ and date. Tests, CI and docs alone don't need a line.
 
 ### Added
 
-- Python, Node.js: `logfire_fleet()` / `logfireFleet()` and `LogfireFleet`, what the Logfire
-  SDK's own `fleet` option calls (`logfire.configure(fleet=True)` with `logfire[fleet]`;
-  `configure({ fleet: true })` in `@pydantic/logfire-node` with this package beside it). The
-  Logfire SDK builds its own SDK and hands this package its head sampler, its resource and (in
-  Python) its export to Logfire at the points `configure_logfire()` uses, so nothing reads the
-  Logfire SDK's private modules and, unlike `manage()`, the sampling controls are carried out. A
-  versioned contract (`LOGFIRE_FLEET_CONTRACT`); a second `configure()` is governed under the same
-  client.
 - Supervisor installers and container image: the Collector runs with
   `--feature-gates=telemetry.newPipelineTelemetry`, so its own metrics count the items every
   receiver, processor (`batch` too) and exporter takes in and passes on. A Prometheus reader of
   those metrics fails when a component is in more than one pipeline (packaging/README.md,
   "Pipeline item counts") (#120).
-- .NET: `Pydantic.OpAmp.Client`, `Pydantic.OpAmp.Extensions.Hosting` and the automatic
-  instrumentation plugin ship for .NET 10 as well as .NET 8 (`net8.0` and `net10.0`), and their
-  tests run on both. Building from source needs the .NET 10 SDK (#86).
-- Docs: a getting-started guide, the supported runtimes and platforms
-  (`docs/supported-versions.md`), and a troubleshooting page (#86).
-- Python (`pydantic-opamp-otel`): `configure_logfire()`, the Logfire SDK under the server, in place of
-  `logfire.configure()`: the live sampler as its head sampler, and its exporters to Logfire behind
-  the package's gates, so the SDK settings apply to what reaches Logfire (`logfire` extra).
 - Go: an install's or a removal's error can say how it failed: `opamp.FailedForNow(err)` (an
   outage or a timeout: not reported failed, and tried again after a wait) or
   `opamp.FailedLeavingUnknown(err)` (reported failed, and what the agent has is uncertain), with
@@ -102,18 +86,17 @@ and date. Tests, CI and docs alone don't need a line.
   language. An OTLP exporter built from the variables now lists its signal's path under HTTP
   (`http://localhost:4318/v1/traces`); the identity (`otlp@localhost:4318`) is unchanged. The
   warnings read the same in every SDK. On core 0.15.0 (#109).
-- Supervisor installers: the Collector the packages ship (deb, rpm, `.pkg`, `.msi`, the release
-  archives and the container image) is upstream's OpenTelemetry Collector Contrib (`otelcol-contrib`
-  v0.164.0) as released, pinned by SHA-256, in place of our own build of about 20 components. A
-  config the server sends can use any contrib component. The packages are about 100 MB larger.
 - Supervisor: `pydantic-opamp-enroll` ends with a full sentence (`Enrolled with ... The Supervisor is
   running and connected (...)`), and `status` says `Remote config  none received yet`, so a host that
   just connected and is about to get its config doesn't read as broken (#113).
-- Python, Node.js, .NET: the first connection's line (`OpAMP: connected to ...; this SDK is managed
-  as ..., instance ...`) shows with the default log settings, so a working SDK doesn't look like one
-  that isn't loaded. Python writes it to stderr unless the application has logging handlers of its
-  own; Node.js and the .NET plugin show it unless `OTEL_LOG_LEVEL` is set (Node.js) or set below
-  `info` (.NET). Reconnections stay at INFO.
+- Collector extension and Supervisor: forked from contrib v0.164.1 (the Collector's v0.164.0 modules,
+  v1.70.0 for the stable ones), was v0.163.0. The extension takes upstream's `reports_heartbeat`
+  (default true) and health attributes; the Supervisor upstream's `agent::stop_grace_period` (#105).
+- Go, Python, Node.js, Java, .NET: a state file saved by a newer core is left as it was (that run
+  saves nothing), and the client says so once with the new `state_from_newer_version`
+  notification, which every integration and the collector extension log as a warning (#92).
+- Go: `go/opampotel` needs Go 1.26 or later (Go 1.25 is out of support), to take golang.org/x/net
+  0.60.0.
 
 ### Fixed
 
@@ -137,42 +120,12 @@ and date. Tests, CI and docs alone don't need a line.
   before, and the others take numbered folders in it (`2` to `16`). A named directory that can't be
   made or locked is now said as a warning, and each start is then a new instance; in .NET the SDK
   used to run unmanaged. Python also lets the lock go when the SDK is shut down (#138).
-- Supervisor on Windows: `pydantic-opamp-enroll.ps1` (and so an upgrade's refresh) sets the service
-  to start again when the Supervisor stops with an error (a start that failed, such as a Collector
-  slow to answer at boot), after 5 seconds, then 5, then every 30, as systemd and launchd already
-  did on Linux and macOS. It stayed stopped until someone started it (#139).
-- Supervisor installers and container image: a remote config naming a component the Collector
-  isn't built with (a receiver it doesn't have, say) is refused before it runs, FAILED with the
-  Collector's reason, and the Collector keeps running the config it had. The configs turn on
-  `agent.validate_config` (upstream's `otelcol validate` check); the Collector used to start on
-  such a config and exit 1. The container image's configs also turn on
-  `agent.automatic_config_rollback` and `agent.collector_crash_log_snippet_kib: 4`, as the host
-  installers' do: a config the Collector fails on there used to crash-loop until the server sent
-  another (#137).
 - Node.js: the Logfire SDK's `configure({ fleet })` after its `shutdown()` joins Fleet again. The
   client stayed stopped, so the SDK looked managed with no client running (#135).
 - Supervisor: stopping the Collector no longer races a restart. When the Collector exited just
   as the stop's kill deadline passed, the deadline's goroutine read the command a restart was
   replacing, and could have killed the new Collector. It now signals the process it was stopping
   (#124).
-- Supervisor installers: an upgrade in place (apt, dnf, the `.pkg`, the `.msi`) keeps the host
-  running. Before, the Linux packages stopped and disabled the Supervisor during an upgrade, and the
-  `.msi` left it stopped and set to start on demand. After an upgrade the package runs the new
-  `pydantic-opamp-enroll --refresh` (`-Refresh` on Windows). It writes the config again with this
-  version's settings, such as the Collector's own logs, and the last enrollment's options, keeping
-  the issued credentials, and starts the Supervisor again. A config edited by hand is kept, and so
-  is a `--restricted` one written by 0.9.0 or earlier.
-- Supervisor: the Collector's own telemetry settings (from a server's `own_metrics`, `own_logs` and
-  `own_traces` offers) are in the current declarative config format, so the Collector no longer
-  warns on every start that they use the deprecated v0.2.0 format.
-- Supervisor installers: the bundled Collector reports its version (its contrib release, 0.164.0)
-  as `service.version` on its own telemetry; it was empty.
-- .NET: the application's health set while the OpAMP client was starting (a health check that
-  runs at once) is reported. It was lost, and not reported again until the health changed (#112).
-- .NET, platform mode: a WebSocket connection cancelled just as the server accepted it is closed.
-  It could stay open (no reader, no close) until the garbage collector finalized it (#112).
-- .NET, core mode: no download file is made or written after stop returns. A file's write that
-  started late on a busy machine (after stop had stopped waiting for it) could still make it (#112).
 - Go, Python, Node.js, Java, .NET, the Supervisor: on core 0.14.0, which the clients now pin.
   A WebSocket connection given up after the server said nothing for two heartbeat intervals now
   says goodbye first (`agent_disconnect`), as every other close the client makes does; before, the
@@ -183,46 +136,9 @@ and date. Tests, CI and docs alone don't need a line.
   link for hours. Telemetry settings the application refused are offered to it again when the
   server sends them again (once per connection), and after a restart the client starts from the
   settings it last applied and keeps reporting the refusal.
-- Python: with `configure_logfire`, the log controls (the logs export, `log_levels`,
-  `log_rate_limit`) apply to the Logfire SDK's logs, which are spans; before, they did nothing to
-  them while the policy was answered as applied. Pausing traces leaves those logs be (#98).
-- .NET (`Pydantic.OpAmp.Extensions.Hosting`, the automatic instrumentation plugin): a health
-  report given while the agent was starting was lost until the next one (30 s on with the default
-  health check publisher); the first message now carries it (#86).
-- Python: on Windows, the core tap (`OPAMP_CORE_TAP`) wrote its records in text mode, which broke
-  them (#86).
-- Python and .NET: on Windows, a save's rename is written through to the disk (`MoveFileEx` with
-  `MOVEFILE_WRITE_THROUGH`), since a directory can't be flushed there: a save answered stored
-  survives a power cut (#86).
-- .NET: on Windows, a proxy variable the client refuses (as `ALL_PROXY=socks4://...`) is named as
-  it was set in the error, not in lower case (#86).
-- Java agent extension: under Elastic's distribution of the agent (EDOT Java), describing the
-  SDK's sampler no longer overflows the stack when EDOT logs the SDK at start (EDOT's default
-  sampler's own description never returns), and EDOT's span logger no longer sets the trace
-  gate's controls aside while EDOT's own OpAMP client is off. Every check of the extension now
-  passes under EDOT Java 1.14 (#83).
-
-### Changed
-
-- Collector extension and Supervisor: forked from contrib v0.164.1 (the Collector's v0.164.0 modules,
-  v1.70.0 for the stable ones), was v0.163.0. The extension takes upstream's `reports_heartbeat`
-  (default true) and health attributes; the Supervisor upstream's `agent::stop_grace_period` (#105).
-- Go, Python, Node.js, Java, .NET: a state file saved by a newer core is left as it was (that run
-  saves nothing), and the client says so once with the new `state_from_newer_version`
-  notification, which every integration and the collector extension log as a warning (#92).
-- Node.js (`@pydantic/opamp-otel`): the register runs the instrumentations' loader hook for
-  `import` in the application's thread (`module.registerHooks`) on Node.js 22.22.3, 24.11.1, 25.1.0,
-  26 and later, instead of on a loader thread with a V8 isolate of its own: about 7 MB less
-  resident memory for a small HTTP app, with the same instrumentations. Older Node.js keeps the
-  loader thread (#91).
-- Go: `go/opampotel` needs Go 1.26 or later (Go 1.25 is out of support), to take golang.org/x/net
-  0.60.0.
 
 ### Security
 
-- Python: on Windows, state files, downloads, the downloads directory and the core tap are made
-  with an access-control list allowing the agent's user alone, as the .NET and Java clients make
-  them; a mode of 0600 meant nothing there, so they took the directory's inherited list (#86).
 - Go, Python, Node.js, Java, .NET (platform mode): the client certificate configured for the OpAMP
   server is presented only when a package file is at the server's own origin; a file anywhere else
   is fetched without it (and, in Go, without skipping verification). It was presented to every
@@ -232,13 +148,53 @@ and date. Tests, CI and docs alone don't need a line.
   client certificate presented (and, in Go, verification skipped where it is for the server). A
   file elsewhere, and TLS to an https:// proxy, get neither; the CAs still apply. On core
   0.11.0, which the clients now pin (#87).
-- Node.js: undici 7.30.1, for GHSA-xjj6-f33q-929c, GHSA-4qv8-2p9j-2685 and GHSA-f72v-6w45-q472
-  (#81).
 - Dependencies with known advisories updated: golang.org/x/net 0.60.0 (`go/opampotel`, the
   examples, the conformance server), google.golang.org/grpc 1.83.1 and OpenTelemetry Go 1.45.0
   (the Go example, the conformance server), aiohttp 3.14.5 and OpenTelemetry Python 1.45.1
   (Python), ip-address 10.7.4 (Node.js), jackson-databind 2.22.3 (Java tests). Every lockfile is
   now checked against OSV on every change and nightly (`scripts/deps_scan.py`).
+
+## Supervisor 0.10.3 (2026-11-07)
+
+`go/opampsupervisor/v0.10.3`: 0.10.2 and one packaging fix, cut from the 0.10.2 tag so it carries
+nothing else from main. Same Collector (otelcol-contrib v0.164.0) and core (0.14.0) as 0.10.0.
+
+### Fixed
+
+- Supervisor on macOS: upgrading the `.pkg` over an installed Supervisor waits for launchd to
+  finish unloading the old service (up to 30 seconds) before replacing its files. `launchctl
+  bootout` can return while launchd still holds the service, so the upgrade's restart could fail
+  and leave the Supervisor stopped. A failed stop, a failed check or the timeout now aborts the
+  installation instead of replacing files under a service that may still be running. Fresh
+  installs, Linux and Windows are unchanged (#142).
+
+## Supervisor 0.10.2 (2026-11-07)
+
+`go/opampsupervisor/v0.10.2`: 0.10.1 and one packaging fix, cut from the 0.10.1 tag so it carries
+nothing else from main. Same Collector (otelcol-contrib v0.164.0) and core (0.14.0) as 0.10.0.
+
+### Fixed
+
+- Supervisor on Windows: `pydantic-opamp-enroll.ps1` (and so an upgrade's refresh) sets the service
+  to start again when the Supervisor stops with an error (a start that failed, such as a Collector
+  slow to answer at boot), after 5 seconds, then 5, then every 30, as systemd and launchd already
+  did on Linux and macOS. It stayed stopped until someone started it (#139).
+
+## Supervisor 0.10.1 (2026-11-07)
+
+`go/opampsupervisor/v0.10.1`: 0.10.0 and one packaging fix, cut from the 0.10.0 tag so it carries
+nothing else from main. Same Collector (otelcol-contrib v0.164.0) and core (0.14.0) as 0.10.0.
+
+### Fixed
+
+- Supervisor installers and container image: a remote config naming a component the Collector
+  isn't built with (a receiver it doesn't have, say) is refused before it runs, FAILED with the
+  Collector's reason, and the Collector keeps running the config it had. The configs turn on
+  `agent.validate_config` (upstream's `otelcol validate` check); the Collector used to start on
+  such a config and exit 1. The container image's configs also turn on
+  `agent.automatic_config_rollback` and `agent.collector_crash_log_snippet_kib: 4`, as the host
+  installers' do: a config the Collector fails on there used to crash-loop until the server sent
+  another (#137).
 
 ## SDKs 0.2.1 (2026-11-06)
 
@@ -310,6 +266,32 @@ Go or the Supervisor, which have not had a release with them:
   package`) in place of building from a checkout, and the READMEs PyPI and npm show link to the
   docs on GitHub. The NuGet packages carry their README, Pydantic as author, the project URL and
   tags (#124).
+
+## Supervisor 0.10.0 (2026-11-04)
+
+`go/opampsupervisor/v0.10.0`, on core 0.14.0. The Go modules are not released with it.
+
+### Changed
+
+- Supervisor installers: the Collector the packages ship (deb, rpm, `.pkg`, `.msi`, the release
+  archives and the container image) is upstream's OpenTelemetry Collector Contrib (`otelcol-contrib`
+  v0.164.0) as released, pinned by SHA-256, in place of our own build of about 20 components. A
+  config the server sends can use any contrib component. The packages are about 100 MB larger (#123).
+
+### Fixed
+
+- Supervisor installers: an upgrade in place (apt, dnf, the `.pkg`, the `.msi`) keeps the host
+  running. Before, the Linux packages stopped and disabled the Supervisor during an upgrade, and the
+  `.msi` left it stopped and set to start on demand. After an upgrade the package runs the new
+  `pydantic-opamp-enroll --refresh` (`-Refresh` on Windows). It writes the config again with this
+  version's settings, such as the Collector's own logs, and the last enrollment's options, keeping
+  the issued credentials, and starts the Supervisor again. A config edited by hand is kept, and so
+  is a `--restricted` one written by 0.9.0 or earlier (#122).
+- Supervisor: the Collector's own telemetry settings (from a server's `own_metrics`, `own_logs` and
+  `own_traces` offers) are in the current declarative config format, so the Collector no longer
+  warns on every start that they use the deprecated v0.2.0 format (#119).
+- Supervisor installers: the bundled Collector reports its version (its contrib release, 0.164.0)
+  as `service.version` on its own telemetry; it was empty (#119).
 
 ## Supervisor 0.9.0 (2026-11-04)
 
