@@ -555,6 +555,9 @@ Installing a newer package over the installed one (apt, dnf, the `.pkg` or the `
 in place. The host
 keeps its enrollment, its issued credentials and its instance UID, and needs no new key:
 
+- Before replacing files, the macOS package unloads the Supervisor and waits up to 30 seconds
+  for launchd to remove the service. A stop error, an inspection error or a timeout aborts the
+  installation rather than replacing files under a service that may still be running.
 - The enroll script keeps the options it was last run with, never a token, in `enroll.options`
   beside the config, with the config's SHA-256 in `supervisor.yaml.sha256`.
 - After the upgrade, the package runs `pydantic-opamp-enroll --refresh` (`-Refresh` on Windows).
