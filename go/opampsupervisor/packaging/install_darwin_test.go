@@ -42,8 +42,8 @@ func enroll(t *testing.T, endpoint string) {
 	run(t, "enroll-token\n", "/opt/pydantic-opamp/bin/pydantic-opamp-enroll", "--endpoint", endpoint, "--plaintext", "--no-start")
 }
 
-// startService loads the LaunchDaemon, which starts the Supervisor; unloading it (bootout waits
-// for the Supervisor to exit) is the returned function.
+// startService loads the LaunchDaemon, which starts the Supervisor; the returned function
+// unloads it and waits for launchd to finish removing it after bootout returns.
 func startService(t *testing.T) func() {
 	t.Helper()
 	if exec.Command("launchctl", "print", "system/"+label).Run() != nil {
