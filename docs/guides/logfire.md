@@ -6,7 +6,7 @@ redaction and scrubbing, the [Logfire SDK policy](../sdk-settings.md). There are
 
 | The application uses | How it joins the server | Languages |
 |---|---|---|
-| the Logfire SDK for Python | `logfire_fleet_otel.configure_logfire()` in place of `logfire.configure()` | Python |
+| the Logfire SDK for Python | `logfire.configure(fleet=True)` from `logfire` 5.5.0 ([python-otel.md](../python-otel.md#the-logfire-sdk-logfireconfigurefleettrue)); on 5.1 to 5.4, `logfire_fleet_otel.configure_logfire()` in place of `logfire.configure()` | Python |
 | the Logfire SDK for JavaScript | `manage()` from `@pydantic/logfire-fleet-otel`, after `logfire.configure()` | Node.js |
 | an OpenTelemetry SDK, exporting to Logfire over OTLP | this repository's integration for the language | Python, Go, Node.js, Java, .NET |
 
@@ -20,7 +20,9 @@ to connect an application, a host or a Kubernetes cluster to it.
 
 ## The Logfire SDK for Python
 
-Install the package with its `logfire` extra, and call `configure_logfire()` with the arguments
+From `logfire` 5.5.0, install `logfire[fleet]` and pass `fleet=True` to `logfire.configure()`
+([python-otel.md](../python-otel.md#the-logfire-sdk-logfireconfigurefleettrue)). On `logfire` 5.1
+to 5.4, install this package with its `logfire` extra, and call `configure_logfire()` with the arguments
 the application gives `logfire.configure()` today:
 
 ```python
@@ -134,8 +136,8 @@ installation; each process of it is an instance.
    OTEL_OPAMP_STATE_DIR=/var/lib/checkout/opamp
    ```
 
-   Give each process its own state directory, so its identity and the key Fleet issues it
-   survive restarts. The telemetry still needs its write token ([above](#where-the-telemetry-goes)).
+   Give each process its own state directory, so its identity (and the policy it last applied)
+   survives restarts. The telemetry still needs its write token ([above](#where-the-telemetry-goes)).
 4. The dialog moves from **Waiting for connection** to **Connected** when the application
    reports. Check Live view to see its telemetry arrive.
 
@@ -231,7 +233,3 @@ cap (on its `logfire.info()` and the rest), redaction and scrubbing apply to wha
 Its head sampling stays the Logfire SDK's own (`sampling.head`): a policy that overrides the
 sampling controls or debug mode is refused. Don't add `node --import @pydantic/logfire-fleet-otel/register`
 too: it starts a second SDK, and the Logfire SDK's can't register its providers.
-
-## The Logfire SDK for Rust
-
-No integration yet.

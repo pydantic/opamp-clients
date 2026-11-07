@@ -96,9 +96,6 @@ import { config as policyConfig, decide, type Overrides, policy } from "./policy
 import { Agent, Controls, glob, hostFromEnv, MASK } from "../src/index.js";
 
 const LAYER = new SdkSettings();
-const text = (s: string) => new TextEncoder().encode(s);
-/** The policy with every control local: what the SDK starts with when nothing was kept. */
-const EMPTY = text(policy());
 /** 2026-10-14T12:00:00Z, the vectors' clock. */
 const NOW = 1_791_979_200_000;
 

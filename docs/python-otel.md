@@ -175,7 +175,8 @@ runs unmanaged.
 
 ## The Logfire SDK: `logfire.configure(fleet=True)`
 
-A Logfire SDK that has the `fleet` option joins the fleet from `logfire.configure()` itself.
+The Logfire SDK joins the fleet from `logfire.configure()` itself from `logfire` 5.5.0. On
+`logfire` 5.1 to 5.4, use [`configure_logfire()`](#the-logfire-sdk-configure_logfire) below.
 Install it with its `fleet` extra, which installs this package:
 
 ```bash
@@ -204,7 +205,7 @@ governed under the same client and instance.
 
 ## The Logfire SDK: `configure_logfire()`
 
-For a Logfire SDK without the `fleet` option. An application on the
+For `logfire` 5.1 to 5.4, which have no `fleet` option. An application on the
 [Logfire SDK](https://logfire.pydantic.dev/docs/) calls
 `configure_logfire()` in place of `logfire.configure()`, with the same keyword arguments, and its
 SDK joins the fleet and takes the server's settings. Install the package with its `logfire` extra
@@ -314,7 +315,7 @@ path.
   | `head_sampling` | a sampler in place of the configured one (`OTEL_TRACES_SAMPLER`). A span whose parent was sampled, here or by the caller, is sampled at any ratio, 0 included. Local: the configured sampler. |
   | `signal_exports.traces`, `signal_exports.logs` | every trace and log exporter on the SDK's providers ([what the policy governs](#what-the-policy-governs)). `enabled: false` drops what would be exported. |
   | `log_levels` (`level`) | live, at the same gated log exporters. A record below the level's SeverityNumber is dropped at its next export, and one with no severity (0) is kept. Local: every record goes. |
-  | `sampling_rules`, `log_levels` (`scopes`), `attribute_redaction`, `scrubbing`, `trace_rate_limit`, `log_rate_limit`, `debug` | live, in the same sampler and gates. See [the newer settings](#the-newer-settings). |
+  | `sampling_rules`, `log_levels` (`scopes`), `attribute_redaction`, `scrubbing`, `trace_rate_limit`, `log_rate_limit`, `debug` | live, in the same sampler and gates. See [the settings that match telemetry](#the-settings-that-match-telemetry). |
   | `signal_exports.metrics` | every push metric exporter: the gate goes in front of each periodic reader's exporter (metrics have no export-processor hook), whatever `OTEL_METRICS_EXPORTER` names. A reader that is pulled (Prometheus) can't be gated and is reported ungoverned. |
   | `instrumentations` (`disabled`) | at the next start, added to `OTEL_PYTHON_DISABLED_INSTRUMENTATIONS`. Names are the instrumentations' entry points: `flask`, `requests`, `urllib`, and so on. |
   | `instrumentations` (`all_disabled`) | at the next start, `OTEL_PYTHON_DISABLED_INSTRUMENTATIONS=*`. |
@@ -350,7 +351,7 @@ path.
 The rules are the SDK settings layer's (`logfire_fleet_client.sdk`), the same in every language. The
 package only carries them out on the Python SDK.
 
-## The newer settings
+## The settings that match telemetry
 
 Each is carried out in the package's live sampler and gated exporters, so only where its
 configurator built the SDK: there the package declares them to the layer ([the
@@ -558,7 +559,7 @@ It is sent once, and again when a processor added to a provider later adds an ex
     unsubscribing; readers and subscribers on other threads; a bad map FAILED with nothing changed;
     restarts with and without a state directory; forked workers; the shared vectors through the
     layer and the agent;
-  - the newer settings (`tests/test_next_settings.py`): every shared vector in
+  - the settings that match telemetry (`tests/test_next_settings.py`): every shared vector in
     `testdata/sdk-settings` that applies, through the package's own sampler, gates
     and agent (`sampling`, `logs`, `redact`, `caps` with an injected clock, `debug` through
     decisions, restarts and refreshes, `health` through the agent's counters); generated rules,

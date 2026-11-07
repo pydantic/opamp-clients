@@ -17,7 +17,7 @@ Download the extension jar from Maven Central, `dev.pydantic:logfire-fleet-javaa
 next to the upstream agent:
 
 ```bash
-V=0.2.0
+V=0.2.1
 curl -sSfLo logfire-fleet-javaagent-extension.jar https://repo1.maven.org/maven2/dev/pydantic/logfire-fleet-javaagent-extension/$V/logfire-fleet-javaagent-extension-$V.jar
 curl -sSfLo opentelemetry-javaagent.jar https://repo1.maven.org/maven2/io/opentelemetry/javaagent/opentelemetry-javaagent/2.31.1/opentelemetry-javaagent-2.31.1.jar
 ```

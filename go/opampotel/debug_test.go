@@ -6,7 +6,6 @@ package opampotel
 import (
 	"context"
 	"encoding/json"
-	"reflect"
 	"slices"
 	"strings"
 	"sync"
@@ -133,18 +132,6 @@ func timedAgent(t *testing.T, stateDir string, ft *fakeTime) (*agent, *fakeRepor
 	a.reporter = r
 	a.mu.Unlock()
 	return a, r
-}
-
-func sameJSON(t testing.TB, got string, want json.RawMessage) bool {
-	t.Helper()
-	var g, w any
-	if err := json.Unmarshal([]byte(got), &g); err != nil {
-		t.Fatalf("%q: %v", got, err)
-	}
-	if err := json.Unmarshal(want, &w); err != nil {
-		t.Fatal(err)
-	}
-	return reflect.DeepEqual(g, w)
 }
 
 // Debug mode over time, and what the answer comes to with each save, through the agent

@@ -80,15 +80,6 @@ jobs:
         with:
           # Built from the tag, also when run by hand.
           ref: go/opampsupervisor/v${{ needs.version.outputs.version }}
-      # archive.sh from this workflow's commit, so a tag cut before it existed (v0.1.0) still builds.
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          ref: ${{ github.workflow_sha }}
-          path: .release
-          sparse-checkout: go/opampsupervisor/packaging/archive.sh
-          sparse-checkout-cone-mode: false
-      - name: The archive script, from this workflow's commit
-        run: cp .release/go/opampsupervisor/packaging/archive.sh go/opampsupervisor/packaging/archive.sh
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version: "1.26"
@@ -229,7 +220,7 @@ jobs:
           if [ "$INSTALLERS_ONLY" = true ]; then
             gh release view "$tag" >/dev/null
           fi
-          notes="The Supervisor and a collector with this repository's opamp extension, for Linux, macOS and Windows on amd64 and arm64.
+          notes="The Supervisor and the collector it runs (upstream's OpenTelemetry Collector Contrib, unchanged), for Linux, macOS and Windows on amd64 and arm64.
           Each archive holds \`opampsupervisor\` and \`otelcol\`; see [the collector docs](https://github.com/$GH_REPO/blob/$tag/docs/collector.md).
           Native installers are also included: deb and rpm for Linux, .pkg for macOS and .msi for Windows, on both architectures.
           The installers are unsigned. The macOS package is not notarized; install it with the command-line installer.
