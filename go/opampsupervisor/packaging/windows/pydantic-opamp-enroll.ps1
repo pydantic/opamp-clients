@@ -74,7 +74,22 @@ function Get-Root {
 
 function Get-Sha256([string]$path) { (Get-FileHash -LiteralPath $path -Algorithm SHA256).Hash.ToLowerInvariant() }
 
+# A Supervisor that stops with an error (a start that failed) is started again after 5 seconds,
+# then 5, then every 30, as systemd and launchd do. Set here rather than in the .msi: Windows
+# Installer's own service configuration can't set a restart action (it fails with access denied).
+# Without it the service stayed stopped until someone started it.
+function Set-Recovery {
+    # Not for a test root (OPAMP_ENROLL_ROOT), nor before the .msi has installed the service.
+    if ($env:OPAMP_ENROLL_ROOT -or -not (Get-Service -Name $service -ErrorAction SilentlyContinue)) { return }
+    $null = & sc.exe failure $service reset= 86400 actions= restart/5000/restart/5000/restart/30000
+    if ($LASTEXITCODE -ne 0) { Fail "could not set the $service service to start again after a failure (sc.exe failure: $LASTEXITCODE)" }
+    # Also when it stops with an error code, not only when it crashes.
+    $null = & sc.exe failureflag $service 1
+    if ($LASTEXITCODE -ne 0) { Fail "could not set the $service service to start again after a failure (sc.exe failureflag: $LASTEXITCODE)" }
+}
+
 function Restart-Supervisor {
+    Set-Recovery
     Set-Service -Name $service -StartupType Automatic
     Restart-Service -Name $service
 }
@@ -342,6 +357,7 @@ if (-not $edited) {
 $done = if ($Refresh) { 'Refreshed' } else { 'Enrolled' }
 
 if ($NoStart) {
+    Set-Recovery
     Write-Output "$done with $Endpoint. Start the Supervisor with: Set-Service $service -StartupType Automatic; Start-Service $service"
 } else {
     $started = [DateTimeOffset]::UtcNow.ToUnixTimeSeconds()

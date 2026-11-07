@@ -137,6 +137,10 @@ and date. Tests, CI and docs alone don't need a line.
   before, and the others take numbered folders in it (`2` to `16`). A named directory that can't be
   made or locked is now said as a warning, and each start is then a new instance; in .NET the SDK
   used to run unmanaged. Python also lets the lock go when the SDK is shut down (#138).
+- Supervisor on Windows: `pydantic-opamp-enroll.ps1` (and so an upgrade's refresh) sets the service
+  to start again when the Supervisor stops with an error (a start that failed, such as a Collector
+  slow to answer at boot), after 5 seconds, then 5, then every 30, as systemd and launchd already
+  did on Linux and macOS. It stayed stopped until someone started it (#139).
 - Node.js: the Logfire SDK's `configure({ fleet })` after its `shutdown()` joins Fleet again. The
   client stayed stopped, so the SDK looked managed with no client running (#135).
 - Supervisor: stopping the Collector no longer races a restart. When the Collector exited just

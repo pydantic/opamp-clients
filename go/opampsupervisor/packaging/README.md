@@ -289,7 +289,10 @@ command line still installs it.
 
 The `.msi` installs the Supervisor, the collector and `pydantic-opamp-enroll.ps1` in
 `Program Files\pydantic-opamp`. It also installs the `pydantic-opamp-supervisor` service, which
-runs as LocalSystem, logs to the Application event log, and stays stopped until enrolled. As an
+runs as LocalSystem, logs to the Application event log, and stays stopped until enrolled. The
+enroll script sets the service so that a Supervisor that stops with an error (a start that failed)
+is started again after 5 seconds, then 5, then every 30, as systemd and launchd do on Linux and
+macOS. As an
 administrator (`/norestart` keeps a quiet install that finds a file in use from restarting
 Windows on the spot; msiexec exits 3010 to say a restart is due instead):
 
