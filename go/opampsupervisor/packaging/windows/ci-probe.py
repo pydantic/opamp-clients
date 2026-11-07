@@ -9,6 +9,12 @@ open, and checks separately whether DNS, a new TCP connection to GitHub, the Azu
 wireserver (168.63.129.16) and loopback still work. So the last report tells a frozen machine from
 one that can't open new connections, and shows the seconds before.
 
+When reports stop getting through for 45 s, it goes on locally: it saves what the network looks like
+(adapters, routes, ARP, the System log), tries to bring the network back one step at a time, and
+reports again if one works. If none does, it saves everything, registers a task that reports the
+saved file at the next boot, and restarts the machine. A frozen machine does none of this; a machine
+that only lost its network says so after the restart.
+
   python ci-probe.py --repo O/R --sha SHA --name NAME --log FILE --stop FILE [--dry-run]
 
 --token-file holds the token that writes check runs (HEARTBEAT_TOKEN otherwise).
@@ -23,6 +29,8 @@ import json
 import os
 import socket
 import ssl
+import subprocess
+import sys
 import threading
 import time
 from datetime import datetime, timezone
@@ -226,6 +234,8 @@ class Reporter:
         self.conns = [self.connect(), self.connect()] if not dry_run else []
         self.id = None
         self.log: collections.deque[str] = collections.deque(maxlen=30)
+        self.last_ok = time.monotonic()
+        self.thread = None
 
     def connect(self):
         c = http.client.HTTPSConnection('api.github.com', timeout=10, context=self.ctx)
@@ -255,6 +265,7 @@ class Reporter:
                     return None
                 if i:
                     self.log.append(f'{now()} sent on conn {i}')
+                self.last_ok = time.monotonic()
                 return json.loads(out)
             except Exception as e:  # noqa: BLE001
                 self.log.append(f'{now()} conn {i} FAILED {type(e).__name__}: {e}')
@@ -276,6 +287,13 @@ class Reporter:
                 self.id = r['id']
         else:
             self.request('PATCH', f'/repos/{self.repo}/check-runs/{self.id}', body)
+
+    def post_async(self, *args):
+        # Off the main loop, so sampling (and noticing a dead network) goes on while a report hangs.
+        if self.thread and self.thread.is_alive():
+            return
+        self.thread = threading.Thread(target=self.post, args=args, daemon=True)
+        self.thread.start()
 
     def keepalive(self):
         # Keeps the spare connection from idling out: a cheap call that doesn't count against the
@@ -318,6 +336,93 @@ def tail(path, n=60):
         return [str(e)]
 
 
+def sh(cmd, timeout=20):
+    t = time.monotonic()
+    try:
+        r = subprocess.run(cmd, capture_output=True, text=True, errors='replace', timeout=timeout, shell=isinstance(cmd, str))
+        out = (r.stdout + r.stderr).rstrip()
+        return f'$ {cmd} (exit {r.returncode}, {time.monotonic() - t:.1f}s)\n{out[-6000:]}'
+    except Exception as e:  # noqa: BLE001
+        return f'$ {cmd} FAILED after {time.monotonic() - t:.1f}s {type(e).__name__}: {e}'
+
+
+def ps(script, timeout=30):
+    return sh(['powershell', '-NoProfile', '-NonInteractive', '-Command', script], timeout)
+
+
+DIAGNOSE = [
+    lambda: sh('ipconfig /all'), lambda: sh('route print -4'), lambda: sh('arp -a'),
+    lambda: ps('Get-NetAdapter | Format-Table -AutoSize Name, Status, LinkSpeed, MediaConnectionState, ifIndex | Out-String -Width 200'),
+    lambda: ps('Get-NetIPInterface -AddressFamily IPv4 | Format-Table -AutoSize | Out-String -Width 200'),
+    lambda: ps('Get-NetFirewallProfile | Format-Table Name, Enabled, DefaultInboundAction, DefaultOutboundAction | Out-String'),
+    lambda: ps('Get-NetTCPConnection -State Established,SynSent | Format-Table -AutoSize LocalAddress, LocalPort, RemoteAddress, RemotePort, State, OwningProcess | Out-String -Width 200'),
+    lambda: sh('wevtutil qe System /c:60 /rd:true /f:text', 40),
+    lambda: sh('wevtutil qe Application /c:30 /rd:true /f:text', 40),
+]
+
+RECOVER = [
+    ('wait', lambda: 'waited'),
+    ('ipconfig /renew', lambda: sh('ipconfig /renew', 60)),
+    ('flush ARP and DNS', lambda: sh('netsh interface ip delete arpcache') + '\n' + sh('ipconfig /flushdns')),
+    ('stop the Supervisor service', lambda: ps('Stop-Service pydantic-opamp-supervisor -Force -ErrorAction Continue; Get-Process otelcol*,pydantic-opamp* -ErrorAction SilentlyContinue | Stop-Process -Force; "done"', 60)),
+    ('restart the NIC', lambda: ps("Get-NetAdapter -Physical | Restart-NetAdapter -Confirm:$false; 'done'", 90)),
+]
+
+
+def after_boot(a):
+    # Runs from the boot task: reports what the probe saved before it restarted the machine.
+    token = open(a.token_file).read().strip()
+    saved = json.load(open(a.dark, encoding='utf-8'))
+    rep = Reporter(a.repo, a.sha, a.name, token, False)
+    rep.id = saved['id']
+    for _ in range(60):
+        rep.post('completed', f"went dark, restarted, reported after boot at {now()} UTC",
+                 f'booted again {datetime.fromtimestamp(psutil.boot_time(), timezone.utc).isoformat()}\n' + saved['text'], 'failure')
+        if time.monotonic() - rep.last_ok < 5:
+            return
+        time.sleep(10)
+
+
+def go_dark(a, rep, ring, checks, out):
+    """The reports stopped getting through: find out locally whether it's the network, and try to
+    get it back."""
+    lines = [f'{now()} reports stopped getting through ({time.monotonic() - rep.last_ok:.0f}s since one did)',
+             *checks, '## Reporting', *rep.log, '## Every 2 s', *ring]
+
+    def save():
+        text = '\n'.join(lines)
+        with open(a.dark, 'w', encoding='utf-8') as f:
+            json.dump({'id': rep.id, 'text': text}, f)
+        if out:
+            out.write(text + '\n')
+            out.flush()
+
+    save()
+    lines.append('## Diagnosis')
+    for d in DIAGNOSE:
+        lines.append(d())
+        save()
+    for name, step in RECOVER:
+        lines.append(f'## {now()} recovery: {name}')
+        lines.append(step())
+        time.sleep(20)
+        lines.append(f'{now()} ' + ' | '.join(c.run() for c in CHECKS))
+        save()
+        rep.post('in_progress', f'went dark, back after "{name}" at {now()} UTC', '\n'.join(lines))
+        if time.monotonic() - rep.last_ok < 30:
+            return True
+    lines.append(f'## {now()} nothing brought it back: restarting the machine to report after boot')
+    save()
+    task = (f'"{sys.executable}" "{os.path.abspath(__file__)}" --after-boot --repo {a.repo} --sha {a.sha} '
+            f'--name "{a.name}" --log x --stop x --dark "{a.dark}" --token-file "{a.token_file}"')
+    lines.append(sh(['schtasks', '/Create', '/F', '/RU', 'SYSTEM', '/SC', 'ONSTART', '/TN', 'probe-after-boot', '/TR', task]))
+    save()
+    lines.append(sh('shutdown /r /f /t 5'))
+    save()
+    time.sleep(600)
+    return False
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument('--repo', required=True)
@@ -329,7 +434,11 @@ def main():
     ap.add_argument('--minutes', type=float, default=40)
     ap.add_argument('--dry-run', action='store_true')
     ap.add_argument('--token-file')
+    ap.add_argument('--dark', help='where to save the state when reports stop getting through')
+    ap.add_argument('--after-boot', action='store_true')
     a = ap.parse_args()
+    if a.after_boot:
+        return after_boot(a)
     boot = datetime.fromtimestamp(psutil.boot_time(), timezone.utc).isoformat()
     token = open(a.token_file).read().strip() if a.token_file else os.environ.get('HEARTBEAT_TOKEN', '')
     rep = Reporter(a.repo, a.sha, a.name, token, a.dry_run)
@@ -357,8 +466,13 @@ def main():
             if out:
                 out.write('\n'.join(['--- ' + checks[-1], *detail]) + '\n')
                 out.flush()
-            rep.post('in_progress', f'alive at {now()} UTC', text)
-        if tick % 20 == 0:
+            rep.post_async('in_progress', f'alive at {now()} UTC', text)
+        if a.dark and rep.id is not None and time.monotonic() - rep.last_ok > 45:
+            if rep.thread:
+                rep.thread.join(30)
+            go_dark(a, rep, ring, checks, out)
+            rep.last_ok = time.monotonic()
+        if tick % 20 == 0 and not (rep.thread and rep.thread.is_alive()):
             rep.keepalive()
         time.sleep(2)
     done = os.path.exists(a.stop)

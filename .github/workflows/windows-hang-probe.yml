@@ -5,7 +5,9 @@ name: Windows installer hang probe
 # machine's state to a check run of its own every 10 s over connections it keeps open, and checks
 # DNS, new connections, the Azure host's wireserver and loopback on their own, every disk's
 # throughput and latency, service state changes, and the newest msiexec log (the Logging policy is
-# set for it). Round 2 had 4 of 6 runs go dark, idle controls 0 of 4. Remove before merging.
+# set for it). Rounds 2 and 3 had 4 of 6 and 4 of 8 go dark, idle controls 0 of 4. When its reports stop
+# getting through, the probe looks at the network locally, tries to bring it back, and failing that
+# restarts the machine to report after boot. Remove before merging.
 on:
   push:
     branches: [claude/project-thread-9rmm5t]
@@ -54,13 +56,17 @@ jobs:
           Get-PSDrive -PSProvider FileSystem | Format-Table Name, Root, Used, Free
           Get-CimInstance Win32_DiskDrive | Format-Table Index, Model, Size
           $python = (Get-Command python).Source
-          $script = "$PWD\go\opampsupervisor\packaging\windows\ci-probe.py"
+          # On C:, which a restart keeps: the probe restarts a machine that lost its network and
+          # reports from a boot task.
+          New-Item -Force -ItemType Directory C:\probe | Out-Null
+          Copy-Item go\opampsupervisor\packaging\windows\ci-probe.py C:\probe\
+          $script = "C:\probe\ci-probe.py"
           $temp = $env:RUNNER_TEMP
-          Set-Content -NoNewline -Path "$temp\probe.token" -Value $env:HEARTBEAT_TOKEN
+          Set-Content -NoNewline -Path "C:\probe\probe.token" -Value $env:HEARTBEAT_TOKEN
           # Created by WMI, not as a child of this step: the runner ends a step's processes with it.
           $command = "cmd.exe /c `"`"$python`" `"$script`" --repo $env:GITHUB_REPOSITORY --sha $env:GITHUB_SHA " +
             "--name `"Windows probe, $env:RUN`" --log `"$temp\install-test.log`" --stop `"$temp\probe.stop`" " +
-            "--out `"$temp\probe.log`" --token-file `"$temp\probe.token`" 2> `"$temp\probe.err`"`""
+            "--out `"$temp\probe.log`" --token-file C:\probe\probe.token --dark C:\probe\dark.json 2> `"$temp\probe.err`"`""
           $r = Invoke-CimMethod -ClassName Win32_Process -MethodName Create -Arguments @{ CommandLine = $command }
           "probe pid $($r.ProcessId), return $($r.ReturnValue)"
           "started at $((Get-Date).ToUniversalTime().ToString('HH:mm:ss'))" | Out-File "$temp\install-test.log"
