@@ -171,7 +171,7 @@ carries nothing else from main. Same Collector (otelcol-contrib v0.164.0) and co
   start and connect back to the Supervisor (`agent.bootstrap_timeout: 30s` in the packaged
   configs). The 420 MB Collector a virus scanner checks on its first launch, or one on a slow disk,
   could miss 3 seconds, and the Supervisor then stopped and was restarted by the service manager.
-  An upgrade's refresh sets it on a config nobody edited (#141).
+  An upgrade's refresh sets it on a config nobody edited (#143).
 
 ## Supervisor 0.10.2 (2026-11-07)
 
