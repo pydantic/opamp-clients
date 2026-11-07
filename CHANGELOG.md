@@ -120,7 +120,7 @@ and date. Tests, CI and docs alone don't need a line.
 - Supervisor `.msi`: the Windows service is started again when the Supervisor stops with an error
   (a start that failed, such as a Collector slow to answer at boot), after 5 seconds, then 5, then
   every 30, as systemd and launchd already did on Linux and macOS. It stayed stopped until someone
-  started it (#PR).
+  started it (#139).
 - Node.js: the Logfire SDK's `configure({ fleet })` after its `shutdown()` joins Fleet again. The
   client stayed stopped, so the SDK looked managed with no client running (#135).
 - Supervisor: stopping the Collector no longer races a restart. When the Collector exited just
