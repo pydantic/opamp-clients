@@ -1431,25 +1431,7 @@ class Agent:
                        layer=self.layer, listed_as=self._listed_as)
         self.found, self.exporters = found.found, found.exporters
         self._warn(found.warnings)
-        built = sdk_host(configured=self.configured, auto_instrumented=self._auto_instrumented,
-                         governed=any(found.sdk.values()))
-        if built != self.host:
-            self.host = built
-            lost = ", ".join(_undeclared(built))
-            if not any(found.sdk.values()):
-                _log.warning("OpAMP: the global providers aren't the OpenTelemetry SDK's, so nothing they "
-                             "export passes this package's gates: %s can't be carried out", lost)
-            elif self.managed:
-                _log.warning("OpAMP: manage() keeps the application's own sampler, so %s can't be carried "
-                             "out (configure() or opentelemetry-instrument set up one the server changes)", lost)
-            elif os.environ.get("OTEL_CONFIG_FILE"):
-                _log.warning("OpAMP: the SDK was built from OTEL_CONFIG_FILE, so its sampler isn't this "
-                             "package's: %s can't be carried out", lost)
-            else:
-                _log.warning("OpAMP: the SDK wasn't built by this package's configurator "
-                             "(OTEL_PYTHON_CONFIGURATOR=opamp picks it): %s can't be carried out", lost)
-            with self._lock:
-                self._step(host=built)
+        self._settle_host(found)
         loop = _loop_thread("opamp")
         self._loop = loop
         s = self.setup
@@ -1522,15 +1504,42 @@ class Agent:
                 self._warned.add(warning)
                 _log.warning("OpAMP: %s", warning)
 
+    def _settle_host(self, found: Governed) -> None:
+        """What was built is known: the host is what this package can carry out of it, and the flow
+        decides again under it when that changed, saying what can't be carried out."""
+        built = sdk_host(configured=self.configured, auto_instrumented=self._auto_instrumented,
+                         governed=any(found.sdk.values()))
+        if built != self.host:
+            self.host = built
+            lost = ", ".join(_undeclared(built))
+            if not lost:
+                pass  # all of it carried out: nothing to say
+            elif not any(found.sdk.values()):
+                _log.warning("OpAMP: the global providers aren't the OpenTelemetry SDK's, so nothing they "
+                             "export passes this package's gates: %s can't be carried out", lost)
+            elif self.managed:
+                _log.warning("OpAMP: manage() keeps the application's own sampler, so %s can't be carried "
+                             "out (configure() or opentelemetry-instrument set up one the server changes)", lost)
+            elif os.environ.get("OTEL_CONFIG_FILE"):
+                _log.warning("OpAMP: the SDK was built from OTEL_CONFIG_FILE, so its sampler isn't this "
+                             "package's: %s can't be carried out", lost)
+            else:
+                _log.warning("OpAMP: the SDK wasn't built by this package's configurator "
+                             "(OTEL_PYTHON_CONFIGURATOR=opamp picks it): %s can't be carried out", lost)
+            with self._lock:
+                self._step(host=built)
+
     def rebuilt(self, tracer_provider=None, meter_provider=None, logger_provider=None) -> None:
         """The SDK was built again once the client had started (``logfire.configure()`` called a
         second time): the new providers' exporters get the gates and replace the old ones in the
-        inventory. The client and its settings stay as they are."""
+        inventory, and the host is what the new build carries out. The client stays as it is."""
         with self._lock:
             found = govern(self.controls, tracer_provider, meter_provider, logger_provider, log_spans=self.logfire,
                            layer=self.layer, listed_as=self._listed_as)
             self.found, self.exporters = found.found, found.exporters
             self._warn(found.warnings)
+            # Built by this package now (configure_logfire() after manage(), say), or no longer.
+            self._settle_host(found)
             self._report_exporters()
 
     def processor_added(self, processor, signal: str) -> None:

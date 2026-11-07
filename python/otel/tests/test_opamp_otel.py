@@ -853,6 +853,24 @@ def test_settings_another_configurator_would_not_carry_out_are_refused(server, t
     assert effective(ours) == {"head_sampling": {"ratio": 0.5}, "signal_exports": off("traces")}
 
 
+def test_built_again_by_this_package_the_host_is_what_it_carries_out_now(server, tmp_path, monkeypatch):
+    # manage() under the application's own SDK, then configure_logfire(): the second build's
+    # sampler is the package's, so a rate the server sends is carried out. The host used to stay
+    # the first build's, and the rate was refused for as long as the process ran.
+    sdk_globals(monkeypatch)
+    agent, _ = prepared(tmp_path, OTEL_OPAMP_ENDPOINT=server.endpoint)
+    agent.start(Resource.create({"service.name": "checkout"}), tracer_provider=TracerProvider())
+    try:
+        before = agent.remote_config(config(policy(head_sampling={"ratio": 0.5})))
+        agent.configured = True  # as configure_logfire() sets it, before building its SDK
+        agent.start(Resource.create({"service.name": "checkout"}), tracer_provider=TracerProvider())
+        after = agent.remote_config(config(policy(head_sampling={"ratio": 0.5})))
+    finally:
+        agent.stop()
+    assert before.status == FAILED and after.status == APPLIED, after.error_message
+    assert set(logfire_fleet_otel.SAMPLER) <= set(agent.host.live)
+
+
 def test_with_a_configuration_file_the_instance_is_managed_and_gated_but_the_sampler_isnt_ours(server, tmp_path,
                                                                                                monkeypatch):
     sdk_globals(monkeypatch)
