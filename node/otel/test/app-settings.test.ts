@@ -27,8 +27,6 @@ import {
 
 const LAYER = new SdkSettings();
 const text = (s: string) => new TextEncoder().encode(s);
-/** The policy with every control local: what the SDK starts with when nothing was kept. */
-const EMPTY = text(policy());
 const APPLIED = RemoteConfigStatuses.RemoteConfigStatuses_APPLIED;
 const FAILED = RemoteConfigStatuses.RemoteConfigStatuses_FAILED;
 /** 2026-10-14T12:00:00Z. */

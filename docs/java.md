@@ -13,11 +13,11 @@ or later. Its [README](../java/opamp/README.md) has the full reference.
 <dependency>
   <groupId>dev.pydantic</groupId>
   <artifactId>logfire-fleet-client</artifactId>
-  <version>0.2.0</version>
+  <version>0.2.1</version>
 </dependency>
 ```
 
-Gradle: `implementation("dev.pydantic:logfire-fleet-client:0.2.0")`. The latest version is on
+Gradle: `implementation("dev.pydantic:logfire-fleet-client:0.2.1")`. The latest version is on
 [Maven Central](https://central.sonatype.com/artifact/dev.pydantic/logfire-fleet-client).
 
 ## Start and stop

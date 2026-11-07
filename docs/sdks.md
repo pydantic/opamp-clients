@@ -26,7 +26,7 @@ export arrives with the token and the SDK's resource. Every example passes over 
 
 | Language | Example | SDK used |
 |---|---|---|
-| Go | [examples/go](../examples/go/main.go) | `go.opentelemetry.io/otel/sdk` 1.38 |
+| Go | [examples/go](../examples/go/main.go) | `go.opentelemetry.io/otel/sdk` 1.45 |
 | Node.js | [examples/node](../examples/node/example.mjs) | `@opentelemetry/sdk-trace-node` 2.1 |
 | Python | [examples/python](../examples/python/example.py) | `opentelemetry-sdk` 1.38 |
 | Java | [examples/java](../examples/java/src/main/java/Example.java) | `io.opentelemetry:opentelemetry-sdk` 1.54 |

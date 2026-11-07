@@ -134,8 +134,8 @@ installation; each process of it is an instance.
    OTEL_OPAMP_STATE_DIR=/var/lib/checkout/opamp
    ```
 
-   Give each process its own state directory, so its identity and the key Fleet issues it
-   survive restarts. The telemetry still needs its write token ([above](#where-the-telemetry-goes)).
+   Give each process its own state directory, so its identity (and the policy it last applied)
+   survives restarts. The telemetry still needs its write token ([above](#where-the-telemetry-goes)).
 4. The dialog moves from **Waiting for connection** to **Connected** when the application
    reports. Check Live view to see its telemetry arrive.
 
@@ -231,7 +231,3 @@ cap (on its `logfire.info()` and the rest), redaction and scrubbing apply to wha
 Its head sampling stays the Logfire SDK's own (`sampling.head`): a policy that overrides the
 sampling controls or debug mode is refused. Don't add `node --import @pydantic/logfire-fleet-otel/register`
 too: it starts a second SDK, and the Logfire SDK's can't register its providers.
-
-## The Logfire SDK for Rust
-
-No integration yet.

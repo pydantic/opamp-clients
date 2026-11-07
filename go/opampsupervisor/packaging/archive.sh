@@ -20,16 +20,8 @@ rm -rf "$work" dist/otelcol
 mkdir -p "$work"
 
 # The fetcher runs here, so it is built for this machine; it fetches the collector for GOOS/GOARCH.
-# The release workflow runs this script on its tag's files: a tag from before contrib.json (up to
-# 0.9.0) still builds its own collector with ocb, from its collector.yaml.
 collector="upstream's OpenTelemetry Collector Contrib (otelcol-contrib), unchanged"
-if [ -f contrib.json ]; then
-	(cd .. && GOOS= GOARCH= go run ./internal/fetchcontrib -os "$GOOS" -arch "$GOARCH" -out "packaging/dist/otelcol/otelcol$exe")
-else
-	GOOS= GOARCH= GOBIN="$PWD/dist/bin" go install go.opentelemetry.io/collector/cmd/builder@v0.164.0
-	(cd .. && packaging/dist/bin/builder --config packaging/collector.yaml)
-	collector="an OpenTelemetry Collector built with this repository's opamp extension"
-fi
+(cd .. && GOOS= GOARCH= go run ./internal/fetchcontrib -os "$GOOS" -arch "$GOARCH" -out "packaging/dist/otelcol/otelcol$exe")
 cp "dist/otelcol/otelcol$exe" "$work/otelcol$exe"
 (cd .. && go build -trimpath -ldflags "-s -w" -o "packaging/$work/opampsupervisor$exe" .)
 cp ../../../LICENSE "$work/LICENSE"
@@ -49,7 +41,7 @@ Or run the collector on its own, with the opamp extension in its config:
   ./otelcol$exe --config otelcol.yaml
 
 Licenses: LICENSE (MIT) and LICENSE.Apache-2.0 (the files derived from OpenTelemetry's, and the
-collector's OpenTelemetry components); the compiled OpAMP core in both binaries is under
+collector's OpenTelemetry components); the compiled OpAMP core in the Supervisor is under
 licenses/core/LICENSE.txt, with its third-party notices in licenses/core/THIRD_PARTY_NOTICES.txt.
 
 Docs: https://github.com/pydantic/opamp-clients/blob/main/docs/collector.md

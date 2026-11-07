@@ -18,7 +18,7 @@ doesn't connect.
 | .NET | [docs](docs/dotnet-otel.md) | `dotnet add package Logfire.Fleet.AutoInstrumentation` (or `.Extensions.Hosting`) | [`dotnet/`](dotnet/) (`Logfire.Fleet.Client`), [docs](docs/dotnet.md) |
 
 [docs/how-it-works.md](docs/how-it-works.md) explains how the clients and the core fit together,
-[docs/sdks.md](docs/sdks.md) compares the SDKs, and [examples/](examples/) runs each one.
+[docs/sdks.md](docs/sdks.md) wires a client to an OpenTelemetry SDK by hand, and [examples/](examples/) runs each one.
 Two guides start from an application as it is: on the Logfire SDK or sending to Logfire
 ([docs/guides/logfire.md](docs/guides/logfire.md)), and on Elastic's OpenTelemetry distributions
 ([docs/guides/elastic.md](docs/guides/elastic.md)).

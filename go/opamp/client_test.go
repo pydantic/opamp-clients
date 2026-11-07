@@ -210,10 +210,9 @@ func TestStopFromTheCallbackReturnsAtOnce(t *testing.T) {
 	ts := httptest.NewServer(srv)
 	defer ts.Close()
 	type result struct {
-		err         error
-		took        time.Duration
-		stoppedYet  bool
-		callsBefore int
+		err        error
+		took       time.Duration
+		stoppedYet bool
 	}
 	inside := make(chan result, 1)
 	stopped := make(chan struct{})

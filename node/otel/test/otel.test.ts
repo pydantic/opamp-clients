@@ -71,7 +71,6 @@ beforeEach(() => {
 });
 
 const LAYER = new SdkSettings();
-const text = (s: string) => new TextEncoder().encode(s);
 const settings = (doc: string) => decide(LAYER, config(doc), hostFromEnv()).apply;
 // Every setting (docs/sdk-settings.md).
 const SETTINGS = ["debug_sampling_rate", "debug_send_logs_level", "debug_until", "deactivate_all_instrumentations",

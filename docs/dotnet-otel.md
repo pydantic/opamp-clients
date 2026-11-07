@@ -88,7 +88,7 @@ not conflict with the ones automatic instrumentation ships.
   | `instrumentations` `all_disabled` | at the next start, every instrumentation's variable set to false (one set to true would otherwise win). |
 
   The newer controls (rules, per-scope levels, redaction, scrubbing, rate caps, debug mode) and export
-  health are [below](#the-newer-settings). No control changes the SDK's own log level.
+  health are [below](#the-settings-that-match-telemetry). No control changes the SDK's own log level.
 - **Doesn't trace itself.** The OpAMP client runs inside a `SuppressInstrumentationScope`, as the
   SDK's own exporters do, so its requests (and its goodbye) never show up as the application's
   spans.
@@ -192,7 +192,7 @@ without a scheme gets a warning at start (one that isn't a URL at all stops the 
 says so). `WithOpAmp()` (below) says the same on the application's logger, at Information,
 Warning and Debug, naming `OpAmp:Endpoint` and `OpAmp:Headers` instead.
 
-## The newer settings
+## The settings that match telemetry
 
 Each is a control of the policy. Each is carried out at once, in the plugin and in
 `WithOpAmp()` alike (the same code), and declared to the layer
