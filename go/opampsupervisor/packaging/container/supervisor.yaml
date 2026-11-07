@@ -33,6 +33,9 @@ agent:
   # container reaches the collector too.
   connection_env:
     logfire/otlp: LOGFIRE_TOKEN
+  # The Collector has 30 seconds to start and connect back (upstream's 3 is short for a 420 MB
+  # binary that a virus scanner checks on its first launch, or a slow disk).
+  bootstrap_timeout: 30s
   # A remote config the Collector fails on is replaced by the last one that ran healthy, and stays FAILED.
   automatic_config_rollback: true
   # The Collector's last 4 KiB of log goes with a FAILED config's status, so the server shows why.
