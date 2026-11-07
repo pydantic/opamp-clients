@@ -3,8 +3,9 @@ name: Windows installer hang probe
 # Temporary, on this branch only: CI's Windows installer job eight times at once, each with
 # go/opampsupervisor/packaging/windows/ci-probe.py running apart from the runner. It writes the
 # machine's state to a check run of its own every 10 s over connections it keeps open, and checks
-# DNS, new connections, the Azure host's wireserver and loopback on their own. Two runs skip the
-# install tests and only wait, as a control. Remove before merging.
+# DNS, new connections, the Azure host's wireserver and loopback on their own, every disk's
+# throughput and latency, service state changes, and the newest msiexec log (the Logging policy is
+# set for it). Round 2 had 4 of 6 runs go dark, idle controls 0 of 4. Remove before merging.
 on:
   push:
     branches: [claude/project-thread-9rmm5t]
@@ -31,10 +32,7 @@ jobs:
       fail-fast: false
       matrix:
         kind: [test]
-        run: [1, 2, 3, 4, 5, 6]
-        include:
-          - { kind: idle, run: 1 }
-          - { kind: idle, run: 2 }
+        run: [1, 2, 3, 4, 5, 6, 7, 8]
     defaults:
       run:
         shell: bash
@@ -50,6 +48,11 @@ jobs:
           RUN: ${{ matrix.kind }} ${{ matrix.run }}
         run: |
           python -m pip install --quiet psutil==7.2.2
+          # Every msiexec writes a verbose log to TEMP, which the probe reports.
+          New-Item -Force -Path HKLM:\SOFTWARE\Policies\Microsoft\Windows\Installer | Out-Null
+          Set-ItemProperty -Path HKLM:\SOFTWARE\Policies\Microsoft\Windows\Installer -Name Logging -Value voicewarmupx
+          Get-PSDrive -PSProvider FileSystem | Format-Table Name, Root, Used, Free
+          Get-CimInstance Win32_DiskDrive | Format-Table Index, Model, Size
           $python = (Get-Command python).Source
           $script = "$PWD\go\opampsupervisor\packaging\windows\ci-probe.py"
           $temp = $env:RUNNER_TEMP

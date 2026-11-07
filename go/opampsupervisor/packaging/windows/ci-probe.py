@@ -96,10 +96,25 @@ CHECKS = [Check('dns', dns), Check('tcp github', tcp('api.github.com', 443)),
 class Sampler:
     def __init__(self):
         self.procs: dict[int, psutil.Process] = {}
-        self.last_disk = psutil.disk_io_counters()
+        self.last_disk = psutil.disk_io_counters(perdisk=True)
+        self.services = self.service_states()
+        self.changes: collections.deque[str] = collections.deque(maxlen=40)
         self.last_net = psutil.net_io_counters()
         self.last_t = time.monotonic()
         psutil.cpu_percent()
+
+    @staticmethod
+    def service_states():
+        out = {}
+        if os.name != 'nt':
+            return out
+        for svc in psutil.win_service_iter():
+            try:
+                d = svc.as_dict()
+            except Exception:  # noqa: BLE001
+                continue
+            out[d['name']] = (d['status'], d['pid'])
+        return out
 
     def sample(self, detailed: bool) -> tuple[str, list[str]]:
         t = time.monotonic()
@@ -107,13 +122,34 @@ class Sampler:
         self.last_t = t
         vm = psutil.virtual_memory()
         sw = psutil.swap_memory()
-        disk = psutil.disk_io_counters()
+        disk = psutil.disk_io_counters(perdisk=True)
         net = psutil.net_io_counters()
-        dr = (disk.read_bytes - self.last_disk.read_bytes) / dt / 1e6
-        dw = (disk.write_bytes - self.last_disk.write_bytes) / dt / 1e6
+        disks = []
+        for name, d in disk.items():
+            o = self.last_disk.get(name)
+            if not o:
+                continue
+            ops = (d.read_count - o.read_count) + (d.write_count - o.write_count)
+            busy = (d.read_time - o.read_time) + (d.write_time - o.write_time)
+            disks.append(f'{name[-1]}:r{(d.read_bytes - o.read_bytes) / dt / 1e6:.0f}w{(d.write_bytes - o.write_bytes) / dt / 1e6:.0f}MB/s '
+                         f'{ops / dt:.0f}iops {busy / max(ops, 1):.0f}ms/op')
         nr = (net.bytes_recv - self.last_net.bytes_recv) / dt / 1e3
         ns = (net.bytes_sent - self.last_net.bytes_sent) / dt / 1e3
         self.last_disk, self.last_net = disk, net
+        services = self.service_states()
+        for name, (status, pid) in services.items():
+            old = self.services.get(name)
+            if old and old[0] != status:
+                self.changes.append(f'{now()} service {name} {old[0]} -> {status} (pid {pid})')
+            elif not old:
+                self.changes.append(f'{now()} service {name} added {status}')
+        for name in set(self.services) - set(services):
+            self.changes.append(f'{now()} service {name} removed')
+        self.services = services
+        svc_by_pid: dict[int, list[str]] = collections.defaultdict(list)
+        for name, (status, pid) in services.items():
+            if pid:
+                svc_by_pid[pid].append(name)
         rows = []
         seen = set()
         for p in psutil.process_iter(['name', 'ppid', 'memory_info', HANDLES, 'num_threads', 'cmdline']):
@@ -139,10 +175,14 @@ class Sampler:
         states = collections.Counter(c.status for c in conns)
         by_pid = collections.Counter(c.pid for c in conns)
         top_cpu = sorted(rows, key=lambda r: -r[0])[:4]
+
+        def label(p):
+            svcs = svc_by_pid.get(p.pid)
+            return p.info['name'] + (f'[{",".join(svcs)[:60]}]' if svcs else '')
         line = (f'{now()} cpu {psutil.cpu_percent():.0f}% mem avail {vm.available >> 20}MB swap {sw.percent:.0f}% '
-                f'disk r{dr:.1f} w{dw:.1f}MB/s net r{nr:.0f} s{ns:.0f}KB/s tcp {len(conns)} '
+                f'disk {" ".join(disks)} net r{nr:.0f} s{ns:.0f}KB/s tcp {len(conns)} '
                 f'{dict(states)} procs {len(rows)} top ' +
-                ', '.join(f'{p.info["name"]}:{c:.0f}%' for c, p in top_cpu))
+                ', '.join(f'{label(p)}:{c:.0f}%' for c, p in top_cpu))
         if not detailed:
             return line, []
         names = {p.pid: p.info['name'] for _, p in rows}
@@ -157,7 +197,9 @@ class Sampler:
                 detail.append(f'{p.pid} <- {p.info["ppid"]} {p.info["name"]} cpu {c:.0f}% rss {(mi.rss >> 20) if mi else "?"}MB '
                               f'handles {p.info[HANDLES]} threads {p.info["num_threads"]}: {cmd}')
         detail.append('## Most CPU')
-        detail += [f'{p.pid} {p.info["name"]} {c:.0f}%' for c, p in sorted(rows, key=lambda r: -r[0])[:10]]
+        detail += [f'{p.pid} {label(p)} {c:.0f}%' for c, p in sorted(rows, key=lambda r: -r[0])[:10]]
+        detail.append('## Service changes')
+        detail += list(self.changes)
         detail.append('## Most memory')
         mem = sorted(rows, key=lambda r: -(r[1].info['memory_info'].rss if r[1].info['memory_info'] else 0))[:8]
         detail += [f'{p.pid} {p.info["name"]} {p.info["memory_info"].rss >> 20}MB' for _, p in mem]
@@ -248,6 +290,26 @@ class Reporter:
             self.conns[1].close()
 
 
+def msi_tail(n=25):
+    # With the Logging policy set (the workflow sets it) every msiexec writes MSI*.LOG in TEMP: the
+    # newest one's last lines, and what Restart Manager decided.
+    import glob
+    logs = []
+    for d in (os.environ.get('TEMP', ''), r'C:\Windows\Temp'):
+        logs += glob.glob(os.path.join(d, 'MSI*.LOG'))
+    if not logs:
+        return ['(no MSI logs)']
+    newest = max(logs, key=os.path.getmtime)
+    try:
+        raw = open(newest, 'rb').read()
+    except OSError as e:
+        return [str(e)]
+    text = raw.decode('utf-16', errors='replace') if raw[:2] == b'\xff\xfe' else raw.decode('utf-8', errors='replace')
+    lines = text.splitlines()
+    rm = [l for l in lines if 'RESTART MANAGER' in l or 'Return value 3' in l or 'Note: 1: 1' in l][-10:]
+    return [f'{newest} ({len(raw)} bytes)', *rm, '...', *lines[-n:]]
+
+
 def tail(path, n=60):
     try:
         with open(path, encoding='utf-8', errors='replace') as f:
@@ -272,14 +334,14 @@ def main():
     token = open(a.token_file).read().strip() if a.token_file else os.environ.get('HEARTBEAT_TOKEN', '')
     rep = Reporter(a.repo, a.sha, a.name, token, a.dry_run)
     sampler = Sampler()
-    ring: collections.deque[str] = collections.deque(maxlen=90)
-    checks: collections.deque[str] = collections.deque(maxlen=40)
+    ring: collections.deque[str] = collections.deque(maxlen=60)
+    checks: collections.deque[str] = collections.deque(maxlen=15)
     out = open(a.out, 'a', encoding='utf-8') if a.out else None
     deadline = time.monotonic() + 60 * a.minutes
     tick = 0
     while time.monotonic() < deadline and not os.path.exists(a.stop):
         tick += 1
-        report = tick % 5 == 1  # every 10 s
+        report = tick % 2 == 1  # every 6 s or so
         line, detail = sampler.sample(report)
         ring.append(line)
         if out:
@@ -288,14 +350,15 @@ def main():
         if report:
             results = [c.run() for c in CHECKS]
             checks.append(f'{now()} ' + ' | '.join(results))
-            text = '\n'.join([f'booted {boot}', '## Network checks (every 10 s)', *checks,
+            text = '\n'.join([f'booted {boot}', '## Network checks (every report)', *checks,
                               '## Reporting', *rep.log, '## Now', *detail,
-                              '## Every 2 s (last 3 min)', *ring, '## The test, last 60 lines', *[l.rstrip() for l in tail(a.log)]])
+                              '## Every 2 s (last 3 min)', *ring, '## Newest MSI log', *[l[:300] for l in msi_tail()],
+                              '## The test, last 40 lines', *[l.rstrip() for l in tail(a.log, 40)]])
             if out:
                 out.write('\n'.join(['--- ' + checks[-1], *detail]) + '\n')
                 out.flush()
             rep.post('in_progress', f'alive at {now()} UTC', text)
-        if tick % 30 == 0:
+        if tick % 20 == 0:
             rep.keepalive()
         time.sleep(2)
     done = os.path.exists(a.stop)
