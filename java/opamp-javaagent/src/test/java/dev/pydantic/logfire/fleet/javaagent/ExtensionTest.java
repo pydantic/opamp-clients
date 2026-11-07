@@ -219,6 +219,9 @@ class ExtensionTest {
                 assertTrue(st.getErrorMessage().startsWith(want.path("error").asText()), st.getErrorMessage());
               }
               case "load" -> {
+                if (e != null) {
+                  ended(e);
+                }
                 e = Extension.forTest(null);
                 e.clockForTest(() -> now[0]);
                 e.properties(DefaultConfigProperties.createFromMap(Map.of("otel.opamp.endpoint",
@@ -606,10 +609,19 @@ class ExtensionTest {
     assertFalse(startedIn(dir).inForce().hasSamplingRate());
   }
 
-  static Extension startedIn(Path dir) {
+  static Extension startedIn(Path dir) throws java.io.IOException {
     Extension e = Extension.forTest(null);
     e.properties(DefaultConfigProperties.createFromMap(
         Map.of("otel.opamp.endpoint", "http://server/v1/opamp", "otel.opamp.state.dir", dir.toString())));
+    return ended(e);
+  }
+
+  /**
+   * {@code e}'s JVM ends: its state directory's lock is let go, so the next start in the test is a
+   * restart that takes it back.
+   */
+  static Extension ended(Extension e) throws java.io.IOException {
+    Extension.release(e.setupForTest());
     return e;
   }
 
@@ -634,12 +646,13 @@ class ExtensionTest {
   }
 
   @Test
-  void oneUidNamesTheInstanceAndIsKeptAcrossStarts(@TempDir Path dir) {
+  void oneUidNamesTheInstanceAndIsKeptAcrossStarts(@TempDir Path dir) throws Exception {
     AttributeKey<String> id = AttributeKey.stringKey("service.instance.id");
     Map<String, String> props = Map.of("otel.opamp.endpoint", "http://s/v1/opamp", "otel.opamp.state.dir", dir.toString());
     Extension first = Extension.forTest(null);
     first.properties(DefaultConfigProperties.createFromMap(props));
     String uid = first.resource(Resource.empty()).getAttribute(id);
+    ended(first);
     assertEquals(7, java.util.UUID.fromString(uid).version());
     Extension second = Extension.forTest(null);
     second.properties(DefaultConfigProperties.createFromMap(props));
@@ -666,10 +679,12 @@ class ExtensionTest {
         e.properties(DefaultConfigProperties.createFromMap(props));
         Resource r = Resource.create(io.opentelemetry.api.common.Attributes.of(id, given));
         assertEquals(given, e.resource(r).getAttribute(id), state.toString());
+        ended(e);
       }
       Extension bare = Extension.forTest(null);
       bare.properties(DefaultConfigProperties.createFromMap(props));
       assertEquals(7, java.util.UUID.fromString(bare.resource(Resource.empty()).getAttribute(id)).version());
+      ended(bare);
     }
   }
 
@@ -684,6 +699,7 @@ class ExtensionTest {
     first.notified(new dev.pydantic.logfire.fleet.Notification.InstanceUidChanged(
         java.nio.ByteBuffer.allocate(16).putLong(assigned.getMostSignificantBits())
             .putLong(assigned.getLeastSignificantBits()).array()));
+    ended(first);
     Extension second = Extension.forTest(null);
     second.properties(DefaultConfigProperties.createFromMap(props));
     String after = second.resource(Resource.empty()).getAttribute(id);
@@ -960,11 +976,12 @@ class ExtensionTest {
         home(base)).stateDir());
     assertEquals(null, setupFrom(Map.of("otel.opamp.endpoint", "http://s", "otel.resource.attributes",
         "service.instance.id=" + UUID.randomUUID()), home(base)).stateDir());
-    // Named: that one, unlocked as before.
+    // Named: that one, locked as the default one is.
     Extension.Setup named = setupFrom(Map.of("otel.opamp.endpoint", "http://s", "otel.opamp.state.dir",
         base.resolve("mine").toString()), home(base));
     assertEquals(base.resolve("mine"), named.stateDir());
-    assertEquals(null, named.stateLock());
+    assertTrue(named.stateLock() != null);
+    Extension.release(named);
     // Nowhere to keep it: none, and no error.
     assertEquals(null, setupFrom(on, Map.of()).stateDir());
     Path file = Files.writeString(base.resolve("file"), "");
@@ -982,6 +999,61 @@ class ExtensionTest {
     for (Extension.Setup h : held) {
       Extension.release(h);
     }
+  }
+
+  /**
+   * Processes sharing a named state directory (started with the same OTEL_OPAMP_STATE_DIR): the
+   * first keeps the directory and the UID already in it; the others take numbered folders in it,
+   * each its own UID, taken back at their next start. They used to join the fleet as one instance.
+   */
+  @Test
+  void processesSharingANamedStateDirectoryEachKeepTheirOwnInstance(@TempDir Path base) throws Exception {
+    AttributeKey<String> id = AttributeKey.stringKey("service.instance.id");
+    Path named = base.resolve("mine");
+    Map<String, String> props = Map.of("otel.opamp.endpoint", "http://s/v1/opamp", "otel.service.name", "checkout",
+        "otel.opamp.state.dir", named.toString());
+    java.util.function.Supplier<Extension> start = () -> {
+      Extension e = Extension.forTest(null);
+      e.properties(DefaultConfigProperties.createFromMap(props), home(base));
+      return e;
+    };
+    Extension before = start.get();
+    String uid = before.resource(Resource.empty()).getAttribute(id);
+    assertEquals(named, before.setupForTest().stateDir());
+    Extension.release(before.setupForTest());
+    List<Extension> running = List.of(start.get(), start.get(), start.get());
+    assertEquals(List.of(named, named.resolve("2"), named.resolve("3")),
+        running.stream().map(e -> e.setupForTest().stateDir()).toList());
+    List<String> uids = running.stream().map(e -> e.resource(Resource.empty()).getAttribute(id)).toList();
+    assertEquals(uid, uids.get(0));
+    assertEquals(3, uids.stream().distinct().count());
+    Extension.release(running.get(1).setupForTest());
+    Extension again = start.get();
+    assertEquals(named.resolve("2"), again.setupForTest().stateDir());
+    assertEquals(uids.get(1), again.resource(Resource.empty()).getAttribute(id));
+    Extension.release(running.get(0).setupForTest());
+    Extension.release(running.get(2).setupForTest());
+    Extension.release(again.setupForTest());
+    // Every slot taken: a new instance each start, said once at INFO.
+    Map<String, String> on = Map.of("otel.opamp.endpoint", "http://s", "otel.opamp.state.dir", named.toString());
+    List<Extension.Setup> held = new ArrayList<>();
+    for (int i = 0; i < Extension.SLOTS; i++) {
+      held.add(setupFrom(on, home(base)));
+    }
+    assertEquals(16, held.stream().map(Extension.Setup::stateDir).distinct().count());
+    List<String> said = logged(Level.INFO, () -> assertEquals(null, setupFrom(on, home(base)).stateDir()));
+    assertEquals(List.of("INFO OpAMP: 16 processes already keep their identity in " + named
+        + ": this one is a new instance each start"), said);
+    for (Extension.Setup h : held) {
+      Extension.release(h);
+    }
+    // One that can't be used: a warning (the default one's only at FINE), a new instance each start.
+    Path file = Files.writeString(base.resolve("file"), "");
+    List<String> warned = logged(Level.INFO, () -> assertEquals(null,
+        setupFrom(Map.of("otel.opamp.endpoint", "http://s", "otel.opamp.state.dir", file.toString()), home(base))
+            .stateDir()));
+    assertEquals(1, warned.size(), warned.toString());
+    assertTrue(warned.get(0).startsWith("WARNING OpAMP: the state directory " + file + " can't be used ("), warned.get(0));
   }
 
   @Test

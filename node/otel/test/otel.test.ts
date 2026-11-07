@@ -42,13 +42,28 @@ import {
   release,
   say,
   samplerFromEnv,
-  setupFromEnv,
+  setupFromEnv as claimed,
   type Options,
   type Setup,
 } from "../src/index.js";
 
 /** Processes of one program that each keep their own identity by default (the core's). */
 const SLOTS = 16;
+
+/** Named state directories it can make and lock (it does both, as a process starting would). */
+const NAMED = mkdtempSync(join(tmpdir(), "opamp-otel-named-"));
+const CODE_DIR = join(NAMED, "code");
+const ENV_DIR = join(NAMED, "env");
+
+/**
+ * The Setup a process of its own makes, which then ends: its state directory's lock is let go, so
+ * the next call is a restart. The tests of locking itself call `claimed`.
+ */
+function setupFromEnv(...args: Parameters<typeof claimed>): Setup | undefined {
+  const s = claimed(...args);
+  released(s);
+  return s;
+}
 
 /** What a Setup carries to the client, without what it logs (the endpoint shown, the hints). */
 function bare(s: Setup | undefined): Partial<Setup> | undefined {
@@ -122,6 +137,9 @@ function prepared(dir: string, extra: Record<string, string> = {}): { agent: Age
   const env: NodeJS.ProcessEnv = { OTEL_OPAMP_ENDPOINT: "http://server/v1/opamp", OTEL_OPAMP_STATE_DIR: dir, ...extra };
   const agent = new Agent();
   agent.prepare(env);
+  // Each agent is a start of its own process: its state directory's lock is let go at once, as
+  // that process ending would, so the next one is the restart that takes it back.
+  released(agent.setup);
   return { agent, env };
 }
 
@@ -604,6 +622,7 @@ test("the settings to start with are the config the client kept applied", () => 
 /** The process that held the default state directory ends. */
 function released(setup: Setup | undefined): void {
   if (setup?.stateLock) release(setup.stateLock);
+  delete setup?.stateLock;
 }
 
 test("by default an instance keeps its UID across restarts", () => {
@@ -637,6 +656,46 @@ test("by default an instance keeps its UID across restarts", () => {
   released(elsewhere.setup);
 });
 
+test("processes sharing a named state directory each keep their own instance", () => {
+  // Workers a cluster or PM2 starts inherit OTEL_OPAMP_STATE_DIR. They used to read and write one
+  // state, so joined the fleet as one instance UID. Now the first keeps the directory and the UID
+  // already in it; the others take numbered folders in it, each its own UID, taken back at their
+  // next start.
+  const dir = mkdtempSync(join(tmpdir(), "opamp-otel-"));
+  const named = join(dir, "mine");
+  const env: NodeJS.ProcessEnv = { OTEL_OPAMP_ENDPOINT: "http://s/v1/opamp", OTEL_SERVICE_NAME: "checkout",
+    OTEL_OPAMP_STATE_DIR: named };
+  const before = new Agent();
+  before.prepare({ ...env });
+  assert.equal(before.setup!.stateDir, named);
+  released(before.setup);
+  const [first, second, third] = [new Agent(), new Agent(), new Agent()];
+  for (const a of [first, second, third]) a.prepare({ ...env });
+  assert.deepEqual([first, second, third].map((a) => a.setup!.stateDir), [named, join(named, "2"), join(named, "3")]);
+  assert.equal(first.uid, before.uid);
+  assert.equal(new Set([first.uid, second.uid, third.uid]).size, 3);
+  released(second.setup);
+  const again = new Agent();
+  again.prepare({ ...env });
+  assert.deepEqual([again.setup!.stateDir, again.uid], [join(named, "2"), second.uid]);
+  for (const a of [first, third, again]) released(a.setup);
+  // Every slot taken: a new instance each start, said once at INFO.
+  const held = Array.from({ length: SLOTS }, () => claimed({ ...env }));
+  let last: Setup | undefined;
+  assert.deepEqual(said(() => void (last = claimed({ ...env }))).filter(([, m]) => m.startsWith("OpAMP:")),
+    [["info", `OpAMP: ${SLOTS} processes already keep their identity in ${named}: this one is a new instance each start`]]);
+  assert.equal(last!.stateDir, undefined);
+  held.forEach(released);
+  // One that can't be used: a warning (the default one's only at debug), a new instance each start.
+  const file = join(dir, "file");
+  writeFileSync(file, "");
+  const warned = said(() => void (last = setupFromEnv({ ...env, OTEL_OPAMP_STATE_DIR: file })))
+    .filter(([, m]) => m.startsWith("OpAMP:"));
+  assert.equal(last!.stateDir, undefined);
+  assert.deepEqual(warned.map(([level]) => level), ["warn"]);
+  assert.ok(warned[0]![1].startsWith(`OpAMP: the state directory ${file} can't be used (`), warned[0]![1]);
+});
+
 test("a service.instance.id that isn't a UUID keeps the default state directory, so the UID is the same each start", () => {
   // It can't be the instance UID, so it is replaced by one: kept in the default directory, rather
   // than a new one each start.
@@ -660,10 +719,11 @@ test("the default state directory gives way", () => {
   assert.equal(setupFromEnv({ ...base, OTEL_OPAMP_STATE_DIR: "none" })!.stateDir, undefined);
   assert.equal(setupFromEnv({ ...base, OTEL_RESOURCE_ATTRIBUTES: `service.instance.id=${randomUUID()}` })!.stateDir,
     undefined);
-  // Named: that one, unlocked as before.
-  const named = setupFromEnv({ ...base, OTEL_OPAMP_STATE_DIR: join(dir, "mine") })!;
+  // Named: that one, locked as the default one is.
+  const named = claimed({ ...base, OTEL_OPAMP_STATE_DIR: join(dir, "mine") })!;
   assert.equal(named.stateDir, join(dir, "mine"));
-  assert.equal(named.stateLock, undefined);
+  assert.ok(named.stateLock);
+  released(named);
   // Nowhere to keep it: none, and no error.
   assert.equal(setupFromEnv({ OTEL_OPAMP_ENDPOINT: "http://s" })!.stateDir, undefined);
   const file = join(dir, "file");
@@ -671,9 +731,9 @@ test("the default state directory gives way", () => {
   assert.equal(setupFromEnv({ OTEL_OPAMP_ENDPOINT: "http://s", XDG_STATE_HOME: file, HOME: file, LOCALAPPDATA: file })!
     .stateDir, undefined);
   // Every slot taken: none.
-  const held = Array.from({ length: SLOTS }, () => setupFromEnv(base));
+  const held = Array.from({ length: SLOTS }, () => claimed(base));
   assert.ok(held.every((h) => h?.stateDir !== undefined));
-  assert.equal(setupFromEnv(base)!.stateDir, undefined);
+  assert.equal(claimed(base)!.stateDir, undefined);
   held.forEach(released);
 });
 
@@ -700,8 +760,8 @@ const ROWS: Row[] = [
     fromCode: "https://code/v1/opamp", fromEnv: "https://env/v1/opamp", neither: undefined, read: (s) => s?.endpoint },
   { option: "headers", variable: "OTEL_OPAMP_HEADERS", code: { Authorization: "Bearer code" }, env: "Authorization=Bearer%20env,x=1",
     fromCode: { Authorization: "Bearer code" }, fromEnv: { Authorization: "Bearer env", x: "1" }, neither: {}, read: (s) => s?.headers },
-  { option: "stateDir", variable: "OTEL_OPAMP_STATE_DIR", code: "/state/code", env: "/state/env",
-    fromCode: "/state/code", fromEnv: "/state/env", neither: undefined, read: (s) => s?.stateDir },
+  { option: "stateDir", variable: "OTEL_OPAMP_STATE_DIR", code: CODE_DIR, env: ENV_DIR,
+    fromCode: CODE_DIR, fromEnv: ENV_DIR, neither: undefined, read: (s) => s?.stateDir },
   { option: "heartbeatIntervalMs", variable: "OTEL_OPAMP_HEARTBEAT_INTERVAL", code: 1500, env: "5s",
     fromCode: 1500, fromEnv: 5000, neither: 0, read: (s) => s?.heartbeatMs },
 ];
@@ -797,10 +857,10 @@ const ENV: NodeJS.ProcessEnv = {
   ...NO_DEFAULT_DIR,
   OTEL_OPAMP_ENDPOINT: "http://env/v1/opamp",
   OTEL_OPAMP_HEADERS: "a=env",
-  OTEL_OPAMP_STATE_DIR: "/state/env",
+  OTEL_OPAMP_STATE_DIR: ENV_DIR,
   OTEL_OPAMP_HEARTBEAT_INTERVAL: "5s",
 };
-const FROM_ENV = { endpoint: "http://env/v1/opamp", headers: { a: "env" }, stateDir: "/state/env", heartbeatMs: 5000 };
+const FROM_ENV = { endpoint: "http://env/v1/opamp", headers: { a: "env" }, stateDir: ENV_DIR, heartbeatMs: 5000 };
 const notMs = (v: string) => `OpAMP: heartbeatIntervalMs ${v} is not a number of milliseconds: it is not used`;
 const INVALID: [string, unknown, string | undefined, Partial<Setup>][] = [
   // Kept: the client refuses it when it starts, and the SDK runs unmanaged; nothing stops.
@@ -871,6 +931,7 @@ test("an endpoint in code turns the package on; OTEL_SDK_DISABLED still turns it
   assert.equal(agent.on, true);
   assert.equal(agent.setup!.stateDir, dir);
   assert.match(readFileSync(join(dir, "instance-uid"), "utf8"), /^[0-9a-f-]{36}$/);
+  released(agent.setup); // its process ends
   // The application's state directory, given in code, keeps the UID across restarts as the variable's.
   const again = new Agent();
   again.prepare({}, { endpoint: "http://server/v1/opamp", stateDir: dir });
@@ -885,23 +946,23 @@ test("an endpoint in code turns the package on; OTEL_SDK_DISABLED still turns it
 test("a lock left by a process that is gone is taken over; a running one's isn't", () => {
   const dir = mkdtempSync(join(tmpdir(), "opamp-otel-"));
   const env: NodeJS.ProcessEnv = { OTEL_OPAMP_ENDPOINT: "http://s", XDG_STATE_HOME: dir, HOME: dir, LOCALAPPDATA: dir };
-  const first = setupFromEnv(env)!;
-  released(first);
+  const first = claimed(env)!;
+  released({ ...first });
   const lock = first.stateLock!;
   // Killed, so it never removed its lock.
   const gone = spawnSync(process.execPath, ["-e", ""]).pid!;
   writeFileSync(lock, `${gone} 0`);
-  const after = setupFromEnv(env)!;
+  const after = claimed(env)!;
   assert.equal(after.stateDir, first.stateDir);
   released(after);
   // This pid, from an earlier start (a container's application is often pid 1 each time).
   writeFileSync(lock, `${process.pid} 0`);
-  const restarted = setupFromEnv(env)!;
+  const restarted = claimed(env)!;
   assert.equal(restarted.stateDir, first.stateDir);
   released(restarted);
   // Another process, running: its slot stays its own.
   writeFileSync(lock, `${process.ppid} 0`);
-  const next = setupFromEnv(env)!;
+  const next = claimed(env)!;
   assert.notEqual(next.stateDir, first.stateDir);
   released(next);
 });

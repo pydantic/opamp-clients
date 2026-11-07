@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 import threading
 import time
 from pathlib import Path
@@ -61,6 +62,11 @@ def prepared(tmp_path=None, **extra) -> Agent:
         env["OTEL_OPAMP_STATE_DIR"] = str(tmp_path)
     agent = Agent(app=AppSettings())
     agent.prepare(env)
+    # Each call is a start of its own process: its state directory's lock is let go at once, as that
+    # process ending would, so the next call is the restart that takes it back.
+    if agent.setup is not None and agent.setup.state_lock is not None:
+        os.close(agent.setup.state_lock)
+        agent.setup.state_lock = None
     return agent
 
 

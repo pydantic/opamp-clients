@@ -31,7 +31,7 @@ import { SdkSettings, type Settings } from "@pydantic/logfire-fleet-client/sdk";
 
 import { keepApplied } from "./kept.js";
 import { config as policyConfig, decide, FILE, off, overridden, type Overrides, policy, reported } from "./policy.js";
-import { Agent, Controls, glob, hostFromEnv, MASK, Redaction, SEVERITY_OFF } from "../src/index.js";
+import { Agent, Controls, glob, hostFromEnv, MASK, Redaction, release, SEVERITY_OFF } from "../src/index.js";
 import { Scrubbing } from "../src/scrub.js";
 
 const LAYER = new SdkSettings();
@@ -453,6 +453,22 @@ test("redaction: a key both lists match is dropped; drop doesn't change dropped_
   const { gated, tracer } = tracing(c);
   tracer.startSpan("s", { attributes: { a: 1, b: 2 } }).end();
   assert.deepEqual([gated.getFinishedSpans()[0]!.attributes, gated.getFinishedSpans()[0]!.droppedAttributesCount], [{}, 0]);
+});
+
+test("redaction: an argument masked or scrubbed is out of a Logfire span's message too", () => {
+  // The Logfire SDK renders a span's arguments into logfire.msg: one the policy masks or scrubs
+  // takes the message to its template. It used to stay in the message as it was.
+  const c = new Controls();
+  c.apply(settings({ attribute_redaction: { mask: ["user.email"] }, scrubbing: { patterns: ["hunter*"] } }));
+  const { gated, tracer } = tracing(c);
+  const span = (template: string, message: string, args: Attributes) =>
+    tracer.startSpan(template, { attributes: { "logfire.msg_template": template, "logfire.msg": message, ...args } }).end();
+  span("the code is {code}", "the code is hunter2", { code: "hunter2" });
+  span("signed in {user.email}", "signed in a@example.com", { "user.email": "a@example.com" });
+  span("the order is {order}", "the order is o-1", { order: "o-1", "user.email": "b@example.com" });
+  const sent = gated.getFinishedSpans().map((s) => [s.attributes["logfire.msg"], s.attributes]);
+  assert.deepEqual(sent.map(([m]) => m), ["the code is {code}", "signed in {user.email}", "the order is o-1"]);
+  assert.doesNotMatch(JSON.stringify(sent), /hunter2|a@example\.com|b@example\.com/);
 });
 
 test("redaction is declared, and a host that doesn't declare it refuses it", () => {
@@ -902,6 +918,9 @@ class TestAgent extends Agent {
       clear: (t) => void ((t as { cleared: boolean }).cleared = true),
     };
     this.prepare({ OTEL_OPAMP_ENDPOINT: "http://server/v1/opamp", OTEL_OPAMP_STATE_DIR: dir ?? "none", ...env });
+    // Each agent is a start of its own process: its state directory's lock is let go at once, as
+    // that process ending would, so the next one is the restart that takes it back.
+    if (this.setup?.stateLock) release(this.setup.stateLock);
     // A client that keeps what it is handed: the effective config, and (below) health.
     this.client = {
       setEffectiveConfig: (e: never) => this.reported.push(overridden(e)),

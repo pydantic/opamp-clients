@@ -928,6 +928,11 @@ def agent_at(clocks: Clocks, state, **env) -> Agent:
     agent.wall_ms = lambda: clocks.wall
     agent.monotonic = lambda: clocks.mono
     agent.prepare({"OTEL_OPAMP_ENDPOINT": "http://s/v1/opamp", "OTEL_OPAMP_STATE_DIR": str(state), **env})
+    # Each call is a start of its own process: its state directory's lock is let go at once, as that
+    # process ending would, so the next call is the restart that takes it back.
+    if agent.setup is not None and agent.setup.state_lock is not None:
+        os.close(agent.setup.state_lock)
+        agent.setup.state_lock = None
     return agent
 
 
