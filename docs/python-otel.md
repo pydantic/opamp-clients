@@ -175,10 +175,9 @@ runs unmanaged.
 
 ## The Logfire SDK: `logfire.configure(fleet=True)`
 
-A Logfire SDK that has the `fleet` option joins the fleet from `logfire.configure()` itself.
-No released Logfire SDK has it yet (`logfire` 5.4.0 has no `fleet` extra): until one does, use
-[`configure_logfire()`](#the-logfire-sdk-configure_logfire) below. Install it with its `fleet`
-extra, which installs this package:
+The Logfire SDK joins the fleet from `logfire.configure()` itself from `logfire` 5.5.0. On
+`logfire` 5.1 to 5.4, use [`configure_logfire()`](#the-logfire-sdk-configure_logfire) below.
+Install it with its `fleet` extra, which installs this package:
 
 ```bash
 pip install 'logfire[fleet]'
@@ -206,7 +205,7 @@ governed under the same client and instance.
 
 ## The Logfire SDK: `configure_logfire()`
 
-For a Logfire SDK without the `fleet` option. An application on the
+For `logfire` 5.1 to 5.4, which have no `fleet` option. An application on the
 [Logfire SDK](https://logfire.pydantic.dev/docs/) calls
 `configure_logfire()` in place of `logfire.configure()`, with the same keyword arguments, and its
 SDK joins the fleet and takes the server's settings. Install the package with its `logfire` extra

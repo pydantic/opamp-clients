@@ -6,7 +6,7 @@ redaction and scrubbing, the [Logfire SDK policy](../sdk-settings.md). There are
 
 | The application uses | How it joins the server | Languages |
 |---|---|---|
-| the Logfire SDK for Python | `logfire_fleet_otel.configure_logfire()` in place of `logfire.configure()` | Python |
+| the Logfire SDK for Python | `logfire.configure(fleet=True)` from `logfire` 5.5.0 ([python-otel.md](../python-otel.md#the-logfire-sdk-logfireconfigurefleettrue)); on 5.1 to 5.4, `logfire_fleet_otel.configure_logfire()` in place of `logfire.configure()` | Python |
 | the Logfire SDK for JavaScript | `manage()` from `@pydantic/logfire-fleet-otel`, after `logfire.configure()` | Node.js |
 | an OpenTelemetry SDK, exporting to Logfire over OTLP | this repository's integration for the language | Python, Go, Node.js, Java, .NET |
 
@@ -20,7 +20,9 @@ to connect an application, a host or a Kubernetes cluster to it.
 
 ## The Logfire SDK for Python
 
-Install the package with its `logfire` extra, and call `configure_logfire()` with the arguments
+From `logfire` 5.5.0, install `logfire[fleet]` and pass `fleet=True` to `logfire.configure()`
+([python-otel.md](../python-otel.md#the-logfire-sdk-logfireconfigurefleettrue)). On `logfire` 5.1
+to 5.4, install this package with its `logfire` extra, and call `configure_logfire()` with the arguments
 the application gives `logfire.configure()` today:
 
 ```python

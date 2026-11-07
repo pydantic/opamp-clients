@@ -138,7 +138,7 @@ unmanaged.
 
 A Logfire SDK that has the `fleet` option (`@pydantic/logfire-node`, with this package installed
 beside it as its optional peer dependency) joins the fleet from `logfire.configure()` itself, and
-nothing is refused. No released `@pydantic/logfire-node` has it yet: until one does, use
+nothing is refused. With a `@pydantic/logfire-node` that doesn't have the option, use
 [`manage()`](#an-sdk-set-up-already-manage) after `logfire.configure()`.
 
 ```js
