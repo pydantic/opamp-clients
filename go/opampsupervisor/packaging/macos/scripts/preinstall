@@ -2,6 +2,35 @@
 # Copyright (c) 2026 Pydantic Services Inc.
 # SPDX-License-Identifier: MIT
 #
-# Stops the Supervisor before an upgrade replaces its files; postinstall starts it again.
-launchctl bootout system/dev.pydantic.opamp-supervisor 2>/dev/null || true
-exit 0
+# Waits for the Supervisor to unload before an upgrade replaces its files; postinstall restarts it.
+label=system/dev.pydantic.opamp-supervisor
+
+# Only launchctl's missing-service status proves it is safe to replace the running files.
+loaded() {
+	launchctl print "$label" >/dev/null 2>&1
+	status=$?
+	case "$status" in
+		0) return 0 ;;
+		113) return 1 ;;
+		*) echo "could not inspect $label (launchctl exit $status); installation aborted" >&2; exit 1 ;;
+	esac
+}
+
+if ! loaded; then
+	exit 0
+fi
+if ! launchctl bootout "$label"; then
+	echo "could not unload $label; installation aborted" >&2
+	exit 1
+fi
+
+# bootout can return while launchd still owns the label, making the next bootstrap fail.
+remaining=30
+while loaded; do
+	if [ "$remaining" -eq 0 ]; then
+		echo "$label is still loaded after 30 seconds; installation aborted" >&2
+		exit 1
+	fi
+	sleep 1
+	remaining=$((remaining - 1))
+done
