@@ -140,7 +140,18 @@ and date. Tests, CI and docs alone don't need a line.
   (Python), ip-address 10.7.4 (Node.js), jackson-databind 2.22.3 (Java tests). Every lockfile is
   now checked against OSV on every change and nightly (`scripts/deps_scan.py`).
 
-## Supervisor 0.10.1 (unreleased)
+## Supervisor 0.10.2 (unreleased)
+
+0.10.1 plus one packaging fix.
+
+### Fixed
+
+- Supervisor on Windows: `pydantic-opamp-enroll.ps1` (and so an upgrade's refresh) sets the service
+  to start again when the Supervisor stops with an error (a start that failed, such as a Collector
+  slow to answer at boot), after 5 seconds, then 5, then every 30, as systemd and launchd already
+  did on Linux and macOS. It stayed stopped until someone started it (#139).
+
+## Supervisor 0.10.1
 
 `go/opampsupervisor/v0.10.1`: 0.10.0 and one packaging fix, cut from the 0.10.0 tag so it carries
 nothing else from main. Same Collector (otelcol-contrib v0.164.0) and core as 0.10.0.

@@ -159,3 +159,43 @@ func assertStartsAtBoot(t *testing.T) {
 	require.NoError(t, err, string(out))
 	assert.Equal(t, "Automatic Running", strings.TrimSpace(string(out)))
 }
+
+// serviceStatus is the service's status as Get-Service says it (Running, Stopped, ...).
+func serviceStatus(t *testing.T) string {
+	t.Helper()
+	out, err := timed(t, "", "powershell", "-NoProfile", "-NonInteractive", "-Command", "(Get-Service "+service+").Status")
+	require.NoError(t, err, string(out))
+	return strings.TrimSpace(string(out))
+}
+
+// A Supervisor whose start fails stops with an error, and the Service Control Manager starts it
+// again, as systemd (Restart=on-failure) and launchd (KeepAlive) do: once what failed is fixed,
+// the host comes back with nobody there. The service stayed stopped.
+func TestInstalledServiceStartsAgainAfterAFailedStart(t *testing.T) {
+	requireAdmin(t)
+	for _, dir := range installedDirs {
+		_, err := os.Stat(dir)
+		require.ErrorIs(t, err, os.ErrNotExist, "%s is there already: run it on a fresh machine", dir)
+	}
+	install(t)
+	defer uninstall(t, true)
+	srv := newIssuingServer(t)
+	enroll(t, srv.endpoint)
+
+	// Without its Collector the Supervisor's start fails (it asks the Collector for its feature
+	// gates first), and the service stops with an error.
+	collector := filepath.Join(os.Getenv("ProgramFiles"), "pydantic-opamp", "otelcol.exe")
+	require.NoError(t, os.Rename(collector, collector+".away"))
+	powershell(t, "", "Set-Service "+service+" -StartupType Automatic")
+	_, _ = timed(t, "", "sc.exe", "start", service)
+	require.Eventually(t, func() bool { return serviceStatus(t) == "Stopped" }, time.Minute, 500*time.Millisecond,
+		"the Supervisor without its Collector didn't stop:\n%s", diagnose())
+	require.NoError(t, os.Rename(collector+".away", collector))
+
+	require.EventuallyWithT(t, func(c *assert.CollectT) {
+		auths, _ := srv.seen()
+		assert.NotEmpty(c, auths, "the Supervisor connects")
+	}, 2*time.Minute, time.Second, "the service wasn't started again after its failed start:\n%s", diagnose())
+	assert.Equal(t, "Running", serviceStatus(t))
+	powershell(t, "", "Stop-Service "+service)
+}
