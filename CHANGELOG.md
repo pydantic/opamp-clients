@@ -100,6 +100,10 @@ and date. Tests, CI and docs alone don't need a line.
 
 ### Fixed
 
+- Supervisor, Windows: a quiet install, upgrade or removal of the `.msi` no longer shuts down
+  other programs that have one of its files open (the Restart Manager did, with no word); such a
+  file is replaced at the next restart. `pydantic-opamp-uninstall.ps1` asks the same of a package
+  installed by an older release (#144).
 - Python, Node.js: setting the SDK up again in one process (Python's `configure_logfire()` or
   `manage()`, Node.js's `manage()`, called a second time) keeps the instance it joined the fleet
   as. It used to start over: another instance UID (a second slot of the default state directory)

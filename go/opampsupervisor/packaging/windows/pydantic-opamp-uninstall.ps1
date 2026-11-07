@@ -72,8 +72,10 @@ function Uninstall-Collector {
     # Keep executable recovery code under Program Files, separate from retained data.
     New-Item -ItemType Directory -Force -Path $programs | Out-Null
     if ($PSCommandPath -ne $recovery) { Copy-Item -LiteralPath $PSCommandPath -Destination $recovery -Force }
+    # The property, as the package now sets it, for one installed by an older package: the
+    # removal shuts down no other program that has one of its files open.
     foreach ($product in $products) {
-        $result = Start-Process -FilePath msiexec.exe -ArgumentList @('/x', $product, '/qn', '/norestart') -Wait -PassThru
+        $result = Start-Process -FilePath msiexec.exe -ArgumentList @('/x', $product, '/qn', '/norestart', 'MSIRESTARTMANAGERCONTROL=DisableShutdown') -Wait -PassThru
         if ($result.ExitCode -eq 3010) {
             try { [Console]::Error.WriteLine('Removal completed. Restart Windows to finish removing the Collector.') } catch { }
         } elseif ($result.ExitCode -ne 0) {

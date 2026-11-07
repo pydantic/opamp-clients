@@ -14,6 +14,12 @@
            UpgradeCode="a7c976d2-a6db-4393-86bc-e59b0fb90c66" Scope="perMachine">
     <MajorUpgrade DowngradeErrorMessage="A newer version of the Pydantic OpAMP Supervisor is already installed." />
     <MediaTemplate EmbedCab="yes" />
+    <!-- A quiet install, upgrade or removal never shuts down other programs. By default the Restart
+         Manager closes any program holding one of the package's files open, even one that only
+         reads it (an inventory or backup agent), with no word to anyone. With this it still finds
+         them, and a file in use is replaced at the next restart (msiexec exits 3010) instead. The
+         package stops its own service itself (ServiceControl). -->
+    <Property Id="MSIRESTARTMANAGERCONTROL" Value="DisableShutdown" />
 
     <StandardDirectory Id="ProgramFiles64Folder">
       <Directory Id="INSTALLFOLDER" Name="pydantic-opamp">
