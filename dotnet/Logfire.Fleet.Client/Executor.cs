@@ -3,7 +3,6 @@
 
 using System.Collections.Concurrent;
 using System.Net.WebSockets;
-using System.Security.Cryptography;
 using Google.Protobuf;
 using Logfire.Fleet.Core;
 
@@ -30,9 +29,6 @@ internal sealed class Executor
     private readonly TimeProvider time;
     private readonly IFileOps files;
 
-    // This client's own: download files are named by it, so no other client's work touches them.
-    private readonly string instance = Guid.NewGuid().ToString("N")[..12];
-
     // The core's URLs are sent as they are (see RequestUri).
     private static readonly UriCreationOptions RawPathAndQuery = new() { DangerousDisablePathAndQueryCanonicalization = true };
 
@@ -42,10 +38,10 @@ internal sealed class Executor
     private string? used;
 
     /// <summary>
-    /// Carry out effects over <paramref name="transport"/>: one handler for requests, WebSocket
-    /// upgrades and downloads, so the application's TLS and proxy settings apply to all of them.
-    /// <paramref name="time"/> (default: the system's) dates responses and bounds stop. Saves and
-    /// downloads go through <paramref name="files"/> (the real file system if none).
+    /// Carry out effects over <paramref name="transport"/>: one handler for requests and WebSocket
+    /// upgrades, so the application's TLS and proxy settings apply to both.
+    /// <paramref name="time"/> (default: the system's) dates responses and bounds stop. Saves go
+    /// through <paramref name="files"/> (the real file system if none).
     /// </summary>
     public Executor(
         IClientTransport transport, Action<Queued> deliver, string? stateFile = null, TimeProvider? time = null, IFileOps? files = null)
@@ -66,12 +62,6 @@ internal sealed class Executor
     /// before the outcome reaches the core: a notification of it finds it in place.
     /// </summary>
     internal string? Used => Volatile.Read(ref this.used);
-
-    /// <summary>The file operations saves and downloads go through (journaled with the core tap on).</summary>
-    internal IFileOps Files => this.files;
-
-    /// <summary>The state file, if any: downloads go beside it.</summary>
-    internal string? StatePath => this.stateFile;
 
     public void Run(Effect effect)
     {
@@ -100,16 +90,6 @@ internal sealed class Executor
             case Effect.KindOneofCase.Store:
                 this.Store(effect.Store);
                 break;
-            case Effect.KindOneofCase.Download:
-                this.Download(effect.Download);
-                break;
-            case Effect.KindOneofCase.Discard:
-                if (this.stateFile is not null)
-                {
-                    this.TryDelete(this.DownloadPath(effect.Discard.Id_));
-                }
-
-                break;
             case Effect.KindOneofCase.Cancel:
                 this.InFlight.Cancel(effect.Cancel.Id_);
                 break;
@@ -127,50 +107,8 @@ internal sealed class Executor
     /// </summary>
     public Task ReleaseAsync(TimeSpan bound) => this.InFlight.CloseAsync(bound);
 
-    /// <summary>Where package files are downloaded, beside the state file.</summary>
-    internal static string DownloadsDir(string stateFile) => stateFile + ".downloads";
-
-    /// <summary>Delete what was downloaded (before a restart).</summary>
-    internal static void DeleteDownloads(string stateFile, IFileOps? files = null)
-    {
-        try
-        {
-            (files ?? FileOps.Real).Clear(DownloadsDir(stateFile));
-        }
-        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
-        {
-            // what is left is never used: each download's file is made new, under a name of its own
-        }
-    }
-
     /// <summary>
-    /// Where a redirect points: <paramref name="location"/> resolved against the URL requested by
-    /// .NET's URL library (<c>new Uri(base, relative)</c>), and that URL's origin (port 0 when it is
-    /// the scheme's default or absent). A Location that doesn't resolve goes as given, with no
-    /// origin: the core refuses it.
-    /// </summary>
-    internal static (string Location, Origin? Origin) Resolve(Uri requested, string location)
-    {
-        Uri url;
-        try
-        {
-            url = new Uri(requested, location);
-        }
-        catch (UriFormatException)
-        {
-            return (location, null);
-        }
-
-        return (url.AbsoluteUri, new Origin
-        {
-            Scheme = url.Scheme,
-            Host = url.Host,
-            Port = url.IsDefaultPort || url.Port < 0 ? 0u : (uint)url.Port,
-        });
-    }
-
-    /// <summary>
-    /// A URL of the core's (a request's, a download's, a connection's), as the client sends it:
+    /// A URL of the core's (a request's, a connection's), as the client sends it:
     /// its path and query exactly as the core gave them. .NET's Uri would otherwise rewrite them,
     /// decoding escapes of unreserved characters (<c>%41</c> sent as <c>A</c>) and upper-casing
     /// the others' hex, so the server would get another request target than every other client's
@@ -194,10 +132,6 @@ internal sealed class Executor
         return new Uri(url, RawPathAndQuery);
     }
 
-    /// <summary>The file of download <paramref name="id"/>: this client's own.</summary>
-    internal string DownloadPath(ulong id) =>
-        Path.Combine(DownloadsDir(this.stateFile!), $"{this.instance}-{id.ToString(System.Globalization.CultureInfo.InvariantCulture)}");
-
     /// <summary>The message and its causes' (a TLS failure is "the SSL connection could not be established", then why).</summary>
     internal static string Detail(Exception e)
     {
@@ -214,18 +148,6 @@ internal sealed class Executor
 
     private static IEnumerable<Header> FromHeaders(IEnumerable<KeyValuePair<string, IEnumerable<string>>> headers) =>
         headers.SelectMany(h => h.Value.Select(v => new Header { Name = h.Key, Value = v }));
-
-    private void TryDelete(string path)
-    {
-        try
-        {
-            this.files.Remove(path);
-        }
-        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
-        {
-            // it goes at the next start
-        }
-    }
 
     /// <summary>A result of effect <paramref name="id"/>; <paramref name="final"/> if the effect is over.</summary>
     private void Report(ulong id, Input input, bool final = true) => this.deliver(new Queued(input, id, final));
@@ -258,121 +180,6 @@ internal sealed class Executor
                 ? new Input { Stored = new Id { Id_ = store.Id } }
                 : new Input { StoreFailed = new Failed { Id = store.Id, Detail = e.Message } }),
             this.files));
-    }
-
-    private void Download(Download d)
-    {
-        if (this.InFlight.Register(d.Id) is not { } ct)
-        {
-            return;
-        }
-
-        if (this.stateFile is null)
-        {
-            this.Report(d.Id, new Input { DownloadFailed = new Failed { Id = d.Id, Detail = "no state file" } });
-            return;
-        }
-
-        var file = new DownloadFile(this.DownloadPath(d.Id));
-        var work = StateFile.Begin(this.stateFile); // the next client on the state file waits for it
-        var task = this.DownloadAsync(d, file, ct, work);
-        this.InFlight.Track(task);
-        // Cancelled, the file goes, written in full or in part, once the download lets go of it.
-        this.InFlight.Adopt(d.Id, () => task.ContinueWith(_ => this.Drop(file), CancellationToken.None, TaskContinuationOptions.LongRunning, TaskScheduler.Default));
-    }
-
-    /// <summary>Delete a download's file, if it made one: never one it found there.</summary>
-    private void Drop(DownloadFile file)
-    {
-        if (file.Made)
-        {
-            this.TryDelete(file.Path);
-        }
-    }
-
-    /// <summary>
-    /// GET a package file into its path whatever the status, hashing it as it goes, following no
-    /// redirect: the status goes to the core, with a redirect's Location. On failure nothing is left.
-    /// </summary>
-    private async Task DownloadAsync(Download d, DownloadFile file, CancellationToken ct, IDisposable work)
-    {
-        using (work)
-        {
-            await Task.Yield(); // registered before it runs
-            Input result;
-            try
-            {
-                result = new Input { DownloadResponse = await this.FetchAsync(d, file, ct).ConfigureAwait(false) };
-            }
-            catch (Exception e)
-            {
-                // Whatever went wrong, the download ends with an input, and nothing is left.
-                await FileOps.OffPool(() => this.Drop(file)).ConfigureAwait(false);
-                result = new Input { DownloadFailed = new Failed { Id = d.Id, Detail = Detail(e) } };
-            }
-
-            if (ct.IsCancellationRequested)
-            {
-                await FileOps.OffPool(() => this.Drop(file)).ConfigureAwait(false); // cancelled: whatever it was, it goes
-            }
-
-            this.Report(d.Id, result);
-        }
-    }
-
-    /// <summary>
-    /// The GET, into a file made new (never one already there: one left by a run that crashed is
-    /// neither written over nor handed over), flushed to the disk before the response is answered.
-    /// </summary>
-    private async Task<DownloadResponse> FetchAsync(Download d, DownloadFile into, CancellationToken ct)
-    {
-        var url = RequestUri(d.Url);
-        using var req = new HttpRequestMessage(HttpMethod.Get, url);
-        foreach (var h in d.Headers)
-        {
-            req.Headers.TryAddWithoutValidation(h.Name, h.Value);
-        }
-
-        // The server's client certificate only for a file at its own origin (the core says which).
-        using var resp = await this.transport.DownloadAsync(req, d.ServerOrigin, ct).ConfigureAwait(false);
-        var status = (int)resp.StatusCode;
-        var response = new DownloadResponse { Id = d.Id, Status = (uint)status };
-        if (status is >= 300 and < 400 && resp.Headers.TryGetValues("Location", out var locations) && locations.FirstOrDefault() is { } given)
-        {
-            var (location, origin) = Resolve(url, given);
-            response.Location = location;
-            response.LocationOrigin = origin;
-        }
-
-        using var sha = IncrementalHash.CreateHash(HashAlgorithmName.SHA256);
-        await using (var body = await resp.Content.ReadAsStreamAsync(ct).ConfigureAwait(false))
-        {
-            using var file = await FileOps.OffPool(() =>
-            {
-                this.files.MakeDir(Path.GetDirectoryName(into.Path)!);
-                return this.files.CreateNew(into.Path, download: true);
-            }).ConfigureAwait(false);
-            into.Made = true;
-            var buf = new byte[64 * 1024];
-            ulong size = 0;
-            int n;
-            while ((n = await body.ReadAsync(buf, ct).ConfigureAwait(false)) > 0)
-            {
-                size += (ulong)n;
-                if (size > d.MaxBytes)
-                {
-                    throw new IOException($"file over {d.MaxBytes} bytes");
-                }
-
-                sha.AppendData(buf, 0, n);
-                await file.WriteAsync(buf.AsMemory(0, n), ct).ConfigureAwait(false);
-            }
-
-            await FileOps.OffPool(file.Sync).ConfigureAwait(false);
-        }
-
-        response.Sha256 = ByteString.CopyFrom(sha.GetHashAndReset());
-        return response;
     }
 
     private void Post(HttpRequest r)
@@ -691,13 +498,5 @@ internal sealed class Executor
                 this.last = this.last.ContinueWith(_ => work(), TaskScheduler.Default).Unwrap();
             }
         }
-    }
-
-    /// <summary>A download's file: where, and whether the download made it (so it is its to delete).</summary>
-    private sealed class DownloadFile(string path)
-    {
-        public string Path { get; } = path;
-
-        public bool Made { get; set; }
     }
 }

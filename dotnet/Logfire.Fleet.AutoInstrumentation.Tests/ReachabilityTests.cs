@@ -4,6 +4,7 @@
 using Logfire.Fleet.Client;
 using Logfire.Fleet.Client.Sdk;
 using Logfire.Fleet.Otel;
+using AgentLog = Logfire.Fleet.Otel.AgentLog;
 using Xunit;
 
 namespace Logfire.Fleet.AutoInstrumentation.Tests;
@@ -20,12 +21,35 @@ public class ReachabilityTests
             m => this.Lines.Add($"Error: {m}"), m => this.Lines.Add($"Debug: {m}"));
     }
 
-    /// <summary>Reachability as the agent makes it: the endpoint and the hints as the core's Setup gives them for OTEL_OPAMP_*.</summary>
-    private static Reachability For(string endpoint, string service, AgentLog log)
+    /// <summary>
+    /// An agent for an endpoint (the server and the hints as the core's Setup gives them for
+    /// OTEL_OPAMP_*), the SDK built with a service name, without a client: what it says of the
+    /// notifications it is told. <see cref="InUse"/>: the endpoint the client would say it uses now.
+    /// </summary>
+    private sealed class Told
     {
-        var server = Server.FromEnv(n => n == "OTEL_OPAMP_ENDPOINT" ? endpoint : n == "OTEL_OPAMP_STATE_DIR" ? "none" : null, _ => { })!;
-        return new Reachability(server.ShownEndpoint, server.Hinted, service, Uid, log);
+        private readonly SdkAgent agent;
+
+        public Told(string endpoint, string service, AgentLog log)
+        {
+            string? Env(string n) => n switch
+            {
+                "OTEL_OPAMP_ENDPOINT" => endpoint,
+                "OTEL_OPAMP_STATE_DIR" => "none",
+                "OTEL_RESOURCE_ATTRIBUTES" => "service.instance.id=" + Uid,
+                _ => null,
+            };
+            var server = Server.FromEnv(Env, _ => { })!;
+            this.agent = new SdkAgent(server, Env, null, _ => new Host(), log, new Controls());
+            this.agent.BuiltForTest(service);
+        }
+
+        public string? InUse { get; set; }
+
+        public void Notified(OpAmpNotification n) => this.agent.Tell(n, this.InUse);
     }
+
+    private static Told For(string endpoint, string service, AgentLog log) => new(endpoint, service, log);
 
     [Fact]
     public void ConnectingFailingAndRecoveringAreEachSaidOnce()
@@ -78,17 +102,16 @@ public class ReachabilityTests
     public void WhatIsSaidNamesTheEndpointInUse()
     {
         var said = new Said();
-        string? inUse = null; // none yet: the configured one
-        var server = Server.FromEnv(n => n == "OTEL_OPAMP_ENDPOINT" ? "https://a.example.com/v1/opamp" : null, _ => { })!;
-        var r = new Reachability(server.ShownEndpoint, server.Hinted, string.Empty, Uid, said.Log) { InUse = () => inUse };
+        var r = For("https://a.example.com/v1/opamp", string.Empty, said.Log); // none in use yet: the configured one
         r.Notified(new OpAmpNotification.Connected());
-        inUse = "https://user:secret@b.example.com/v1/opamp?token=x";
+        r.InUse = "https://user:secret@b.example.com/v1/opamp?token=x";
         r.Notified(new OpAmpNotification.ConnectFailed(null, "connection refused"));
         r.Notified(new OpAmpNotification.Connected());
-        Assert.Equal(3, said.Lines.Count);
-        Assert.StartsWith("Info: connected to https://a.example.com/v1/opamp;", said.Lines[0], StringComparison.Ordinal);
-        Assert.StartsWith("Warn: can't reach https://b.example.com/v1/opamp (connection refused)", said.Lines[1], StringComparison.Ordinal);
-        Assert.Equal("Info: connected to https://b.example.com/v1/opamp again", said.Lines[2]);
+        Assert.Equal(3, said.Lines.Count(l => !l.StartsWith("Debug: ", StringComparison.Ordinal)));
+        var lines = said.Lines.Where(l => !l.StartsWith("Debug: ", StringComparison.Ordinal)).ToList();
+        Assert.StartsWith("Info: connected to https://a.example.com/v1/opamp;", lines[0], StringComparison.Ordinal);
+        Assert.StartsWith("Warn: can't reach https://b.example.com/v1/opamp (connection refused)", lines[1], StringComparison.Ordinal);
+        Assert.Equal("Info: connected to https://b.example.com/v1/opamp again", lines[2]);
         Assert.DoesNotContain(said.Lines, l => l.Contains("secret", StringComparison.Ordinal) || l.Contains("token=x", StringComparison.Ordinal));
     }
 
@@ -97,22 +120,27 @@ public class ReachabilityTests
     {
         var said = new Said();
         For("wss://opamp.example.com/v1/opamp", string.Empty, said.Log).Notified(new OpAmpNotification.Connected());
-        Assert.Equal(["Info: connected to wss://opamp.example.com/v1/opamp; this SDK is managed, instance " + Uid], said.Lines);
+        Assert.Equal(["Info: connected to wss://opamp.example.com/v1/opamp; this SDK is managed, instance " + Uid],
+            said.Lines.Where(l => !l.StartsWith("Debug: ", StringComparison.Ordinal)));
     }
 
     [Theory]
     [InlineData(404, "nothing serves OpAMP at that path: check OTEL_OPAMP_ENDPOINT (it usually ends in /v1/opamp)")]
     [InlineData(403, "the server refused this agent's credentials: check OTEL_OPAMP_HEADERS (Authorization=Bearer <token>)")]
     [InlineData(503, "the server answered with an error")]
-    public void EachFailureSaysWhatToCheck(int status, string hint) =>
-        Assert.Equal(hint, Reachability.Hint(new Server(new Uri("http://s/v1/opamp"), new Dictionary<string, string>(), null, TimeSpan.Zero).Hinted, status));
+    public void EachFailureSaysWhatToCheck(int status, string hint)
+    {
+        var said = new Said();
+        For("http://s/v1/opamp", string.Empty, said.Log).Notified(new OpAmpNotification.ConnectFailed(status, string.Empty));
+        Assert.Contains(said.Lines, l => l.StartsWith("Warn: ", StringComparison.Ordinal) && l.Contains($": {hint}. Retrying", StringComparison.Ordinal));
+    }
 
     [Theory]
     [InlineData("https://user:secret@opamp.example.com:4320/v1/opamp?token=x#f", "https://opamp.example.com:4320/v1/opamp")]
     [InlineData("https://user:secret@opamp.example.com:notaport/v1/opamp?token=x", "https://opamp.example.com:notaport/v1/opamp")]
     [InlineData("https://[::1/v1/opamp?k=v", "https://[::1/v1/opamp")]
     [InlineData("https://[::1]:4320", "https://[::1]:4320")]
-    public void TheEndpointIsLoggedWithoutUserInfoOrQuery(string endpoint, string logged) => Assert.Equal(logged, Reachability.Shown(endpoint, "?"));
+    public void TheEndpointIsLoggedWithoutUserInfoOrQuery(string endpoint, string logged) => Assert.Equal(logged, Server.ShownFor(endpoint, "?"));
 
     [Fact]
     public void AnEndpointWithoutASchemeIsRefused()

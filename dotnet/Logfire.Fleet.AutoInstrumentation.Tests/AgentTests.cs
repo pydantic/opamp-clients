@@ -68,8 +68,7 @@ public class AgentTests
         Assert.Equal(RemoteConfigStatuses.Applied, status.Status);
         Assert.False(agent.Controls.SendLogs);
         Assert.Empty(p.Set); // the instrumentations were read already: nothing changes until the restart
-        // The client keeps the config applied, in its own state: nothing of the plugin's own.
-        Assert.False(File.Exists(Path.Combine(p.Env["OTEL_OPAMP_STATE_DIR"]!, "sdk-settings.json")));
+        // The client keeps the config applied, in its own state.
         Kept.KeepApplied(p.Env["OTEL_OPAMP_STATE_DIR"]!, policy);
 
         agent.Stop(TimeSpan.Zero); // the process exits
@@ -83,7 +82,7 @@ public class AgentTests
     }
 
     [Fact]
-    public void TheSettingsToStartWithAreTheConfigTheClientKeptAppliedElseTheFileKeptBefore()
+    public void TheSettingsToStartWithAreTheConfigTheClientKeptApplied()
     {
         var dir = TempDir();
         double? Rate()
@@ -99,18 +98,18 @@ public class AgentTests
             }
         }
 
-        // Kept before the client kept the config applied (an earlier release): it carries over.
-        File.WriteAllText(Path.Combine(dir, "sdk-settings.json"), Policy.HeadSampling(0.25));
-        Assert.Equal(0.25, Rate());
-        // Once the client keeps a config applied, that is where a start begins: the old file is not read.
+        // Nothing kept: the SDK's own settings.
+        Assert.Null(Rate());
         Kept.KeepApplied(dir, Policy.HeadSampling(0.5));
         Assert.Equal(0.5, Rate());
-        // A config applied with every control local: every setting the SDK's own, not the old file's.
+        // A config applied with every control local: every setting the SDK's own.
+        Kept.KeepApplied(dir, Policy.HeadSampling(0.5));
         Kept.KeepApplied(dir, Policy.Local);
         Assert.Null(Rate());
-        // A client state that doesn't read: the old file again.
+        // A client state that doesn't read: the SDK's own settings again.
+        Kept.KeepApplied(dir, Policy.HeadSampling(0.5));
         File.WriteAllBytes(Path.Combine(dir, "opamp-state"), [0xff, 0xff]);
-        Assert.Equal(0.25, Rate());
+        Assert.Null(Rate());
     }
 
     [Fact]
@@ -172,17 +171,21 @@ public class AgentTests
     }
 
     [Fact]
-    public void ASecondProcessOnTheSameStateDirectoryRunsUnmanaged()
+    public void ASecondProcessOnTheSameStateDirectoryIsAnInstanceOfItsOwn()
     {
         var dir = TempDir();
         var parent = new Process { Env = { ["OTEL_OPAMP_STATE_DIR"] = dir } };
         var agent = parent.Prepare()!;
         Assert.Equal(RemoteConfigStatuses.Applied, agent.RemoteConfig(Config(DisableHttpClient)).Status);
 
-        // A child the application starts inherits the variables: it doesn't take the parent's UID or state.
+        // A child the application starts inherits the variables: it doesn't take the parent's UID or
+        // state, but a folder of the directory's (it used to run unmanaged).
         var child = new Process { Env = { ["OTEL_OPAMP_STATE_DIR"] = dir } };
-        Assert.Null(child.Prepare());
+        var own = child.Prepare()!;
+        Assert.NotEqual(agent.Uid, own.Uid);
+        Assert.Equal(own.Uid, File.ReadAllText(Path.Combine(dir, "2", "instance-uid")).Trim());
         Assert.Empty(child.Set);
+        own.Stop(TimeSpan.Zero);
 
         Kept.KeepApplied(dir, DisableHttpClient); // as the client does, before APPLIED goes out
         agent.Stop(TimeSpan.Zero);
@@ -281,7 +284,6 @@ public class AgentTests
             await serving;
         }
 
-        Assert.False(File.Exists(Path.Combine(dir, "sdk-settings.json")));
         var next = new Process { Env = { ["OTEL_OPAMP_STATE_DIR"] = dir } }.Prepare()!;
         try
         {
@@ -489,7 +491,7 @@ public class AgentTests
     /// <summary>
     /// Issue #218: a state directory the UID can't be saved in keeps none, so the resource's UUID
     /// names the instance at every start, as without one; not a new UID each start. (A directory
-    /// that can't be locked leaves the SDK unmanaged before this: here the directory is the
+    /// that can't be locked is no state directory before this: here the directory is the
     /// process's, and only the UID's file can't be written.)
     /// </summary>
     [Fact]
@@ -607,6 +609,60 @@ public class AgentTests
         unnamed.Env.Remove("OTEL_SERVICE_NAME");
         Assert.StartsWith(Path.Combine(StateBase(home), "opamp", StateDirs.ProgramName() + "-"), Claimed(unnamed, out var p));
         p!.Dispose();
+    }
+
+    /// <summary>
+    /// Processes sharing a named state directory (a child process, or workers, inheriting
+    /// OTEL_OPAMP_STATE_DIR): the first keeps the directory and the UID already in it; the others
+    /// take numbered folders in it, each its own UID, taken back at their next start. Another used
+    /// to run unmanaged.
+    /// </summary>
+    [Fact]
+    public void ProcessesSharingANamedStateDirectoryEachKeepTheirOwnInstance()
+    {
+        var named = Path.Combine(TempDir(), "mine");
+        Process In(string dir) => new() { Env = { ["OTEL_SERVICE_NAME"] = "checkout", ["OTEL_OPAMP_STATE_DIR"] = dir } };
+        var before = In(named).Prepare()!;
+        before.Stop(TimeSpan.Zero);
+        var running = new[] { In(named).Prepare()!, In(named).Prepare()!, In(named).Prepare()! };
+        Assert.Equal(before.Uid, running[0].Uid);
+        Assert.Equal(3, running.Select(a => a.Uid).Distinct().Count());
+        Assert.Equal(running[1].Uid, File.ReadAllText(Path.Combine(named, "2", "instance-uid")).Trim());
+        Assert.Equal(running[2].Uid, File.ReadAllText(Path.Combine(named, "3", "instance-uid")).Trim());
+        running[1].Stop(TimeSpan.Zero);
+        var again = In(named).Prepare()!;
+        Assert.Equal(running[1].Uid, again.Uid);
+        running[0].Stop(TimeSpan.Zero);
+        running[2].Stop(TimeSpan.Zero);
+        again.Stop(TimeSpan.Zero);
+
+        var lines = new List<string>();
+        var log = new AgentLog(m => lines.Add($"Info: {m}"), m => lines.Add($"Warn: {m}"), m => lines.Add($"Error: {m}"));
+        string? Claimed(string dir, out FileStream? held)
+        {
+            var server = Server.FromEnv(n => In(dir).Env.GetValueOrDefault(n) ?? (n == "OTEL_OPAMP_ENDPOINT" ? "http://127.0.0.1:1/v1/opamp" : null), _ => { })!;
+            Assert.True(StateDirs.Claim(ref server, log, out held));
+            return server.StateDir;
+        }
+
+        // Every slot taken: a new instance each start, said once at INFO.
+        var held = new List<FileStream>();
+        for (var i = 0; i < StateDirs.Slots; i++)
+        {
+            Assert.NotNull(Claimed(named, out var l));
+            held.Add(l!);
+        }
+
+        Assert.Null(Claimed(named, out var none));
+        Assert.Null(none);
+        Assert.Equal([$"Info: {StateDirs.Slots} processes already keep their identity in {named}: this one is a new instance each start"], lines);
+        held.ForEach(l => l.Dispose());
+        // One that can't be used: a warning, and a new instance each start.
+        lines.Clear();
+        var file = Path.Combine(TempDir(), "file");
+        File.WriteAllText(file, string.Empty);
+        Assert.Null(Claimed(file, out _));
+        Assert.StartsWith($"Warn: the state directory {file} can't be used (", Assert.Single(lines), StringComparison.Ordinal);
     }
 
     [Fact]

@@ -44,7 +44,7 @@ OTEL_OPAMP_STATE_DIR=/var/lib/checkout/opamp \
 | `OTEL_SDK_DISABLED` | OpenTelemetry's own: `true` turns OpAMP off too, read as `OTEL_OPAMP_DISABLED` is (here `1` is taken as `true` as well). Whether the SDK itself is built is still `Setup`'s: it builds the same SDK, unmanaged. |
 | `OTEL_OPAMP_ENDPOINT` | The OpAMP server: `http(s)://.../v1/opamp` polls, `ws(s)://...` keeps a connection open. Without it, `Setup` builds the same SDK, unmanaged. |
 | `OTEL_OPAMP_HEADERS` | Headers for every request, as `OTEL_EXPORTER_OTLP_HEADERS`: `name=value,...`, values percent-encoded. The key the server gave you goes here. A header HTTP can't carry warns and is left out. |
-| `OTEL_OPAMP_STATE_DIR` | Where to keep state across restarts: the instance UID, the settings for the next start, the client's own state (written readable by the application's user only). Without it, the package keeps one of the user's own, one per process of the program running at once ([default-state-dir.md](default-state-dir.md)); `none` turns that off, and then each start is a new instance. A directory named here belongs to one process: two processes given the same one are the same instance. |
+| `OTEL_OPAMP_STATE_DIR` | Where to keep state across restarts: the instance UID, the settings for the next start, the client's own state (written readable by the application's user only). Without it, the package keeps one of the user's own, one per process of the program running at once ([default-state-dir.md](default-state-dir.md)); `none` turns that off, and then each start is a new instance. Processes given the same directory (workers a server starts, a child process) each keep their own identity: the first takes the directory, the others numbered folders in it ([default-state-dir.md](default-state-dir.md#a-directory-named)). |
 | `OTEL_OPAMP_HEARTBEAT_INTERVAL` | How often to check in until the server offers an interval (default 30 s): milliseconds, or `30s`, `2m`. A value it can't read is the default, with a warning; longer than a day is a day. |
 
 The core reads these (and the options below), by the same rules in every language: whether OpAMP is off, the endpoint, the headers, the interval, which state directory, and the instance UID kept there. The package keeps only the I/O: reading the variables, making and locking the state directory's slot, reading and writing its `instance-uid` file, and logging the warnings.
@@ -242,8 +242,7 @@ settings it carries out. For example, with otelhttp, a log bridge and a Promethe
   reader, so a Prometheus reader, or any reader while `OTEL_METRICS_PRODUCERS` is set, is
   `gated: false`. A global provider set in place of `Setup`'s adds an `app_provider`,
   `gated: false`, and the inventory is sent again ([above](#where-the-server-cant-reach)).
-- **Settings** are those of the host the layer is given at `Load` and `Decide`, with the same
-  clock: every one.
+- **Settings** are those of the host the agent flow is given, with the same clock: every one.
 
 ## The settings that match telemetry
 
@@ -368,16 +367,15 @@ there is no cap from the next export.
  "debug": {"mode": "override", "until": "2026-10-14T15:30:00Z", "sampling_ratio": 1, "log_level": "debug"}}
 ```
 
-The layer decides everything; the package passes it the time (`LoadAt`, `DecideAt`, with
-`time.Now()`) and runs one timer (`time.AfterFunc`). Until `until`, the settings the layer
+The layer's agent flow decides everything; the package passes it the time (`time.Now()`, wall
+and monotonic) and runs one timer (`time.AfterFunc`). Until `until`, the settings the flow
 hands over have the debug ratio and level folded in. The rules and the levels per scope wait
-until the end. Redaction, the caps and the signal exports stay as sent. Each answer says when to ask
-again (`refresh_at_unix_ms`); the timer is armed for it, in place of any earlier one, next to the
-decision and under the same lock, and a timer a newer decision replaced does nothing. When it
-goes off the package calls `Refresh`, puts what it returns in force, and reports the effective
-config, in which `debug` is local again: the server sees debug mode end, but is not needed for
-it. The wait is on Go's monotonic clock, so a wall clock moved back while it runs doesn't make
-it longer. A restart before the end, with the saved document, is still in debug mode until the
+until the end. Redaction, the caps and the signal exports stay as sent. Each output says when to
+wake it; the timer is armed for that, in place of any earlier one, under the same lock as the
+step, and a timer a newer step replaced does nothing. When it goes off the package steps the
+flow, which puts the settings without debug in force and reports the effective config, in which
+`debug` is local again: the server sees debug mode end, but is not needed for it. The wait is on
+Go's monotonic clock, so a wall clock moved back while it runs doesn't make it longer. A restart before the end, with the saved document, is still in debug mode until the
 same time; without a state directory the server sends the config again, and the window, being
 a time, is the same.
 
@@ -387,7 +385,7 @@ No setting: always on. Each gate counts, after the exporter's own retries, the e
 succeeded and failed (with the exporter's error), the spans, metric data points or log records
 in failed ones, and the items it dropped on purpose (a signal's exports off, a switched-off
 instrumentation, a level, a cap). The agent's health at start, and then every 30 s on the same
-timer as debug mode, carries what the layer's `Health` call makes of them, under
+timer as debug mode, carries what the agent flow makes of them, under
 `component_health_map["exporters"]`, with one child each for `traces`, `metrics` and `logs`:
 
 ```json
@@ -483,7 +481,7 @@ told of.
   - the application's own settings (`appsettings_test.go`): reads before any config, without a
     server and once a key is left out; the typed reads against `custom.json`'s `typed` vectors and
     their edges; every `custom.json` case through the layer and `Controls`; a function told once
-    per change and never for the same map (sent again, another way, by a Refresh at the end of
+    per change and never for the same map (sent again, another way, at the end of
     debug mode), in order, one at a time, each with its own copy; a panic recovered and logged;
     unsubscribing, also from inside a function; readers and subscribers on other goroutines; a bad
     map FAILED with nothing changed; restarts with and without a state directory, through `Setup`

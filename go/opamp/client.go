@@ -12,6 +12,10 @@
 // exactly like the other languages' clients on the same core. The endpoint's scheme says the
 // transport: http:// and https:// plain HTTP, ws:// and wss:// WebSocket.
 //
+// This is the client an SDK uses: it does what every SDK needs. The Go Supervisor and the
+// Collector's extension use package collector, which adds the server's packages, custom
+// messages, commands and renewed authentication headers on top of it.
+//
 // # Callbacks
 //
 // The notification callback is called one at a time, on the client's goroutine, never before
@@ -26,7 +30,7 @@
 //
 // The client keeps no time of its own: how long a request, a WebSocket connection being opened,
 // a closing handshake or a download may take is the core's (Config.RequestTimeout,
-// ConnectTimeout, DownloadTimeout), and an effect ends with its result or the core's cancel,
+// ConnectTimeout, and package collector's DownloadTimeout), and an effect ends with its result or the core's cancel,
 // which the client carries out at once. Stop ends when the core says it has stopped, within
 // Config.StopTimeout: the goodbye and the closing handshake are done or given up by then.
 //
@@ -34,7 +38,7 @@
 // system's randomness) and, with a state file, keeps it across restarts; Client.InstanceUID says
 // which is in use.
 //
-// Package files are downloaded without following redirects: the client reports each response,
+// Package files (package collector's) are downloaded without following redirects: the client reports each response,
 // whatever its status, with a redirect's Location resolved by net/url, and the core decides.
 //
 // # Core mode (the default) and platform mode (advanced)
@@ -45,7 +49,8 @@
 // says what to set instead.
 //
 // Here platform mode is net/http's. Start refuses an HTTPClient without ModePlatform, a TLS.Config
-// that names the server (ServerName) in core mode, and NoSpliceDownloads in platform mode.
+// that names the server (ServerName) in core mode, and package collector's NoSpliceDownloads in
+// platform mode.
 //
 // In core mode the shared core speaks HTTP/1.1 (chunked bodies, kept connections), WebSocket,
 // HTTP CONNECT and SOCKS5 itself (in the same WebAssembly module), so the bytes
@@ -55,8 +60,8 @@
 // proxy with Proxy.ResolveLocally), tells the core which proxy to use, moves the bytes with
 // backpressure, and writes package files (made new, synced before they are handed over; with the
 // core tap on, journaled as in platform mode). The core keeps every time and decides redirects.
-// Package bodies go from the connection straight to their file unless Config.NoSpliceDownloads is
-// set.
+// Package bodies go from the connection straight to their file unless package collector's
+// Config.NoSpliceDownloads is set.
 //
 //	cfg := opamp.Config{Endpoint: "wss://opamp.example.com/v1/opamp"}
 //
@@ -133,7 +138,6 @@ import (
 	"io/fs"
 	"net/http"
 	"os"
-	"reflect"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -143,6 +147,7 @@ import (
 
 	"github.com/pydantic/opamp-clients/go/opamp/internal/core"
 	"github.com/pydantic/opamp-clients/go/opamp/internal/corepb"
+	"github.com/pydantic/opamp-clients/go/opamp/internal/plumb"
 )
 
 // Config is the client's settings.
@@ -154,22 +159,13 @@ type Config struct {
 	// (Client.InstanceUID says which).
 	InstanceUID [16]byte
 	// Capabilities the agent supports (AgentCapabilities bits), fixed for the run. ReportsStatus is
-	// always added, and the core adds the bits of what it does itself (packages, connection
-	// settings). Declare ReportsHeartbeat for heartbeats, and the Reports* bit of each status you
+	// always added, and the core adds the bits of what it does itself (connection settings). Declare ReportsHeartbeat for heartbeats, and the Reports* bit of each status you
 	// set: a status whose bit isn't declared isn't sent.
 	Capabilities uint64
 	// HeartbeatInterval until the server offers one; 0: 30 s.
 	HeartbeatInterval time.Duration
 	// Header is sent with every request or upgrade (e.g. Authorization).
 	Header http.Header
-	// AuthHeader, if set, gives the headers an authentication extension adds to every request and
-	// WebSocket upgrade: a token it renews, say. It is called once before the client starts, then
-	// about every second on a goroutine of its own while the client runs; when what it gives
-	// changes, the core takes it from the next request or connection on (a connection open keeps
-	// its headers). Each header replaces the one of the same name in Header, or in connection
-	// settings the server offered. The core checks every list it sends, as it checks Header: one
-	// its rule refuses fails that attempt, and nothing is sent. Both modes.
-	AuthHeader func() http.Header
 	// RequestTimeout for plain HTTP; 0: 30 s.
 	RequestTimeout time.Duration
 	// ConnectTimeout is how long a WebSocket connection may take to open; 0: 30 s.
@@ -184,16 +180,15 @@ type Config struct {
 	// MaxReceiveBytes is the largest response or WebSocket message the client accepts; 0: 64 MiB.
 	// covers: OPAMP-SIZE-02, OPAMP-SIZE-08
 	MaxReceiveBytes uint64
-	// TLS is how the client makes TLS connections (https://, wss://, package downloads, an
-	// https:// proxy), in both modes. The zero value trusts the system's CAs.
+	// TLS is how the client makes TLS connections (https://, wss://, an https:// proxy), in both
+	// modes. The zero value trusts the system's CAs.
 	TLS TLS
-	// Proxy is the proxy to reach the server through, for HTTP, WebSocket and package downloads
-	// alike. The zero value takes it from the environment (HTTP_PROXY, HTTPS_PROXY, ALL_PROXY,
+	// Proxy is the proxy to reach the server through, for HTTP and WebSocket alike. The zero value takes it from the environment (HTTP_PROXY, HTTPS_PROXY, ALL_PROXY,
 	// NO_PROXY, by core mode's rule; in platform mode by net/http's); Proxy.Direct goes direct.
 	Proxy Proxy
 	// HTTPClient, if set, is used instead of TLS and Proxy (setting both is an error). Only
 	// platform mode can use it, and only when asked for by name: without Mode set to
-	// ModePlatform it is an error. OpAMP requests and package downloads go through its Transport, one round trip
+	// ModePlatform it is an error. OpAMP requests go through its Transport, one round trip
 	// each: no redirect is followed (the core decides) and its Jar and Timeout don't apply.
 	// WebSocket takes the TLS settings, proxy, CONNECT headers and dialer of its Transport, which
 	// must then be an *http.Transport (nil: http.DefaultTransport).
@@ -214,10 +209,6 @@ type Config struct {
 	AcceptConnectionSettings bool
 	// VerifyTimeout is how long offered settings have to prove themselves; 0: 60 s.
 	VerifyTimeout time.Duration
-	// AcceptPackages takes packages from the server (docs/packages.md): the client downloads
-	// them to StateFile + ".downloads" and the application installs them (InstallPackage,
-	// RemovePackage). Only with a StateFile: a restart would forget what the agent has.
-	AcceptPackages bool
 	// RequestInstanceUID asks the server to assign the instance UID (the RequestInstanceUid
 	// flag, docs/instance-uid.md). The UID the client starts with (made up, or InstanceUID) is
 	// the temporary value until the server assigns one. With a StateFile the assigned UID is
@@ -225,19 +216,12 @@ type Config struct {
 	// assigns a new UID each time: the agent is a new agent after every restart.
 	// covers: OPAMP-UID-04
 	RequestInstanceUID bool
-	// MaxPackageBytes is the largest package file downloaded; 0: 1 GiB.
-	MaxPackageBytes uint64
-	// DownloadTimeout is how long a download may take; 0: 10 minutes.
-	DownloadTimeout time.Duration
 	// Mode is who speaks HTTP and WebSocket: ModeCore (the shared core itself, over Go's TCP
 	// connections and crypto/tls) or ModePlatform (net/http and gorilla/websocket; advanced).
 	// Unset (""): core mode. Both take TLS and Proxy; only ModePlatform takes HTTPClient.
 	Mode Mode
-	// NoSpliceDownloads, in core mode, passes package files' bytes through the core. Unset (the
-	// default), a download's body goes from the connection straight to its file wherever the
-	// core knows the next bytes are body (Config.splice_downloads). It is core mode's: in platform
-	// mode it is an error.
-	NoSpliceDownloads bool
+	// plumbed is package collector's settings (packages): none for an SDK's client.
+	plumbed plumb.Options
 
 	// coreModule, when set (by tests in this package only), is the WebAssembly module run
 	// instead of the embedded core: the adversary (testdata/core/opamp_core_adversary.wasm).
@@ -252,8 +236,6 @@ type Config struct {
 	streamNet *streamPlatform
 	// environ, when set (by tests), is the environment core mode's proxy rule reads.
 	environ func(string) (string, bool)
-	// authEvery, when set (by tests), is how often AuthHeader is asked again; 0: every second.
-	authEvery time.Duration
 }
 
 // Status is the agent's status as the client starts. The first message reports it in full.
@@ -265,9 +247,6 @@ type Status struct {
 	// AvailableComponents: the components the agent has (leave Hash empty: the core computes it).
 	// The server gets the hash, and the components in full when it asks.
 	AvailableComponents *protobufs.AvailableComponents
-	// CustomCapabilities: the custom capabilities the agent supports; custom messages for them
-	// reach the application (CustomMessage), and it may send them.
-	CustomCapabilities *protobufs.CustomCapabilities
 }
 
 // Client is a running OpAMP client.
@@ -360,7 +339,7 @@ func Open(ctx context.Context, cfg Config) (*Opened, error) {
 		if tlsCfg, err = cfg.TLS.tlsConfig(); err != nil {
 			return nil, fmt.Errorf("opamp: TLS: %w", err)
 		}
-		cc.Streams, cc.SpliceDownloads = true, !cfg.NoSpliceDownloads
+		cc.Streams, cc.SpliceDownloads = true, !cfg.plumbed.NoSpliceDownloads
 		// The core picks each connection's proxy from these.
 		proxies = newCoreProxies(cfg.Proxy, cfg.environ)
 		cc.Proxy = proxies.choice
@@ -425,6 +404,18 @@ var errOpenedUsed = errors.New("opamp: the client was started or closed already"
 // Start starts the opened client, as Start does: status is the agent's status as it starts, and
 // notify is told everything that happens, on the client's goroutine.
 func (o *Opened) Start(status Status, notify func(*Client, Notification)) (*Client, error) {
+	if notify == nil {
+		notify = func(*Client, Notification) {}
+	}
+	return o.start(status, nil, func(c *Client, n Notification) {
+		if n.Kind < plumb.KindCommand { // the Collector's are package collector's
+			notify(c, n)
+		}
+	})
+}
+
+// start starts the opened client: first goes to the core before its start.
+func (o *Opened) start(status Status, first []*corepb.Input, notify func(*Client, Notification)) (*Client, error) {
 	o.mu.Lock()
 	defer o.mu.Unlock()
 	if o.used {
@@ -434,17 +425,11 @@ func (o *Opened) Start(status Status, notify func(*Client, Notification)) (*Clie
 	cfg, c, out := o.cfg, o.core, o.out
 	cl := &Client{cmds: newMailbox[*corepb.Input](), done: make(chan struct{})}
 	cl.setUID(out.GetInstanceUid())
-	var first []report
-	for _, in := range statusInputs(status) {
-		first = append(first, report{in: in})
+	var queue []report
+	for _, in := range append(statusInputs(status), first...) {
+		queue = append(queue, report{in: in})
 	}
-	var auth http.Header
-	if cfg.AuthHeader != nil {
-		// The first request or connection has them.
-		auth = cfg.AuthHeader()
-		first = append(first, report{in: authInput(auth)})
-	}
-	first = append(first, report{in: &corepb.Input{Kind: &corepb.Input_Start{Start: &corepb.Empty{}}}})
+	queue = append(queue, report{in: &corepb.Input{Kind: &corepb.Input_Start{Start: &corepb.Empty{}}}})
 	x := newExecutor(o.conn)
 	cl.used = &x.used
 	if cfg.fs != nil {
@@ -462,13 +447,10 @@ func (o *Opened) Start(status Status, notify func(*Client, Notification)) (*Clie
 		// platform effects, should a core emit them) goes to x as in platform mode.
 		x.streams = newStreams(x, o.tlsCfg, o.proxies, cfg.streamNet)
 	}
-	if notify == nil {
-		notify = func(*Client, Notification) {}
-	}
 	// Stop is bounded by the core's own stop timeout, as given or its default: init reports it.
 	stopBound := time.Duration(out.GetLimits().GetStopTimeoutMs()) * time.Millisecond
 	l := &loop{core: c, x: x, notify: func(n Notification) { notify(cl, n) }, cmds: cl.cmds, start: time.Now(),
-		queue: first, uid: cl.setUID, stopBound: stopBound}
+		queue: queue, uid: cl.setUID, stopBound: stopBound}
 	started := make(chan struct{})
 	go func() {
 		cl.loopG.Store(goid())
@@ -483,38 +465,8 @@ func (o *Opened) Start(status Status, notify func(*Client, Notification)) (*Clie
 		}
 		close(cl.done)
 	}()
-	if cfg.AuthHeader != nil {
-		every := cfg.authEvery
-		if every <= 0 {
-			every = time.Second
-		}
-		go cl.renewAuth(cfg.AuthHeader, auth.Clone(), every)
-	}
 	defer close(started)
 	return cl, nil
-}
-
-// renewAuth asks auth for its headers every period until the client has stopped, and hands the
-// core each change (last: a copy of what it has; auth may hand back one map, changed in place).
-func (c *Client) renewAuth(auth func() http.Header, last http.Header, every time.Duration) {
-	t := time.NewTicker(every)
-	defer t.Stop()
-	for {
-		select {
-		case <-c.done:
-			return
-		case <-t.C:
-		}
-		if h := auth(); !reflect.DeepEqual(h, last) {
-			last = h.Clone()
-			c.send(authInput(last))
-		}
-	}
-}
-
-// authInput hands the core the authentication headers h.
-func authInput(h http.Header) *corepb.Input {
-	return &corepb.Input{Kind: &corepb.Input_SetAuthHeaders{SetAuthHeaders: &corepb.Headers{Headers: fromHTTP(h)}}}
 }
 
 // InstanceUID is the instance UID in use: the application's, one saved before a restart, one the
@@ -563,18 +515,6 @@ func (c *Client) SetEffectiveConfig(e *protobufs.EffectiveConfig) {
 	c.send(&corepb.Input{Kind: &corepb.Input_SetEffectiveConfig{SetEffectiveConfig: e}})
 }
 
-// SetCustomCapabilities changes the custom capabilities the agent supports.
-func (c *Client) SetCustomCapabilities(cc *protobufs.CustomCapabilities) {
-	c.send(&corepb.Input{Kind: &corepb.Input_SetCustomCapabilities{SetCustomCapabilities: cc}})
-}
-
-// SendCustomMessage sends a custom message, for one of the agent's custom capabilities. It goes
-// with the next message the server takes, and again if that message is lost; if it can't be sent
-// at all, a CustomMessageNotSent notification says why.
-func (c *Client) SendCustomMessage(m *protobufs.CustomMessage) {
-	c.send(&corepb.Input{Kind: &corepb.Input_SendCustomMessage{SendCustomMessage: m}})
-}
-
 // SetAvailableComponents changes the components the agent has (leave Hash empty: the core computes it).
 func (c *Client) SetAvailableComponents(a *protobufs.AvailableComponents) {
 	c.send(&corepb.Input{Kind: &corepb.Input_SetAvailableComponents{SetAvailableComponents: a}})
@@ -589,96 +529,6 @@ func (c *Client) SetRemoteConfigStatus(s *protobufs.RemoteConfigStatus) {
 // notification).
 func (c *Client) SetConnectionSettingsStatus(s *protobufs.ConnectionSettingsStatus) {
 	c.send(&corepb.Input{Kind: &corepb.Input_SetConnectionSettingsStatus{SetConnectionSettingsStatus: s}})
-}
-
-// PackageInstalled answers InstallPackage: the package at hash is installed (err nil), or why
-// it isn't. An error is a failure for good (the version is reported failed and not tried again
-// until another is offered) unless wrapped by FailedForNow or FailedLeavingUnknown.
-func (c *Client) PackageInstalled(name string, hash []byte, err error) {
-	c.send(&corepb.Input{Kind: &corepb.Input_PackageInstalled{PackageInstalled: packageInstalled(name, hash, err)}})
-}
-
-// PackageRemoved answers RemovePackage: the package is removed (err nil), or why it isn't. One
-// that isn't is reported failed, and not removed again until it is offered and dropped again,
-// unless its error is wrapped by FailedForNow or FailedLeavingUnknown.
-func (c *Client) PackageRemoved(name string, err error) {
-	c.send(&corepb.Input{Kind: &corepb.Input_PackageRemoved{PackageRemoved: packageRemoved(name, err)}})
-}
-
-func packageInstalled(name string, hash []byte, err error) *corepb.PackageInstalled {
-	p := &corepb.PackageInstalled{Name: name, Hash: hash, Ok: err == nil}
-	if err != nil {
-		p.Detail, p.Failure = err.Error(), failureOf(err)
-	}
-	return p
-}
-
-func packageRemoved(name string, err error) *corepb.PackageRemoved {
-	p := &corepb.PackageRemoved{Name: name, Failed: err != nil}
-	if err != nil {
-		p.Detail, p.Failure = err.Error(), failureOf(err)
-	}
-	return p
-}
-
-// packageFailure is an install's or a removal's error that says how it failed.
-type packageFailure struct {
-	error
-	how corepb.PackageFailure
-}
-
-func (e packageFailure) Unwrap() error { return e.error }
-
-// FailedForNow marks an install's or a removal's error (for PackageInstalled and PackageRemoved)
-// as a failure for now that left what was there: an outage, a timeout. The package is not
-// reported failed; it waits and is tried again, after 30 s, doubling each time in a row up to
-// 10 minutes, while the other packages go on (a restart tries at once).
-func FailedForNow(err error) error {
-	return packageFailure{err, corepb.PackageFailure_PACKAGE_FAILURE_LATER}
-}
-
-// FailedLeavingUnknown marks an install's or a removal's error (for PackageInstalled and
-// PackageRemoved) as a failure that can't tell what it left: a rollback that failed. It is
-// reported failed, as for good, and what the agent has of the package is uncertain from then on:
-// after a restart it is installed (or removed) again, whatever was saved.
-func FailedLeavingUnknown(err error) error {
-	return packageFailure{err, corepb.PackageFailure_PACKAGE_FAILURE_UNKNOWN}
-}
-
-// IsFailedForNow says whether err is marked FailedForNow (and not FailedLeavingUnknown).
-func IsFailedForNow(err error) bool {
-	return err != nil && failureOf(err) == corepb.PackageFailure_PACKAGE_FAILURE_LATER
-}
-
-// IsFailedLeavingUnknown says whether err is marked FailedLeavingUnknown.
-func IsFailedLeavingUnknown(err error) bool {
-	return err != nil && failureOf(err) == corepb.PackageFailure_PACKAGE_FAILURE_UNKNOWN
-}
-
-// failureOf is how err says it failed: for good unless marked. Of several marks (a join), what
-// is unknown wins over what is for now.
-func failureOf(err error) corepb.PackageFailure {
-	how := corepb.PackageFailure_PACKAGE_FAILURE_FINAL
-	var walk func(error)
-	walk = func(e error) {
-		switch x := e.(type) {
-		case nil:
-			return
-		case packageFailure:
-			if x.how == corepb.PackageFailure_PACKAGE_FAILURE_UNKNOWN || how == corepb.PackageFailure_PACKAGE_FAILURE_FINAL {
-				how = x.how
-			}
-			walk(x.error)
-		case interface{ Unwrap() []error }:
-			for _, e := range x.Unwrap() {
-				walk(e)
-			}
-		case interface{ Unwrap() error }:
-			walk(x.Unwrap())
-		}
-	}
-	walk(err)
-	return how
 }
 
 // Stop sends agent_disconnect if a message can still be sent, then stops. It returns when the
@@ -744,7 +594,7 @@ func (cfg Config) coreMode() (bool, error) {
 
 // platformModeOnly refuses what platform mode doesn't honour.
 func (cfg Config) platformModeOnly() error {
-	if cfg.NoSpliceDownloads {
+	if cfg.plumbed.NoSpliceDownloads {
 		return errors.New("opamp: NoSpliceDownloads in platform mode: it is core mode's (net/http writes package files itself); leave it unset, or run in core mode (no HTTPClient, and Mode unset or ModeCore)")
 	}
 	return nil
@@ -803,10 +653,10 @@ func coreConfig(cfg Config) (*corepb.Config, error) {
 		MaxReceiveBytes:          cfg.MaxReceiveBytes,
 		AcceptConnectionSettings: cfg.AcceptConnectionSettings,
 		VerifyTimeoutMs:          millis(cfg.VerifyTimeout),
-		AcceptPackages:           cfg.AcceptPackages,
+		AcceptPackages:           cfg.plumbed.AcceptPackages,
 		RequestInstanceUid:       cfg.RequestInstanceUID,
-		MaxPackageBytes:          cfg.MaxPackageBytes,
-		DownloadTimeoutMs:        millis(cfg.DownloadTimeout),
+		MaxPackageBytes:          cfg.plumbed.MaxPackageBytes,
+		DownloadTimeoutMs:        millis(cfg.plumbed.DownloadTimeout),
 	}, nil
 }
 
@@ -832,9 +682,6 @@ func statusInputs(s Status) []*corepb.Input {
 	}
 	if s.AvailableComponents != nil {
 		in = append(in, &corepb.Input{Kind: &corepb.Input_SetAvailableComponents{SetAvailableComponents: s.AvailableComponents}})
-	}
-	if s.CustomCapabilities != nil {
-		in = append(in, &corepb.Input{Kind: &corepb.Input_SetCustomCapabilities{SetCustomCapabilities: s.CustomCapabilities}})
 	}
 	return in
 }
@@ -962,8 +809,8 @@ func (l *loop) run() error {
 					if note.Kind == unknownNotification {
 						continue
 					}
-					if note.Kind == InstallPackage {
-						note.Path = l.x.downloadPath(n.GetInstallPackage().Download)
+					if note.Kind == plumb.KindInstallPackage {
+						note.path = l.x.downloadPath(n.GetInstallPackage().Download)
 					}
 					if note.Kind == Stopped {
 						stopped = &note

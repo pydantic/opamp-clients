@@ -9,11 +9,10 @@ Each step is one of:
 
 - the server settles something the client asked of it, at a turn the step picks: a connection
   attempt (accepted or refused), a request (answered, in pieces, with an offer: a remote config,
-  a custom message, a package, a heartbeat interval; an error status; or a reset), a WebSocket
-  upgrade (accepted, refused with a status, reset), the client's Close frame (answered or reset),
-  a package download (the file, a bad file, a 404, cut off mid-body, stalled mid-body until a
-  later step sends the rest or resets, a reset); a quarter of what the client gives up on finishes
-  anyway (a connection, response or file that comes after its cancel);
+  a heartbeat interval, or a custom message or a package, which a client that accepts neither
+  refuses; an error status; or a reset), a WebSocket upgrade (accepted, refused with a status,
+  reset), the client's Close frame (answered or reset); a quarter of what the client gives up on
+  finishes anyway (a connection or response that comes after its cancel);
 - the server pushes on an open WebSocket, closes it, or drops it;
 - the application calls the client: from the loop, from another thread (it must be
   marshalled), or from inside its callback; or its callback raises on its next call;
@@ -25,15 +24,15 @@ After each step, with the loop idle, it checks spec/shell-contract.md:
 
 - RULE-SHELL-01, -02: callbacks one at a time, on the loop's thread, none before start returned,
   none after stopped; stopped last, once; a callback that raised stops the client with that
-  error, and stop raises it; custom messages and remote configs in the order offered;
+  error, and stop raises it; remote configs in the order offered;
 - RULE-SHELL-03: the core is stepped on the loop's thread only, never re-entered, and nothing
   touches the loop from another thread;
 - RULE-SHELL-04: every input names an effect the core issued, of its kind, still waited on;
   each answered once; a connection's messages only while open, its end once; core mode's streams
   likewise (opened, TLS, data, end, resolution, the proxy's answer);
 - RULE-SHELL-06: nothing about an effect after its cancel (or a stream after its close); a
-  connection, transport, request or download the core has given up on is released by the time
-  the loop is idle, and a cancelled or discarded download's file is gone;
+  connection, transport or request the core has given up on is released by the time the loop
+  is idle;
 - RULE-SHELL-07: no input after the core said stopped; stop returns within stop_timeout plus a
   margin (virtual time), and then nothing is open, no task of the client's is left, nothing new
   starts, and the state file's writer has nothing in flight unless stop took its whole bound;
@@ -69,17 +68,16 @@ import logfire_fleet_client._client as _client_mod
 import logfire_fleet_client._core as _core_mod
 import logfire_fleet_client._executor as _executor
 from _sched_loop import SeededLoop
-from _sched_world import CAPABILITY, OFFERS, FakeSession, World
+from _sched_world import OFFERS, FakeSession, World
 from logfire_fleet_client import Client, Config, Notification, Status, anyvalue_pb2, opamp_pb2 as pb
 from logfire_fleet_client._proto.opamp.core.v1 import core_pb2 as corepb
 
 UID = bytes([0x5A] * 16)
-CAPABILITIES = (pb.AgentCapabilities_AcceptsRemoteConfig | pb.AgentCapabilities_ReportsRemoteConfig
-                | pb.AgentCapabilities_AcceptsPackages | pb.AgentCapabilities_ReportsPackageStatuses)
+CAPABILITIES = pb.AgentCapabilities_AcceptsRemoteConfig | pb.AgentCapabilities_ReportsRemoteConfig
 STOP_S = 5.0  # the default stop_timeout_ms
 MARGIN_S = 1.0
 UNIX0 = 1_790_000_000_000
-METHODS = ["set_health", "set_description", "send_custom_message", "answer_config", "package_installed"]
+METHODS = ["set_health", "set_description", "answer_config"]
 
 CURRENT: ScheduleMachine | None = None
 #: What the runs did, summed (printed at the end: evidence that the steps reach what they should).
@@ -108,7 +106,7 @@ def description(n: int) -> pb.AgentDescription:
 
 @dataclass
 class Tracked:
-    what: str  # request, connection, download, store
+    what: str  # request, connection, store
     state: str = "live"  # live, open, peer_closed, closing, ended, cancelled
     data: bytes = b""
 
@@ -117,8 +115,7 @@ class Monitor:
     """RULE-SHELL-03, -04, -06, -07 and -09 at the core's boundary."""
 
     RESULTS = {"http_response": "request", "http_failed": "request", "ws_failed": "connection",
-               "stored": "store", "store_failed": "store", "download_response": "download",
-               "downloaded": "download", "download_failed": "download"}
+               "stored": "store", "store_failed": "store"}
 
     def __init__(self, machine: ScheduleMachine) -> None:
         self.m = machine
@@ -127,7 +124,6 @@ class Monitor:
         self.streams: dict[int, str] = {}  # opening, tls, open, closed, failed
         self.resolving: dict[int, str] = {}  # live, done, closed
         self.proxies: dict[int, bool] = {}  # answered
-        self.discarded: set[int] = set()  # downloads whose file must be gone
         self.depth = 0
         self.stopped = False
         self.steps = 0
@@ -226,13 +222,13 @@ class Monitor:
         for e in out.effects:
             kind = e.WhichOneof("kind")
             v = getattr(e, kind)
-            if kind in ("http_request", "ws_open", "download", "store"):
-                what = {"http_request": "request", "ws_open": "connection", "download": "download", "store": "store"}[kind]
+            if kind in ("download", "download_done", "discard"):
+                self.bad("RULE-SHELL-04", f"{kind} {v.id}: the client accepts no packages")
+            elif kind in ("http_request", "ws_open", "store"):
+                what = {"http_request": "request", "ws_open": "connection", "store": "store"}[kind]
                 self.effects[v.id] = Tracked(what, data=bytes(v.data) if kind == "store" else b"")
                 if kind == "store":
                     self.m.writer.issued.append((v.id, bytes(v.data)))
-            elif kind == "download_done":
-                self.effects[v.id] = Tracked("download")
             elif kind == "ws_close":
                 t = self.effects.get(v.id)
                 if t is not None and t.state in ("open", "peer_closed"):
@@ -240,13 +236,7 @@ class Monitor:
             elif kind == "cancel":
                 t = self.effects.get(v.id)
                 if t is not None:
-                    if t.what == "download":
-                        self.discarded.add(v.id)
                     t.state = "cancelled"
-                elif self.m.mode == "core":
-                    self.discarded.add(v.id)  # a download of core mode's, before its download_done
-            elif kind == "discard":
-                self.discarded.add(v.id)
             elif kind == "proxy_query":
                 self.proxies[v.id] = False
             elif kind == "stream_resolve":
@@ -430,19 +420,11 @@ class ScheduleMachine(RuleBasedStateMachine):
         elif what == "set_description":
             self.app.described += 1
             c.set_description(description(self.app.described))
-        elif what == "send_custom_message":
-            c.send_custom_message(pb.CustomMessage(capability=CAPABILITY, type="t", data=b"x"))
         elif what == "answer_config":
             configs = [n for n in self.app.notes if n.kind == "remote_config"]
             h = configs[-1].remote_config.config_hash if configs else b"none"
             c.set_remote_config_status(pb.RemoteConfigStatus(last_remote_config_hash=h,
                                                              status=pb.RemoteConfigStatuses_APPLIED))
-        elif what == "package_installed":
-            pkgs = [n for n in self.app.notes if n.kind == "install_package"]
-            if pkgs:
-                c.package_installed(pkgs[-1].package_name, pkgs[-1].package.hash)
-            else:
-                c.package_removed("pkg")
 
     def _notify(self, n: Notification) -> None:
         app = self.app
@@ -512,8 +494,8 @@ class ScheduleMachine(RuleBasedStateMachine):
         scheme = transport + ("s" if tls and self.mode == "core" else "")
         config = Config(endpoint=f"{scheme}://opamp.test/v1/opamp", instance_uid=UID, capabilities=CAPABILITIES,
                         heartbeat_interval_ms=heartbeat, request_timeout_ms=timeouts, connect_timeout_ms=timeouts,
-                        download_timeout_ms=timeouts, state_file=self.state, accept_packages=True, mode=self.mode)
-        status = Status(description=description(0), custom_capabilities=pb.CustomCapabilities(capabilities=[CAPABILITY]))
+                        state_file=self.state, mode=self.mode)
+        status = Status(description=description(0))
 
         def go() -> None:
             self.client = Client.start(config, status, self._notify,
@@ -551,12 +533,9 @@ class ScheduleMachine(RuleBasedStateMachine):
                             label="upgrade")
         elif op.kind == "ws_close":
             how = data.draw(st.sampled_from([("ack",), ("ack",), ("drop",)]), label="close")
-        elif op.kind == "body":
-            how = data.draw(st.sampled_from([("rest",), ("rest",), ("fail",)]), label="the rest of the body")
         else:
-            how = data.draw(st.one_of(
-                st.tuples(st.just("ok"), st.sampled_from([200, 200, 404]), st.booleans(), cuts),
-                st.sampled_from([("fail",), ("fail_mid",), ("stall", True), ("stall", False)])), label="download")
+            assert op.kind == "body", f"the client asked for {op.kind}"
+            how = data.draw(st.sampled_from([("rest",), ("rest",), ("fail",)]), label="the rest of the body")
         note(f"server: {op.kind} {op.url} (which={i}, at turn {k}) -> {how!r}")
         STATS[f"server {op.kind} {how[0]}"] += 1
         self._run(k, lambda: op.decide(how))
@@ -659,8 +638,8 @@ class ScheduleMachine(RuleBasedStateMachine):
                 assert stopped[0].error is app.thrown, f"RULE-SHELL-02: stopped with {stopped[0].error!r}, the callback raised {app.thrown!r}"
             elif app.thrown is None:
                 assert stopped[0].error is None, f"RULE-SHELL-02: stopped with {stopped[0].error!r}, nothing raised"
-        customs = [int(n.custom_message.data) for n in app.notes if n.kind == "custom_message"]
-        assert customs == sorted(set(customs)), f"RULE-SHELL-01: custom messages out of order: {customs}"
+        refused = [n.kind for n in app.notes if n.kind in ("custom_message", "install_package")]
+        assert not refused, f"a client that accepts no custom message or package heard {refused}"
         configs = [int(n.remote_config.config_hash[1:]) for n in app.notes if n.kind == "remote_config"]
         assert configs == sorted(set(configs)), f"RULE-SHELL-01: remote configs out of order: {configs}"
 
@@ -669,19 +648,14 @@ class ScheduleMachine(RuleBasedStateMachine):
             live_ws = [f for f in world.fakes if not f.gone]
             conns = mon.live("connection", ("open", "peer_closed", "closing"))
             assert len(live_ws) <= conns, f"RULE-SHELL-06: {len(live_ws)} WebSockets open, the core has {conns}"
-            for kind, what in (("post", "request"), ("download", "download")):
-                going = [r for r in world.requests if r.kind == kind and not r.finished]
-                live = mon.live(what)
-                assert len(going) <= live, f"RULE-SHELL-06: {len(going)} {kind}s under way, the core waits on {live}"
+            going = [r for r in world.requests if r.kind == "post" and not r.finished]
+            live = mon.live("request")
+            assert len(going) <= live, f"RULE-SHELL-06: {len(going)} posts under way, the core waits on {live}"
         else:
             assert world.network is not None
             open_ = world.network.open()
             streams = sum(1 for s in mon.streams.values() if s in ("opening", "tls", "open"))
             assert len(open_) <= streams, f"RULE-SHELL-06: {len(open_)} connections open, the core has {streams} streams"
-        client = self.client
-        for id_ in mon.discarded:
-            path = client._x.download_path(id_)
-            assert not os.path.exists(path), f"RULE-SHELL-06: download {id_}'s file is still there"
 
         # RULE-SHELL-07: stop is bounded, and leaves nothing.
         if self.stop_task is not None:
@@ -858,37 +832,6 @@ def test_found_stop_is_bounded_by_one_stop_timeout_with_a_save_writing(machine, 
     ])
 
 
-def test_found_a_download_finished_after_its_cancel_leaves_no_file(tapped) -> None:
-    # Platform mode, OPAMP_SCHED_SEED=21 (loop seed 1 here): a download whose response came as stop
-    # cancelled it (the cancel didn't land in its task: here the fake's, as a library that
-    # swallows a cancel would) wrote its whole file after its cancel had deleted it, and the file
-    # stayed.
-    # covers: RULE-SHELL-06
-    replay(PlatformMode, [
-        ("start", dict(seed=1, transport="http", tls=False, heartbeat=30_000, timeouts=30_000)),
-        ("server_settles", dict(data=Drawn(0, 0, ("ok", 200, "package", [])))),
-        ("stop", dict(where="outside", k=0)),
-    ])
-
-
-def test_found_stopped_is_the_last_notification(tapped) -> None:
-    # Platform mode, OPAMP_SCHED_SEED=1 (loop seed 0): stop while a save that answers a package's
-    # download was writing; the save landed, and the core's output for `stored` held stopped and
-    # then install_package (the core emits a notification after stopped). The shell passed them
-    # on in that order: the application heard install_package after stopped.
-    # covers: RULE-SHELL-01
-    replay(PlatformMode, [
-        ("start", dict(seed=0, transport="http", tls=False, heartbeat=500, timeouts=1000)),
-        ("next_save", dict(how="fail", seconds=0.5)),
-        ("next_save", dict(how="slow", seconds=0.5)),
-        ("server_settles", dict(data=Drawn(0, 0, ("ok", 200, "none", [])))),
-        ("server_settles", dict(data=Drawn(0, 0, ("ok", 200, "package", [])))),
-        ("server_settles", dict(data=Drawn(1, 0, ("ok", 200, True, [])))),
-        ("server_settles", dict(data=Drawn(0, 0, ("ok", 200, "none", [])))),
-        ("server_settles", dict(data=Drawn(0, 0, ("fail",)))),
-    ])
-
-
 def test_found_a_connection_is_released_while_a_save_still_writes(tapped) -> None:
     # Core mode, OPAMP_SCHED_SEED=1430863953 (the nightly of 2026-10-25): stop with a save still
     # writing. The shell waited for the save before it closed the core's streams, so a connection
@@ -898,12 +841,12 @@ def test_found_a_connection_is_released_while_a_save_still_writes(tapped) -> Non
         ("start", dict(seed=0, transport="http", tls=False, heartbeat=500, timeouts=1000)),
         ("server_settles", dict(data=Drawn(0, 0, "accept"))),
         ("time_passes", dict(seconds=0.001)),
-        ("server_settles", dict(data=Drawn(0, 0, ("ok", 200, "package", [])))),
+        ("server_settles", dict(data=Drawn(0, 0, ("ok", 200, "config", [])))),
         ("server_settles", dict(data=Drawn(0, 0, ("ok", 200, "config", [])))),
         ("server_settles", dict(data=Drawn(0, 0, "accept"))),
         ("callback_raises_next", dict(often=0)),
         ("next_save", dict(how="slow", seconds=3.0)),
-        ("server_settles", dict(data=Drawn(0, 0, ("ok", 200, "package", [])))),
-        ("server_settles", dict(data=Drawn(0, 0, ("ok", 200, False, [])))),
+        ("server_settles", dict(data=Drawn(0, 0, ("ok", 200, "config", [])))),
+        ("server_settles", dict(data=Drawn(0, 0, ("ok", 200, "none", [])))),
         ("time_passes", dict(seconds=1.0)),
     ])

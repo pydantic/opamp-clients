@@ -16,7 +16,7 @@ public sealed class DefaultProxy
 
 /// <summary>
 /// With no proxy configured the client uses the platform's (<see cref="HttpClient.DefaultProxy"/>)
-/// on requests, the WebSocket and downloads alike; <see cref="OpAmpClientOptions.DirectConnection"/>
+/// on requests and the WebSocket alike; <see cref="OpAmpClientOptions.DirectConnection"/>
 /// goes direct.
 /// </summary>
 [Collection(nameof(DefaultProxy))]
@@ -58,17 +58,7 @@ public class DefaultProxyTests
 
             await client.StopAsync().WaitAsync(TimeSpan.FromSeconds(10));
 
-            // Downloads too.
-            using var transportForDownloads = ClientTransport.Create(null, null, direct);
-            var dir = Directory.CreateTempSubdirectory();
-            var loop = new TestLoop(transportForDownloads, Path.Combine(dir.FullName, "state"));
-            loop.Run(new Effect { Download = new Download { Id = 1, Url = $"http://127.0.0.1:{server.Port}/file", MaxBytes = 1 << 20, TimeoutMs = 10_000 } });
-            Assert.True(loop.TryTake(out var downloaded, TimeSpan.FromSeconds(15)));
-            await loop.X.ReleaseAsync(TimeSpan.FromSeconds(5));
-            dir.Delete(recursive: true);
-
             Assert.True(server.Messages.Count >= 2);
-            Assert.Equal(200u, downloaded!.DownloadResponse.Status);
             var upstreams = via.Tunnels.Select(t => t.Upstream).ToHashSet();
             if (direct)
             {
@@ -79,8 +69,6 @@ public class DefaultProxyTests
             {
                 Assert.All(server.Messages, m => Assert.Contains(m.Remote, upstreams));
                 Assert.Contains(via.Tunnels, t => t.Via == (transport == "ws" ? "connect" : "forward"));
-                Assert.Contains(server.Gets, g => g == "/file");
-                Assert.True(via.Tunnels.Count >= 2); // the client's, and the download's
             }
         }
         finally

@@ -58,8 +58,8 @@ reporting each package's status, resuming after a crash); the application instal
   | For now | it may work later: an outage, a timeout, the agent busy; nothing was changed | reports nothing failed (INSTALL_PENDING), and tries again after 30 s, doubling each time in a row to at most 10 minutes, while the other packages go on; a restart tries at once |
   | Leaving what it has unknown | it failed and can't tell what it left (a rollback that failed) | as for good, and what the agent has of the package is uncertain from then on (see "A crash") |
 
-  So far only Go's answer says which (wrap the error with `opamp.FailedForNow` or
-  `opamp.FailedLeavingUnknown`); every other client's error is a failure for good.
+  So far only Go's answer says which (wrap the error with `collector.FailedForNow` or
+  `collector.FailedLeavingUnknown`); every other client's error is a failure for good.
 - **No offer.** A package offered with no hash names no version: it is never installed or
   removed, and is reported INSTALL_FAILED. An offer with no aggregate hash is told apart from the
   last by its packages; the statuses report the aggregate hash the server sent, empty too.
@@ -88,11 +88,7 @@ reporting each package's status, resuming after a crash); the application instal
 
 | Client | Turn on | Install | Remove |
 |---|---|---|---|
-| Go | `Config.StateFile`, `Config.AcceptPackages` | kind `InstallPackage`: `PackageName`, `Package`, `Path`; answer `PackageInstalled` (an error wrapped by `FailedForNow` or `FailedLeavingUnknown` says how it failed) | kind `RemovePackage`; answer `PackageRemoved` (the same) |
-| Node.js | `stateFile`, `acceptPackages` | `installPackage`: `name`, `package`, `path`; answer `packageInstalled` | `removePackage`; answer `packageRemoved` |
-| Python | `state_file`, `accept_packages` | `install_package`: `package_name`, `package`, `path`; answer `package_installed` | `remove_package`; answer `package_removed` |
-| Java | `stateFile`, `acceptPackages` | `Notification.InstallPackage`: `name`, `pkg`, `path`; answer `packageInstalled` | `Notification.RemovePackage`; answer `packageRemoved` |
-| .NET | `StateFile`, `AcceptPackages` | `OpAmpNotification.InstallPackage`: `Name`, `Package`, `Path`; answer `PackageInstalled` | `OpAmpNotification.RemovePackage`; answer `PackageRemoved` |
+| Go (`go/opamp/collector`, the Supervisor's and the extension's) | `Config.StateFile`, `Config.AcceptPackages` | kind `InstallPackage`: `PackageName`, `Package`, `Path`; answer `PackageInstalled` (an error wrapped by `FailedForNow` or `FailedLeavingUnknown` says how it failed) | kind `RemovePackage`; answer `PackageRemoved` (the same) |
 
 Downloads are limited by `max_package_bytes` (1 GiB) and `download_timeout_ms` (10 minutes). No
 client follows a redirect itself: the core decides (below).

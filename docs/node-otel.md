@@ -41,7 +41,7 @@ node --import @pydantic/logfire-fleet-otel/register app.js
 | `OTEL_SDK_DISABLED` | OpenTelemetry's own: `true` turns OpAMP off too, read as `OTEL_OPAMP_DISABLED` is (here `1` is taken as `true` as well). What the SDK does with it is upstream's (it reads only `true` as off). |
 | `OTEL_OPAMP_ENDPOINT` | The OpAMP server: `http(s)://.../v1/opamp` polls, `ws(s)://...` keeps a connection open. Without it, or with OpAMP off (above), this is upstream's `register`. |
 | `OTEL_OPAMP_HEADERS` | Headers for every request, as `OTEL_EXPORTER_OTLP_HEADERS`: `name=value,...`, values percent-encoded. The key the server gave you goes here. |
-| `OTEL_OPAMP_STATE_DIR` | Where to keep state across restarts: the instance UID, the settings for the next start, the client's own state (written readable by the application's user only). Without it, the package keeps one of the user's own, one per process of the program running at once ([default-state-dir.md](default-state-dir.md)); `none` turns that off, and then each start is a new instance. A directory named here belongs to one process: two processes given the same one are the same instance. |
+| `OTEL_OPAMP_STATE_DIR` | Where to keep state across restarts: the instance UID, the settings for the next start, the client's own state (written readable by the application's user only). Without it, the package keeps one of the user's own, one per process of the program running at once ([default-state-dir.md](default-state-dir.md)); `none` turns that off, and then each start is a new instance. Processes given the same directory (workers a server starts, a child process) each keep their own identity: the first takes the directory, the others numbered folders in it ([default-state-dir.md](default-state-dir.md#a-directory-named)). |
 | `OTEL_OPAMP_HEARTBEAT_INTERVAL` | How often to check in until the server offers an interval (default 30 s): milliseconds, or `30s`, `2m`. A value it can't read is warned about and the default used; longer than a day is a day; it never stops the application. |
 
 The core reads these (and the options below), by the same rules in every language: whether OpAMP is off, the endpoint, the headers, the interval, which state directory, and the instance UID kept there. The package keeps only the I/O: reading the variables, making and locking the state directory's slot, reading and writing its `instance-uid` file, and logging the warnings.
@@ -138,7 +138,8 @@ unmanaged.
 
 A Logfire SDK that has the `fleet` option (`@pydantic/logfire-node`, with this package installed
 beside it as its optional peer dependency) joins the fleet from `logfire.configure()` itself, and
-nothing is refused:
+nothing is refused. With a `@pydantic/logfire-node` that doesn't have the option, use
+[`manage()`](#an-sdk-set-up-already-manage) after `logfire.configure()`.
 
 ```js
 import * as logfire from "@pydantic/logfire-node";
@@ -522,7 +523,7 @@ const unsubscribe = appSettings.onChange((settings, changed) => {
 - `onChange(callback)` returns a function that unsubscribes (calling it again does nothing). The
   callback gets the frozen map now in force and the keys added, changed or removed, sorted, once
   per change, in order, each callback in the order it was added: when a config is applied, at the
-  timer's Refresh, at start from the saved settings (before the application's code runs, so an
+  end of debug mode, at start from the saved settings (before the application's code runs, so an
   application is not told of those: read the snapshot). The same map again, another control
   changing, debug mode's start and end, and a FAILED config tell nothing. A callback that throws,
   or returns a promise that rejects, is logged as an error (on the console without
@@ -612,7 +613,7 @@ sends the hash at start, and the components in full when the server asks.
     the layer and through the agent (what the application reads, and the effective config), its
     typed reads (beyond the safe integers, the default); reads before any config and with keys
     named like Object's own; once per change and never for the same map, however it is sent;
-    `app_settings` local; a FAILED config and a failed save changing nothing; the timer's Refresh and
+    `app_settings` local; a FAILED config and a failed save changing nothing; the end of debug mode and
     debug mode telling nothing; callbacks in order, ones that throw or reject, unsubscribing and
     subscribing from inside a callback; restarts with and without a state directory; one map for
     the register and the application, by `import` or `require`;

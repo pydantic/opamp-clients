@@ -55,122 +55,139 @@ namespace Logfire.Fleet.Client.Sdk {
             "QgcKBV9wYXRoIjMKClNjb3BlTGV2ZWwSDwoHcGF0dGVybhgBIAEoCRIUCgxt",
             "aW5fc2V2ZXJpdHkYAiABKA0iFgoFTmFtZXMSDQoFbmFtZXMYASADKAkiLgoE",
             "SG9zdBIMCgRsaXZlGAEgAygJEhIKCm5leHRfc3RhcnQYAyADKAlKBAgCEAMi",
-            "gwEKBExvYWQSEgoFc2F2ZWQYASABKAxIAIgBARIgCgRob3N0GAIgASgLMhIu",
-            "b3BhbXAuc2RrLnYxLkhvc3QSEwoLbm93X3VuaXhfbXMYAyABKAQSFwoKY29y",
-            "ZV9zdGF0ZRgEIAEoDEgBiAEBQggKBl9zYXZlZEINCgtfY29yZV9zdGF0ZSKk",
-            "AQoGTG9hZGVkEigKCHNldHRpbmdzGAEgASgLMhYub3BhbXAuc2RrLnYxLlNl",
-            "dHRpbmdzEg8KB2N1cnJlbnQYAiABKAwSMgoJZWZmZWN0aXZlGAMgASgLMh8u",
-            "b3BhbXAucHJvdG8udjEuRWZmZWN0aXZlQ29uZmlnEg8KB3dhcm5pbmcYBCAB",
-            "KAkSGgoScmVmcmVzaF9hdF91bml4X21zGAUgASgEIpsBCgZEZWNpZGUSMQoG",
-            "Y29uZmlnGAEgASgLMiEub3BhbXAucHJvdG8udjEuQWdlbnRSZW1vdGVDb25m",
-            "aWcSDwoHY3VycmVudBgCIAEoDBIQCghhdF9zdGFydBgDIAEoDBIgCgRob3N0",
-            "GAUgASgLMhIub3BhbXAuc2RrLnYxLkhvc3QSEwoLbm93X3VuaXhfbXMYBiAB",
-            "KARKBAgEEAUiIgoEUGxhbhIRCgRzYXZlGAEgASgMSACIAQFCBwoFX3NhdmUi",
-            "pgEKBkNvbW1pdBIkCgZkZWNpZGUYASABKAsyFC5vcGFtcC5zZGsudjEuRGVj",
-            "aWRlEikKBXNhdmVkGAIgASgOMhoub3BhbXAuc2RrLnYxLkNvbW1pdC5TYXZl",
-            "ZBINCgVlcnJvchgDIAEoCSI8CgVTYXZlZBIRCg1TQVZFRF9OT1dIRVJFEAAS",
-            "DgoKU0FWRURfRE9ORRABEhAKDFNBVkVEX0ZBSUxFRBACIuUBCghEZWNpc2lv",
-            "bhIyCgZzdGF0dXMYASABKAsyIi5vcGFtcC5wcm90by52MS5SZW1vdGVDb25m",
-            "aWdTdGF0dXMSJQoFYXBwbHkYAiABKAsyFi5vcGFtcC5zZGsudjEuU2V0dGlu",
-            "Z3MSDwoHY3VycmVudBgDIAEoDBIyCgllZmZlY3RpdmUYBSABKAsyHy5vcGFt",
-            "cC5wcm90by52MS5FZmZlY3RpdmVDb25maWcSFwoPcGVuZGluZ19yZXN0YXJ0",
-            "GAYgAygJEhoKEnJlZnJlc2hfYXRfdW5peF9tcxgHIAEoBEoECAQQBSJjCgdS",
-            "ZWZyZXNoEg8KB2N1cnJlbnQYASABKAwSEAoIYXRfc3RhcnQYAiABKAwSIAoE",
-            "aG9zdBgDIAEoCzISLm9wYW1wLnNkay52MS5Ib3N0EhMKC25vd191bml4X21z",
-            "GAQgASgEIpYBCglSZWZyZXNoZWQSKAoIc2V0dGluZ3MYASABKAsyFi5vcGFt",
-            "cC5zZGsudjEuU2V0dGluZ3MSMgoJZWZmZWN0aXZlGAIgASgLMh8ub3BhbXAu",
-            "cHJvdG8udjEuRWZmZWN0aXZlQ29uZmlnEhoKEnJlZnJlc2hfYXRfdW5peF9t",
-            "cxgDIAEoBBIPCgd3YXJuaW5nGAQgASgJIswBCgZIZWFsdGgSKgoGY291bnRz",
-            "GAEgASgLMhoub3BhbXAuc2RrLnYxLkV4cG9ydENvdW50cxIsCghwcmV2aW91",
-            "cxgCIAEoCzIaLm9wYW1wLnNkay52MS5IZWFsdGhSZXBvcnQSEwoLbm93X3Vu",
-            "aXhfbXMYAyABKAQSKAoIc2V0dGluZ3MYBCABKAsyFi5vcGFtcC5zZGsudjEu",
-            "U2V0dGluZ3MSKQoJZXhwb3J0ZXJzGAUgAygLMhYub3BhbXAuc2RrLnYxLkV4",
-            "cG9ydGVyIpEBCgxFeHBvcnRDb3VudHMSKgoGdHJhY2VzGAEgASgLMhoub3Bh",
-            "bXAuc2RrLnYxLlNpZ25hbENvdW50cxIrCgdtZXRyaWNzGAIgASgLMhoub3Bh",
-            "bXAuc2RrLnYxLlNpZ25hbENvdW50cxIoCgRsb2dzGAMgASgLMhoub3BhbXAu",
-            "c2RrLnYxLlNpZ25hbENvdW50cyKRAQoMU2lnbmFsQ291bnRzEhIKCmV4cG9y",
-            "dHNfb2sYASABKAQSFgoOZXhwb3J0c19mYWlsZWQYAiABKAQSFAoMaXRlbXNf",
-            "ZmFpbGVkGAMgASgEEhYKDml0ZW1zX2ZpbHRlcmVkGAQgASgEEhMKC2xhc3Rf",
-            "ZmFpbGVkGAUgASgIEhIKCmxhc3RfZXJyb3IYBiABKAkiZgoMSGVhbHRoUmVw",
-            "b3J0EgwKBHNlbmQYASABKAgSMgoJZXhwb3J0ZXJzGAIgASgLMh8ub3BhbXAu",
-            "cHJvdG8udjEuQ29tcG9uZW50SGVhbHRoEhQKDHNlbnRfdW5peF9tcxgDIAEo",
-            "BCJtCghEZXNjcmliZRIqCghyZXNvdXJjZRgBIAMoCzIYLm9wYW1wLnByb3Rv",
-            "LnYxLktleVZhbHVlEiAKBGhvc3QYAiABKAsyEi5vcGFtcC5zZGsudjEuSG9z",
-            "dBITCgtub3dfdW5peF9tcxgDIAEoBCJvCgpDb21wb25lbnRzEioKCWludmVu",
-            "dG9yeRgBIAEoCzIXLm9wYW1wLnNkay52MS5JbnZlbnRvcnkSIAoEaG9zdBgC",
-            "IAEoCzISLm9wYW1wLnNkay52MS5Ib3N0EhMKC25vd191bml4X21zGAMgASgE",
-            "IswBCglJbnZlbnRvcnkSEwoLaW50ZWdyYXRpb24YASABKAkSGwoTaW50ZWdy",
-            "YXRpb25fdmVyc2lvbhgCIAEoCRIUCgxzZGtfbGFuZ3VhZ2UYAyABKAkSEwoL",
-            "c2RrX3ZlcnNpb24YBCABKAkSNwoQaW5zdHJ1bWVudGF0aW9ucxgFIAMoCzId",
-            "Lm9wYW1wLnNkay52MS5JbnN0cnVtZW50YXRpb24SKQoJZXhwb3J0ZXJzGAYg",
-            "AygLMhYub3BhbXAuc2RrLnYxLkV4cG9ydGVyIjAKD0luc3RydW1lbnRhdGlv",
-            "bhIMCgRuYW1lGAEgASgJEg8KB3ZlcnNpb24YAiABKAkiTAoIRXhwb3J0ZXIS",
-            "DgoGc2lnbmFsGAEgASgJEgwKBG5hbWUYAiABKAkSDQoFZ2F0ZWQYAyABKAgS",
-            "EwoLZGVzdGluYXRpb24YBCABKAkidAoJRXhwb3J0ZXJzEioKBWZvdW5kGAEg",
-            "AygLMhsub3BhbXAuc2RrLnYxLkZvdW5kRXhwb3J0ZXISIQoDZW52GAIgAygL",
-            "MhQub3BhbXAuc2RrLnYxLkVudlZhchIYChBkZWZhdWx0X3Byb3RvY29sGAMg",
-            "ASgJImAKDUZvdW5kRXhwb3J0ZXISDgoGc2lnbmFsGAEgASgJEgwKBGtpbmQY",
-            "AiABKAkSDQoFZ2F0ZWQYAyABKAgSEAoIZW5kcG9pbnQYBCABKAkSEAoIZnJv",
-            "bV9lbnYYBSABKAgiJQoGRW52VmFyEgwKBG5hbWUYASABKAkSDQoFdmFsdWUY",
-            "AiABKAkidQoQRXhwb3J0ZXJzRGVjaWRlZBIpCglleHBvcnRlcnMYASADKAsy",
-            "Fi5vcGFtcC5zZGsudjEuRXhwb3J0ZXISEAoIZ292ZXJuZWQYAiADKAkSEgoK",
-            "dW5nb3Zlcm5lZBgDIAMoCRIQCgh3YXJuaW5ncxgEIAMoCSKCAgoIRXZhbHVh",
-            "dGUSEAoIc2V0dGluZ3MYASABKAwSIAoEaG9zdBgCIAEoCzISLm9wYW1wLnNk",
-            "ay52MS5Ib3N0EhMKC25vd191bml4X21zGAcgASgEEicKBHNwYW4YAyABKAsy",
-            "Fy5vcGFtcC5zZGsudjEuU3BhblN0YXJ0SAASJgoDbG9nGAQgASgLMhcub3Bh",
-            "bXAuc2RrLnYxLkxvZ1JlY29yZEgAEi4KCmF0dHJpYnV0ZXMYBSABKAsyGC5v",
-            "cGFtcC5zZGsudjEuQXR0cmlidXRlc0gAEiMKA2NhcBgGIAEoCzIULm9wYW1w",
-            "LnNkay52MS5DYXBSdW5IAEIHCgVpbnB1dCJ9CgZDYXBSdW4SKwoGc2lnbmFs",
-            "GAEgASgOMhsub3BhbXAuc2RrLnYxLkNhcFJ1bi5TaWduYWwSJgoGZXZlbnRz",
-            "GAIgAygLMhYub3BhbXAuc2RrLnYxLkNhcEV2ZW50Ih4KBlNpZ25hbBIKCgZU",
-            "UkFDRVMQABIICgRMT0dTEAEiYQoIQ2FwRXZlbnQSDQoFYXRfbnMYASABKAQS",
-            "JAoGcGFyZW50GAIgASgOMhQub3BhbXAuc2RrLnYxLlBhcmVudBIPCgdzYW1w",
-            "bGVkGAMgASgIEg8KB3JlY29yZHMYBCABKAQiYgoKQXR0cmlidXRlcxIsCgph",
-            "dHRyaWJ1dGVzGAEgAygLMhgub3BhbXAucHJvdG8udjEuS2V5VmFsdWUSJgoE",
-            "Ym9keRgCIAEoCzIYLm9wYW1wLnByb3RvLnYxLkFueVZhbHVlIiwKCUxvZ1Jl",
-            "Y29yZBINCgVzY29wZRgBIAEoCRIQCghzZXZlcml0eRgCIAEoDSKTAQoJU3Bh",
-            "blN0YXJ0EgwKBG5hbWUYASABKAkSJAoEa2luZBgCIAEoDjIWLm9wYW1wLnNk",
-            "ay52MS5TcGFuS2luZBIsCgphdHRyaWJ1dGVzGAMgAygLMhgub3BhbXAucHJv",
-            "dG8udjEuS2V5VmFsdWUSJAoGcGFyZW50GAQgASgOMhQub3BhbXAuc2RrLnYx",
-            "LlBhcmVudCLKAQoJRXZhbHVhdGVkEg8KB3JlZnVzZWQYASABKAkSLAoIc2Ft",
-            "cGxpbmcYAiABKAsyGi5vcGFtcC5zZGsudjEuU3BhblNhbXBsaW5nEhEKBGtl",
-            "cHQYAyABKAhIAIgBARIqCghyZWRhY3RlZBgEIAMoCzIYLm9wYW1wLnByb3Rv",
-            "LnYxLktleVZhbHVlEiYKBGJvZHkYBiABKAsyGC5vcGFtcC5wcm90by52MS5B",
-            "bnlWYWx1ZRIOCgZwYXNzZWQYBSADKARCBwoFX2tlcHQisgEKDFNwYW5TYW1w",
-            "bGluZxIrCgNob3cYASABKA4yHi5vcGFtcC5zZGsudjEuU3BhblNhbXBsaW5n",
-            "LkhvdxIWCg5wYXJlbnRfc2FtcGxlZBgCIAEoCBIMCgRyYXRlGAMgASgBEhEK",
-            "BHJ1bGUYBCABKA1IAIgBASIzCgNIb3cSEQoNRk9MTE9XX1BBUkVOVBAAEggK",
-            "BFJBVEUQARIPCgtBUFBfU0FNUExFUhACQgcKBV9ydWxlIo0DCgdSZXF1ZXN0",
-            "EiIKBGxvYWQYASABKAsyEi5vcGFtcC5zZGsudjEuTG9hZEgAEiYKBmRlY2lk",
-            "ZRgCIAEoCzIULm9wYW1wLnNkay52MS5EZWNpZGVIABIqCghkZXNjcmliZRgD",
-            "IAEoCzIWLm9wYW1wLnNkay52MS5EZXNjcmliZUgAEioKCGV2YWx1YXRlGAQg",
-            "ASgLMhYub3BhbXAuc2RrLnYxLkV2YWx1YXRlSAASKAoHcmVmcmVzaBgFIAEo",
-            "CzIVLm9wYW1wLnNkay52MS5SZWZyZXNoSAASJgoGaGVhbHRoGAYgASgLMhQu",
-            "b3BhbXAuc2RrLnYxLkhlYWx0aEgAEi4KCmNvbXBvbmVudHMYByABKAsyGC5v",
-            "cGFtcC5zZGsudjEuQ29tcG9uZW50c0gAEiYKBmNvbW1pdBgIIAEoCzIULm9w",
-            "YW1wLnNkay52MS5Db21taXRIABIsCglleHBvcnRlcnMYCSABKAsyFy5vcGFt",
-            "cC5zZGsudjEuRXhwb3J0ZXJzSABCBgoEY2FsbCLmAwoFUmVwbHkSJgoGbG9h",
-            "ZGVkGAEgASgLMhQub3BhbXAuc2RrLnYxLkxvYWRlZEgAEioKCGRlY2lzaW9u",
-            "GAIgASgLMhYub3BhbXAuc2RrLnYxLkRlY2lzaW9uSAASNwoLZGVzY3JpcHRp",
-            "b24YAyABKAsyIC5vcGFtcC5wcm90by52MS5BZ2VudERlc2NyaXB0aW9uSAAS",
-            "DwoFZXJyb3IYBCABKAlIABIsCglldmFsdWF0ZWQYBSABKAsyFy5vcGFtcC5z",
-            "ZGsudjEuRXZhbHVhdGVkSAASLAoJcmVmcmVzaGVkGAYgASgLMhcub3BhbXAu",
-            "c2RrLnYxLlJlZnJlc2hlZEgAEjMKDWhlYWx0aF9yZXBvcnQYByABKAsyGi5v",
-            "cGFtcC5zZGsudjEuSGVhbHRoUmVwb3J0SAASQwoUYXZhaWxhYmxlX2NvbXBv",
-            "bmVudHMYCCABKAsyIy5vcGFtcC5wcm90by52MS5BdmFpbGFibGVDb21wb25l",
-            "bnRzSAASIgoEcGxhbhgJIAEoCzISLm9wYW1wLnNkay52MS5QbGFuSAASOwoR",
-            "ZXhwb3J0ZXJzX2RlY2lkZWQYCiABKAsyHi5vcGFtcC5zZGsudjEuRXhwb3J0",
-            "ZXJzRGVjaWRlZEgAQggKBnJlc3VsdCqZAQoIU3BhbktpbmQSGQoVU1BBTl9L",
-            "SU5EX1VOU1BFQ0lGSUVEEAASFgoSU1BBTl9LSU5EX0lOVEVSTkFMEAESFAoQ",
-            "U1BBTl9LSU5EX1NFUlZFUhACEhQKEFNQQU5fS0lORF9DTElFTlQQAxIWChJT",
-            "UEFOX0tJTkRfUFJPRFVDRVIQBBIWChJTUEFOX0tJTkRfQ09OU1VNRVIQBSqH",
-            "AQoGUGFyZW50Eg8KC1BBUkVOVF9OT05FEAASGAoUUEFSRU5UX0xPQ0FMX1NB",
-            "TVBMRUQQARIaChZQQVJFTlRfTE9DQUxfVU5TQU1QTEVEEAISGQoVUEFSRU5U",
-            "X1JFTU9URV9TQU1QTEVEEAMSGwoXUEFSRU5UX1JFTU9URV9VTlNBTVBMRUQQ",
-            "BEKNAQoeZGV2LnB5ZGFudGljLmxvZ2ZpcmUuZmxlZXQuc2RrQg1TZXR0aW5n",
-            "c1Byb3RvWkFnaXRodWIuY29tL3B5ZGFudGljL29wYW1wLWNsaWVudHMvZ28v",
-            "b3BhbXAvc2Rrc2V0dGluZ3Mvc2V0dGluZ3NwYqoCGExvZ2ZpcmUuRmxlZXQu",
-            "Q2xpZW50LlNka2IGcHJvdG8z"));
+            "8AEKCkFnZW50U3RhcnQSIAoEaG9zdBgBIAEoCzISLm9wYW1wLnNkay52MS5I",
+            "b3N0EhEKCXN0YXRlX2RpchgCIAEoCBIXCgpjb3JlX3N0YXRlGAMgASgMSACI",
+            "AQESEAoIZW5kcG9pbnQYBSABKAkSFAoMaW5zdGFuY2VfdWlkGAcgASgMEicK",
+            "BWhpbnRzGAggASgLMhgub3BhbXAuc2RrLnYxLkFnZW50SGludHMSEwoLbm93",
+            "X3VuaXhfbXMYCSABKAQSEwoLbm93X21vbm9fbXMYCiABKARCDQoLX2NvcmVf",
+            "c3RhdGVKBAgEEAVKBAgGEAciVAoKQWdlbnRIaW50cxIPCgdyZWZ1c2VkGAEg",
+            "ASgJEhEKCW5vdF9mb3VuZBgCIAEoCRITCgt1bnJlYWNoYWJsZRgDIAEoCRIN",
+            "CgVlcnJvchgEIAEoCSKzBAoJQWdlbnRTdGVwEg0KBWFnZW50GAEgASgMEhMK",
+            "C25vd191bml4X21zGAIgASgEEhMKC25vd19tb25vX21zGAMgASgEEjoKDXJl",
+            "bW90ZV9jb25maWcYBCABKAsyIS5vcGFtcC5wcm90by52MS5BZ2VudFJlbW90",
+            "ZUNvbmZpZ0gAEjEKCWNvbm5lY3RlZBgFIAEoCzIcLm9wYW1wLnNkay52MS5B",
+            "Z2VudENvbm5lY3RlZEgAEjoKDmNvbm5lY3RfZmFpbGVkGAYgASgLMiAub3Bh",
+            "bXAuc2RrLnYxLkFnZW50Q29ubmVjdEZhaWxlZEgAEh4KFGluc3RhbmNlX3Vp",
+            "ZF9jaGFuZ2VkGAcgASgMSAASFwoNdWlkX25vdF9zYXZlZBgIIAEoCUgAEiIK",
+            "GHN0YXRlX2Zyb21fbmV3ZXJfdmVyc2lvbhgJIAEoDUgAEi0KB3N0b3BwZWQY",
+            "CiABKAsyGi5vcGFtcC5zZGsudjEuQWdlbnRTdG9wcGVkSAASKwoFdGltZXIY",
+            "CyABKAsyGi5vcGFtcC5zZGsudjEuRXhwb3J0Q291bnRzSAASMQoJZXhwb3J0",
+            "ZXJzGAwgASgLMhwub3BhbXAuc2RrLnYxLkFnZW50RXhwb3J0ZXJzSAASIgoE",
+            "aG9zdBgNIAEoCzISLm9wYW1wLnNkay52MS5Ib3N0SAASKQoFYnVpbHQYDiAB",
+            "KAsyGC5vcGFtcC5zZGsudjEuQWdlbnRCdWlsdEgAQgcKBWlucHV0IkgKCkFn",
+            "ZW50QnVpbHQSDwoHc2VydmljZRgBIAEoCRIpCglleHBvcnRlcnMYAiADKAsy",
+            "Fi5vcGFtcC5zZGsudjEuRXhwb3J0ZXIiIgoOQWdlbnRDb25uZWN0ZWQSEAoI",
+            "ZW5kcG9pbnQYASABKAkiRgoSQWdlbnRDb25uZWN0RmFpbGVkEhAKCGVuZHBv",
+            "aW50GAEgASgJEg4KBnN0YXR1cxgCIAEoDRIOCgZkZXRhaWwYAyABKAkiHQoM",
+            "QWdlbnRTdG9wcGVkEg0KBWVycm9yGAEgASgJImcKDkFnZW50RXhwb3J0ZXJz",
+            "EikKCWV4cG9ydGVycxgBIAMoCzIWLm9wYW1wLnNkay52MS5FeHBvcnRlchIq",
+            "CgZjb3VudHMYAiABKAsyGi5vcGFtcC5zZGsudjEuRXhwb3J0Q291bnRzIpUB",
+            "CgtBZ2VudE91dHB1dBINCgVhZ2VudBgBIAEoDBIqCgdlZmZlY3RzGAIgAygL",
+            "Mhkub3BhbXAuc2RrLnYxLkFnZW50RWZmZWN0EhcKD3dha2VfYXRfbW9ub19t",
+            "cxgDIAEoBBIyCgllZmZlY3RpdmUYBCABKAsyHy5vcGFtcC5wcm90by52MS5F",
+            "ZmZlY3RpdmVDb25maWcimgIKC0FnZW50RWZmZWN0EicKBWFwcGx5GAEgASgL",
+            "MhYub3BhbXAuc2RrLnYxLlNldHRpbmdzSAASNAoJZWZmZWN0aXZlGAIgASgL",
+            "Mh8ub3BhbXAucHJvdG8udjEuRWZmZWN0aXZlQ29uZmlnSAASNAoGc3RhdHVz",
+            "GAMgASgLMiIub3BhbXAucHJvdG8udjEuUmVtb3RlQ29uZmlnU3RhdHVzSAAS",
+            "MQoGaGVhbHRoGAQgASgLMh8ub3BhbXAucHJvdG8udjEuQ29tcG9uZW50SGVh",
+            "bHRoSAASEgoIc2F2ZV91aWQYBSABKAlIABIlCgNsb2cYBiABKAsyFi5vcGFt",
+            "cC5zZGsudjEuQWdlbnRMb2dIAEIICgZlZmZlY3QihAEKCEFnZW50TG9nEisK",
+            "BWxldmVsGAEgASgOMhwub3BhbXAuc2RrLnYxLkFnZW50TG9nLkxldmVsEgwK",
+            "BHRleHQYAiABKAkiPQoFTGV2ZWwSCQoFREVCVUcQABIICgRJTkZPEAESCgoG",
+            "Tk9USUNFEAISCAoEV0FSThADEgkKBUVSUk9SEAQimwQKCkFnZW50U3RhdGUS",
+            "IAoEaG9zdBgBIAEoCzISLm9wYW1wLnNkay52MS5Ib3N0EhEKCXN0YXRlX2Rp",
+            "chgCIAEoCBIPCgdjdXJyZW50GAMgASgMEhAKCGF0X3N0YXJ0GAQgASgMEhEK",
+            "CWVmZmVjdGl2ZRgFIAEoCRIpCglleHBvcnRlcnMYBiADKAsyFi5vcGFtcC5z",
+            "ZGsudjEuRXhwb3J0ZXISKgoGaGVhbHRoGAcgASgLMhoub3BhbXAuc2RrLnYx",
+            "LkhlYWx0aFJlcG9ydBIfChJyZWZyZXNoX2F0X3VuaXhfbXMYCCABKARIAIgB",
+            "ARIgChNyZWZyZXNoX2R1ZV9tb25vX21zGAkgASgESAGIAQESGgoSaGVhbHRo",
+            "X2R1ZV9tb25vX21zGAogASgEEhcKD3N0YXJ0ZWRfdW5peF9tcxgLIAEoBBIQ",
+            "CghlbmRwb2ludBgMIAEoCRIPCgdzZXJ2aWNlGA0gASgJEgsKA3VpZBgOIAEo",
+            "CRInCgVoaW50cxgPIAEoCzIYLm9wYW1wLnNkay52MS5BZ2VudEhpbnRzEgwK",
+            "BGV2ZXIYECABKAgSDwoHZmFpbGluZxgRIAEoCBIVCg1hc2tlZF91bml4X21z",
+            "GBIgASgEEhUKDWFza2VkX21vbm9fbXMYEyABKARCFQoTX3JlZnJlc2hfYXRf",
+            "dW5peF9tc0IWChRfcmVmcmVzaF9kdWVfbW9ub19tcyKRAQoMRXhwb3J0Q291",
+            "bnRzEioKBnRyYWNlcxgBIAEoCzIaLm9wYW1wLnNkay52MS5TaWduYWxDb3Vu",
+            "dHMSKwoHbWV0cmljcxgCIAEoCzIaLm9wYW1wLnNkay52MS5TaWduYWxDb3Vu",
+            "dHMSKAoEbG9ncxgDIAEoCzIaLm9wYW1wLnNkay52MS5TaWduYWxDb3VudHMi",
+            "kQEKDFNpZ25hbENvdW50cxISCgpleHBvcnRzX29rGAEgASgEEhYKDmV4cG9y",
+            "dHNfZmFpbGVkGAIgASgEEhQKDGl0ZW1zX2ZhaWxlZBgDIAEoBBIWCg5pdGVt",
+            "c19maWx0ZXJlZBgEIAEoBBITCgtsYXN0X2ZhaWxlZBgFIAEoCBISCgpsYXN0",
+            "X2Vycm9yGAYgASgJImYKDEhlYWx0aFJlcG9ydBIMCgRzZW5kGAEgASgIEjIK",
+            "CWV4cG9ydGVycxgCIAEoCzIfLm9wYW1wLnByb3RvLnYxLkNvbXBvbmVudEhl",
+            "YWx0aBIUCgxzZW50X3VuaXhfbXMYAyABKAQibQoIRGVzY3JpYmUSKgoIcmVz",
+            "b3VyY2UYASADKAsyGC5vcGFtcC5wcm90by52MS5LZXlWYWx1ZRIgCgRob3N0",
+            "GAIgASgLMhIub3BhbXAuc2RrLnYxLkhvc3QSEwoLbm93X3VuaXhfbXMYAyAB",
+            "KAQibwoKQ29tcG9uZW50cxIqCglpbnZlbnRvcnkYASABKAsyFy5vcGFtcC5z",
+            "ZGsudjEuSW52ZW50b3J5EiAKBGhvc3QYAiABKAsyEi5vcGFtcC5zZGsudjEu",
+            "SG9zdBITCgtub3dfdW5peF9tcxgDIAEoBCLMAQoJSW52ZW50b3J5EhMKC2lu",
+            "dGVncmF0aW9uGAEgASgJEhsKE2ludGVncmF0aW9uX3ZlcnNpb24YAiABKAkS",
+            "FAoMc2RrX2xhbmd1YWdlGAMgASgJEhMKC3Nka192ZXJzaW9uGAQgASgJEjcK",
+            "EGluc3RydW1lbnRhdGlvbnMYBSADKAsyHS5vcGFtcC5zZGsudjEuSW5zdHJ1",
+            "bWVudGF0aW9uEikKCWV4cG9ydGVycxgGIAMoCzIWLm9wYW1wLnNkay52MS5F",
+            "eHBvcnRlciIwCg9JbnN0cnVtZW50YXRpb24SDAoEbmFtZRgBIAEoCRIPCgd2",
+            "ZXJzaW9uGAIgASgJIkwKCEV4cG9ydGVyEg4KBnNpZ25hbBgBIAEoCRIMCgRu",
+            "YW1lGAIgASgJEg0KBWdhdGVkGAMgASgIEhMKC2Rlc3RpbmF0aW9uGAQgASgJ",
+            "InQKCUV4cG9ydGVycxIqCgVmb3VuZBgBIAMoCzIbLm9wYW1wLnNkay52MS5G",
+            "b3VuZEV4cG9ydGVyEiEKA2VudhgCIAMoCzIULm9wYW1wLnNkay52MS5FbnZW",
+            "YXISGAoQZGVmYXVsdF9wcm90b2NvbBgDIAEoCSJgCg1Gb3VuZEV4cG9ydGVy",
+            "Eg4KBnNpZ25hbBgBIAEoCRIMCgRraW5kGAIgASgJEg0KBWdhdGVkGAMgASgI",
+            "EhAKCGVuZHBvaW50GAQgASgJEhAKCGZyb21fZW52GAUgASgIIiUKBkVudlZh",
+            "chIMCgRuYW1lGAEgASgJEg0KBXZhbHVlGAIgASgJInUKEEV4cG9ydGVyc0Rl",
+            "Y2lkZWQSKQoJZXhwb3J0ZXJzGAEgAygLMhYub3BhbXAuc2RrLnYxLkV4cG9y",
+            "dGVyEhAKCGdvdmVybmVkGAIgAygJEhIKCnVuZ292ZXJuZWQYAyADKAkSEAoI",
+            "d2FybmluZ3MYBCADKAkiggIKCEV2YWx1YXRlEhAKCHNldHRpbmdzGAEgASgM",
+            "EiAKBGhvc3QYAiABKAsyEi5vcGFtcC5zZGsudjEuSG9zdBITCgtub3dfdW5p",
+            "eF9tcxgHIAEoBBInCgRzcGFuGAMgASgLMhcub3BhbXAuc2RrLnYxLlNwYW5T",
+            "dGFydEgAEiYKA2xvZxgEIAEoCzIXLm9wYW1wLnNkay52MS5Mb2dSZWNvcmRI",
+            "ABIuCgphdHRyaWJ1dGVzGAUgASgLMhgub3BhbXAuc2RrLnYxLkF0dHJpYnV0",
+            "ZXNIABIjCgNjYXAYBiABKAsyFC5vcGFtcC5zZGsudjEuQ2FwUnVuSABCBwoF",
+            "aW5wdXQifQoGQ2FwUnVuEisKBnNpZ25hbBgBIAEoDjIbLm9wYW1wLnNkay52",
+            "MS5DYXBSdW4uU2lnbmFsEiYKBmV2ZW50cxgCIAMoCzIWLm9wYW1wLnNkay52",
+            "MS5DYXBFdmVudCIeCgZTaWduYWwSCgoGVFJBQ0VTEAASCAoETE9HUxABImEK",
+            "CENhcEV2ZW50Eg0KBWF0X25zGAEgASgEEiQKBnBhcmVudBgCIAEoDjIULm9w",
+            "YW1wLnNkay52MS5QYXJlbnQSDwoHc2FtcGxlZBgDIAEoCBIPCgdyZWNvcmRz",
+            "GAQgASgEImIKCkF0dHJpYnV0ZXMSLAoKYXR0cmlidXRlcxgBIAMoCzIYLm9w",
+            "YW1wLnByb3RvLnYxLktleVZhbHVlEiYKBGJvZHkYAiABKAsyGC5vcGFtcC5w",
+            "cm90by52MS5BbnlWYWx1ZSIsCglMb2dSZWNvcmQSDQoFc2NvcGUYASABKAkS",
+            "EAoIc2V2ZXJpdHkYAiABKA0ikwEKCVNwYW5TdGFydBIMCgRuYW1lGAEgASgJ",
+            "EiQKBGtpbmQYAiABKA4yFi5vcGFtcC5zZGsudjEuU3BhbktpbmQSLAoKYXR0",
+            "cmlidXRlcxgDIAMoCzIYLm9wYW1wLnByb3RvLnYxLktleVZhbHVlEiQKBnBh",
+            "cmVudBgEIAEoDjIULm9wYW1wLnNkay52MS5QYXJlbnQiygEKCUV2YWx1YXRl",
+            "ZBIPCgdyZWZ1c2VkGAEgASgJEiwKCHNhbXBsaW5nGAIgASgLMhoub3BhbXAu",
+            "c2RrLnYxLlNwYW5TYW1wbGluZxIRCgRrZXB0GAMgASgISACIAQESKgoIcmVk",
+            "YWN0ZWQYBCADKAsyGC5vcGFtcC5wcm90by52MS5LZXlWYWx1ZRImCgRib2R5",
+            "GAYgASgLMhgub3BhbXAucHJvdG8udjEuQW55VmFsdWUSDgoGcGFzc2VkGAUg",
+            "AygEQgcKBV9rZXB0IrIBCgxTcGFuU2FtcGxpbmcSKwoDaG93GAEgASgOMh4u",
+            "b3BhbXAuc2RrLnYxLlNwYW5TYW1wbGluZy5Ib3cSFgoOcGFyZW50X3NhbXBs",
+            "ZWQYAiABKAgSDAoEcmF0ZRgDIAEoARIRCgRydWxlGAQgASgNSACIAQEiMwoD",
+            "SG93EhEKDUZPTExPV19QQVJFTlQQABIICgRSQVRFEAESDwoLQVBQX1NBTVBM",
+            "RVIQAkIHCgVfcnVsZSLFAgoHUmVxdWVzdBIqCghkZXNjcmliZRgDIAEoCzIW",
+            "Lm9wYW1wLnNkay52MS5EZXNjcmliZUgAEioKCGV2YWx1YXRlGAQgASgLMhYu",
+            "b3BhbXAuc2RrLnYxLkV2YWx1YXRlSAASLgoKY29tcG9uZW50cxgHIAEoCzIY",
+            "Lm9wYW1wLnNkay52MS5Db21wb25lbnRzSAASLAoJZXhwb3J0ZXJzGAkgASgL",
+            "Mhcub3BhbXAuc2RrLnYxLkV4cG9ydGVyc0gAEi8KC2FnZW50X3N0YXJ0GAog",
+            "ASgLMhgub3BhbXAuc2RrLnYxLkFnZW50U3RhcnRIABItCgphZ2VudF9zdGVw",
+            "GAsgASgLMhcub3BhbXAuc2RrLnYxLkFnZW50U3RlcEgAQgYKBGNhbGxKBAgB",
+            "EAJKBAgCEANKBAgFEAZKBAgGEAdKBAgIEAki3AIKBVJlcGx5EjcKC2Rlc2Ny",
+            "aXB0aW9uGAMgASgLMiAub3BhbXAucHJvdG8udjEuQWdlbnREZXNjcmlwdGlv",
+            "bkgAEg8KBWVycm9yGAQgASgJSAASLAoJZXZhbHVhdGVkGAUgASgLMhcub3Bh",
+            "bXAuc2RrLnYxLkV2YWx1YXRlZEgAEkMKFGF2YWlsYWJsZV9jb21wb25lbnRz",
+            "GAggASgLMiMub3BhbXAucHJvdG8udjEuQXZhaWxhYmxlQ29tcG9uZW50c0gA",
+            "EjsKEWV4cG9ydGVyc19kZWNpZGVkGAogASgLMh4ub3BhbXAuc2RrLnYxLkV4",
+            "cG9ydGVyc0RlY2lkZWRIABIxCgxhZ2VudF9vdXRwdXQYCyABKAsyGS5vcGFt",
+            "cC5zZGsudjEuQWdlbnRPdXRwdXRIAEIICgZyZXN1bHRKBAgBEAJKBAgCEANK",
+            "BAgGEAdKBAgHEAhKBAgJEAoqmQEKCFNwYW5LaW5kEhkKFVNQQU5fS0lORF9V",
+            "TlNQRUNJRklFRBAAEhYKElNQQU5fS0lORF9JTlRFUk5BTBABEhQKEFNQQU5f",
+            "S0lORF9TRVJWRVIQAhIUChBTUEFOX0tJTkRfQ0xJRU5UEAMSFgoSU1BBTl9L",
+            "SU5EX1BST0RVQ0VSEAQSFgoSU1BBTl9LSU5EX0NPTlNVTUVSEAUqhwEKBlBh",
+            "cmVudBIPCgtQQVJFTlRfTk9ORRAAEhgKFFBBUkVOVF9MT0NBTF9TQU1QTEVE",
+            "EAESGgoWUEFSRU5UX0xPQ0FMX1VOU0FNUExFRBACEhkKFVBBUkVOVF9SRU1P",
+            "VEVfU0FNUExFRBADEhsKF1BBUkVOVF9SRU1PVEVfVU5TQU1QTEVEEARCjQEK",
+            "HmRldi5weWRhbnRpYy5sb2dmaXJlLmZsZWV0LnNka0INU2V0dGluZ3NQcm90",
+            "b1pBZ2l0aHViLmNvbS9weWRhbnRpYy9vcGFtcC1jbGllbnRzL2dvL29wYW1w",
+            "L3Nka3NldHRpbmdzL3NldHRpbmdzcGKqAhhMb2dmaXJlLkZsZWV0LkNsaWVu",
+            "dC5TZGtiBnByb3RvMw=="));
       descriptor = pbr::FileDescriptor.FromGeneratedCode(descriptorData,
           new pbr::FileDescriptor[] { global::OpAmp.Proto.V1.AnyvalueReflection.Descriptor, global::OpAmp.Proto.V1.OpampReflection.Descriptor, },
           new pbr::GeneratedClrTypeInfo(new[] {typeof(global::Logfire.Fleet.Client.Sdk.SpanKind), typeof(global::Logfire.Fleet.Client.Sdk.Parent), }, null, new pbr::GeneratedClrTypeInfo[] {
@@ -179,15 +196,18 @@ namespace Logfire.Fleet.Client.Sdk {
             new pbr::GeneratedClrTypeInfo(typeof(global::Logfire.Fleet.Client.Sdk.ScopeLevel), global::Logfire.Fleet.Client.Sdk.ScopeLevel.Parser, new[]{ "Pattern", "MinSeverity" }, null, null, null, null),
             new pbr::GeneratedClrTypeInfo(typeof(global::Logfire.Fleet.Client.Sdk.Names), global::Logfire.Fleet.Client.Sdk.Names.Parser, new[]{ "Names_" }, null, null, null, null),
             new pbr::GeneratedClrTypeInfo(typeof(global::Logfire.Fleet.Client.Sdk.Host), global::Logfire.Fleet.Client.Sdk.Host.Parser, new[]{ "Live", "NextStart" }, null, null, null, null),
-            new pbr::GeneratedClrTypeInfo(typeof(global::Logfire.Fleet.Client.Sdk.Load), global::Logfire.Fleet.Client.Sdk.Load.Parser, new[]{ "Saved", "Host", "NowUnixMs", "CoreState" }, new[]{ "Saved", "CoreState" }, null, null, null),
-            new pbr::GeneratedClrTypeInfo(typeof(global::Logfire.Fleet.Client.Sdk.Loaded), global::Logfire.Fleet.Client.Sdk.Loaded.Parser, new[]{ "Settings", "Current", "Effective", "Warning", "RefreshAtUnixMs" }, null, null, null, null),
-            new pbr::GeneratedClrTypeInfo(typeof(global::Logfire.Fleet.Client.Sdk.Decide), global::Logfire.Fleet.Client.Sdk.Decide.Parser, new[]{ "Config", "Current", "AtStart", "Host", "NowUnixMs" }, null, null, null, null),
-            new pbr::GeneratedClrTypeInfo(typeof(global::Logfire.Fleet.Client.Sdk.Plan), global::Logfire.Fleet.Client.Sdk.Plan.Parser, new[]{ "Save" }, new[]{ "Save" }, null, null, null),
-            new pbr::GeneratedClrTypeInfo(typeof(global::Logfire.Fleet.Client.Sdk.Commit), global::Logfire.Fleet.Client.Sdk.Commit.Parser, new[]{ "Decide", "Saved", "Error" }, null, new[]{ typeof(global::Logfire.Fleet.Client.Sdk.Commit.Types.Saved) }, null, null),
-            new pbr::GeneratedClrTypeInfo(typeof(global::Logfire.Fleet.Client.Sdk.Decision), global::Logfire.Fleet.Client.Sdk.Decision.Parser, new[]{ "Status", "Apply", "Current", "Effective", "PendingRestart", "RefreshAtUnixMs" }, null, null, null, null),
-            new pbr::GeneratedClrTypeInfo(typeof(global::Logfire.Fleet.Client.Sdk.Refresh), global::Logfire.Fleet.Client.Sdk.Refresh.Parser, new[]{ "Current", "AtStart", "Host", "NowUnixMs" }, null, null, null, null),
-            new pbr::GeneratedClrTypeInfo(typeof(global::Logfire.Fleet.Client.Sdk.Refreshed), global::Logfire.Fleet.Client.Sdk.Refreshed.Parser, new[]{ "Settings", "Effective", "RefreshAtUnixMs", "Warning" }, null, null, null, null),
-            new pbr::GeneratedClrTypeInfo(typeof(global::Logfire.Fleet.Client.Sdk.Health), global::Logfire.Fleet.Client.Sdk.Health.Parser, new[]{ "Counts", "Previous", "NowUnixMs", "Settings", "Exporters" }, null, null, null, null),
+            new pbr::GeneratedClrTypeInfo(typeof(global::Logfire.Fleet.Client.Sdk.AgentStart), global::Logfire.Fleet.Client.Sdk.AgentStart.Parser, new[]{ "Host", "StateDir", "CoreState", "Endpoint", "InstanceUid", "Hints", "NowUnixMs", "NowMonoMs" }, new[]{ "CoreState" }, null, null, null),
+            new pbr::GeneratedClrTypeInfo(typeof(global::Logfire.Fleet.Client.Sdk.AgentHints), global::Logfire.Fleet.Client.Sdk.AgentHints.Parser, new[]{ "Refused", "NotFound", "Unreachable", "Error" }, null, null, null, null),
+            new pbr::GeneratedClrTypeInfo(typeof(global::Logfire.Fleet.Client.Sdk.AgentStep), global::Logfire.Fleet.Client.Sdk.AgentStep.Parser, new[]{ "Agent", "NowUnixMs", "NowMonoMs", "RemoteConfig", "Connected", "ConnectFailed", "InstanceUidChanged", "UidNotSaved", "StateFromNewerVersion", "Stopped", "Timer", "Exporters", "Host", "Built" }, new[]{ "Input" }, null, null, null),
+            new pbr::GeneratedClrTypeInfo(typeof(global::Logfire.Fleet.Client.Sdk.AgentBuilt), global::Logfire.Fleet.Client.Sdk.AgentBuilt.Parser, new[]{ "Service", "Exporters" }, null, null, null, null),
+            new pbr::GeneratedClrTypeInfo(typeof(global::Logfire.Fleet.Client.Sdk.AgentConnected), global::Logfire.Fleet.Client.Sdk.AgentConnected.Parser, new[]{ "Endpoint" }, null, null, null, null),
+            new pbr::GeneratedClrTypeInfo(typeof(global::Logfire.Fleet.Client.Sdk.AgentConnectFailed), global::Logfire.Fleet.Client.Sdk.AgentConnectFailed.Parser, new[]{ "Endpoint", "Status", "Detail" }, null, null, null, null),
+            new pbr::GeneratedClrTypeInfo(typeof(global::Logfire.Fleet.Client.Sdk.AgentStopped), global::Logfire.Fleet.Client.Sdk.AgentStopped.Parser, new[]{ "Error" }, null, null, null, null),
+            new pbr::GeneratedClrTypeInfo(typeof(global::Logfire.Fleet.Client.Sdk.AgentExporters), global::Logfire.Fleet.Client.Sdk.AgentExporters.Parser, new[]{ "Exporters", "Counts" }, null, null, null, null),
+            new pbr::GeneratedClrTypeInfo(typeof(global::Logfire.Fleet.Client.Sdk.AgentOutput), global::Logfire.Fleet.Client.Sdk.AgentOutput.Parser, new[]{ "Agent", "Effects", "WakeAtMonoMs", "Effective" }, null, null, null, null),
+            new pbr::GeneratedClrTypeInfo(typeof(global::Logfire.Fleet.Client.Sdk.AgentEffect), global::Logfire.Fleet.Client.Sdk.AgentEffect.Parser, new[]{ "Apply", "Effective", "Status", "Health", "SaveUid", "Log" }, new[]{ "Effect" }, null, null, null),
+            new pbr::GeneratedClrTypeInfo(typeof(global::Logfire.Fleet.Client.Sdk.AgentLog), global::Logfire.Fleet.Client.Sdk.AgentLog.Parser, new[]{ "Level", "Text" }, null, new[]{ typeof(global::Logfire.Fleet.Client.Sdk.AgentLog.Types.Level) }, null, null),
+            new pbr::GeneratedClrTypeInfo(typeof(global::Logfire.Fleet.Client.Sdk.AgentState), global::Logfire.Fleet.Client.Sdk.AgentState.Parser, new[]{ "Host", "StateDir", "Current", "AtStart", "Effective", "Exporters", "Health", "RefreshAtUnixMs", "RefreshDueMonoMs", "HealthDueMonoMs", "StartedUnixMs", "Endpoint", "Service", "Uid", "Hints", "Ever", "Failing", "AskedUnixMs", "AskedMonoMs" }, new[]{ "RefreshAtUnixMs", "RefreshDueMonoMs" }, null, null, null),
             new pbr::GeneratedClrTypeInfo(typeof(global::Logfire.Fleet.Client.Sdk.ExportCounts), global::Logfire.Fleet.Client.Sdk.ExportCounts.Parser, new[]{ "Traces", "Metrics", "Logs" }, null, null, null, null),
             new pbr::GeneratedClrTypeInfo(typeof(global::Logfire.Fleet.Client.Sdk.SignalCounts), global::Logfire.Fleet.Client.Sdk.SignalCounts.Parser, new[]{ "ExportsOk", "ExportsFailed", "ItemsFailed", "ItemsFiltered", "LastFailed", "LastError" }, null, null, null, null),
             new pbr::GeneratedClrTypeInfo(typeof(global::Logfire.Fleet.Client.Sdk.HealthReport), global::Logfire.Fleet.Client.Sdk.HealthReport.Parser, new[]{ "Send", "Exporters", "SentUnixMs" }, null, null, null, null),
@@ -208,8 +228,8 @@ namespace Logfire.Fleet.Client.Sdk {
             new pbr::GeneratedClrTypeInfo(typeof(global::Logfire.Fleet.Client.Sdk.SpanStart), global::Logfire.Fleet.Client.Sdk.SpanStart.Parser, new[]{ "Name", "Kind", "Attributes", "Parent" }, null, null, null, null),
             new pbr::GeneratedClrTypeInfo(typeof(global::Logfire.Fleet.Client.Sdk.Evaluated), global::Logfire.Fleet.Client.Sdk.Evaluated.Parser, new[]{ "Refused", "Sampling", "Kept", "Redacted", "Body", "Passed" }, new[]{ "Kept" }, null, null, null),
             new pbr::GeneratedClrTypeInfo(typeof(global::Logfire.Fleet.Client.Sdk.SpanSampling), global::Logfire.Fleet.Client.Sdk.SpanSampling.Parser, new[]{ "How", "ParentSampled", "Rate", "Rule" }, new[]{ "Rule" }, new[]{ typeof(global::Logfire.Fleet.Client.Sdk.SpanSampling.Types.How) }, null, null),
-            new pbr::GeneratedClrTypeInfo(typeof(global::Logfire.Fleet.Client.Sdk.Request), global::Logfire.Fleet.Client.Sdk.Request.Parser, new[]{ "Load", "Decide", "Describe", "Evaluate", "Refresh", "Health", "Components", "Commit", "Exporters" }, new[]{ "Call" }, null, null, null),
-            new pbr::GeneratedClrTypeInfo(typeof(global::Logfire.Fleet.Client.Sdk.Reply), global::Logfire.Fleet.Client.Sdk.Reply.Parser, new[]{ "Loaded", "Decision", "Description", "Error", "Evaluated", "Refreshed", "HealthReport", "AvailableComponents", "Plan", "ExportersDecided" }, new[]{ "Result" }, null, null, null)
+            new pbr::GeneratedClrTypeInfo(typeof(global::Logfire.Fleet.Client.Sdk.Request), global::Logfire.Fleet.Client.Sdk.Request.Parser, new[]{ "Describe", "Evaluate", "Components", "Exporters", "AgentStart", "AgentStep" }, new[]{ "Call" }, null, null, null),
+            new pbr::GeneratedClrTypeInfo(typeof(global::Logfire.Fleet.Client.Sdk.Reply), global::Logfire.Fleet.Client.Sdk.Reply.Parser, new[]{ "Description", "Error", "Evaluated", "AvailableComponents", "ExportersDecided", "AgentOutput" }, new[]{ "Result" }, null, null, null)
           }));
     }
     #endregion
@@ -2229,19 +2249,25 @@ namespace Logfire.Fleet.Client.Sdk {
   }
 
   /// <summary>
-  /// At start, before the SDK is built: the settings of the last config applied.
+  /// The agent flow: the layer's decisions over time, as a step machine shaped like the client core.
+  /// AgentStart once, before the SDK is built; then AgentStep for each thing that happens (a remote
+  /// config, a client notification, the timer). Each answers an AgentOutput: carry out its effects in
+  /// order, keep one timer for wake_at_mono_ms (replacing any earlier one), and pass `agent` back with
+  /// the next step, as it came. The host keeps no settings document, no timer of its own and no
+  /// wording: put Apply in force on the SDK, hand Effective, Status and Health to the client, write
+  /// SaveUid's file, and say each Log line. Steps for one agent are made one at a time, in order.
   /// </summary>
   [global::System.Diagnostics.DebuggerDisplayAttribute("{ToString(),nq}")]
-  public sealed partial class Load : pb::IMessage<Load>
+  public sealed partial class AgentStart : pb::IMessage<AgentStart>
   #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
       , pb::IBufferMessage
   #endif
   {
-    private static readonly pb::MessageParser<Load> _parser = new pb::MessageParser<Load>(() => new Load());
+    private static readonly pb::MessageParser<AgentStart> _parser = new pb::MessageParser<AgentStart>(() => new AgentStart());
     private pb::UnknownFieldSet _unknownFields;
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public static pb::MessageParser<Load> Parser { get { return _parser; } }
+    public static pb::MessageParser<AgentStart> Parser { get { return _parser; } }
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
@@ -2257,7 +2283,7 @@ namespace Logfire.Fleet.Client.Sdk {
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public Load() {
+    public AgentStart() {
       OnConstruction();
     }
 
@@ -2265,52 +2291,26 @@ namespace Logfire.Fleet.Client.Sdk {
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public Load(Load other) : this() {
-      saved_ = other.saved_;
+    public AgentStart(AgentStart other) : this() {
       host_ = other.host_ != null ? other.host_.Clone() : null;
-      nowUnixMs_ = other.nowUnixMs_;
+      stateDir_ = other.stateDir_;
       coreState_ = other.coreState_;
+      endpoint_ = other.endpoint_;
+      instanceUid_ = other.instanceUid_;
+      hints_ = other.hints_ != null ? other.hints_.Clone() : null;
+      nowUnixMs_ = other.nowUnixMs_;
+      nowMonoMs_ = other.nowMonoMs_;
       _unknownFields = pb::UnknownFieldSet.Clone(other._unknownFields);
     }
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public Load Clone() {
-      return new Load(this);
-    }
-
-    /// <summary>Field number for the "saved" field.</summary>
-    public const int SavedFieldNumber = 1;
-    private readonly static pb::ByteString SavedDefaultValue = pb::ByteString.Empty;
-
-    private pb::ByteString saved_;
-    /// <summary>
-    /// The document this host kept itself (sdk-settings.json, before the core kept the last config
-    /// applied): read only when core_state holds no config applied. Unset: none.
-    /// </summary>
-    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
-    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public pb::ByteString Saved {
-      get { return saved_ ?? SavedDefaultValue; }
-      set {
-        saved_ = pb::ProtoPreconditions.CheckNotNull(value, "value");
-      }
-    }
-    /// <summary>Gets whether the "saved" field is set</summary>
-    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
-    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public bool HasSaved {
-      get { return saved_ != null; }
-    }
-    /// <summary>Clears the value of the "saved" field</summary>
-    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
-    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public void ClearSaved() {
-      saved_ = null;
+    public AgentStart Clone() {
+      return new AgentStart(this);
     }
 
     /// <summary>Field number for the "host" field.</summary>
-    public const int HostFieldNumber = 2;
+    public const int HostFieldNumber = 1;
     private global::Logfire.Fleet.Client.Sdk.Host host_;
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
@@ -2321,31 +2321,29 @@ namespace Logfire.Fleet.Client.Sdk {
       }
     }
 
-    /// <summary>Field number for the "now_unix_ms" field.</summary>
-    public const int NowUnixMsFieldNumber = 3;
-    private ulong nowUnixMs_;
+    /// <summary>Field number for the "state_dir" field.</summary>
+    public const int StateDirFieldNumber = 2;
+    private bool stateDir_;
     /// <summary>
-    /// The wall clock, in milliseconds since the Unix epoch. Debug mode (debug_until) is decided
-    /// against it; 0 (a host built before it) makes the debug settings ones the host can't carry out.
+    /// the host keeps state across restarts
     /// </summary>
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public ulong NowUnixMs {
-      get { return nowUnixMs_; }
+    public bool StateDir {
+      get { return stateDir_; }
       set {
-        nowUnixMs_ = value;
+        stateDir_ = value;
       }
     }
 
     /// <summary>Field number for the "core_state" field.</summary>
-    public const int CoreStateFieldNumber = 4;
+    public const int CoreStateFieldNumber = 3;
     private readonly static pb::ByteString CoreStateDefaultValue = pb::ByteString.Empty;
 
     private pb::ByteString coreState_;
     /// <summary>
-    /// The OpAMP core's saved state, as the host keeps it (what the core asked it to store): the
-    /// settings come from the last config applied in it, read with the core's own decoding, even
-    /// after an endpoint change. Unset: none.
+    /// The client's saved state, as the host keeps it: the policy to start with is the last config
+    /// applied in it, read with the core's own decoding. Unset: none.
     /// </summary>
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
@@ -2368,25 +2366,104 @@ namespace Logfire.Fleet.Client.Sdk {
       coreState_ = null;
     }
 
+    /// <summary>Field number for the "endpoint" field.</summary>
+    public const int EndpointFieldNumber = 5;
+    private string endpoint_ = "";
+    /// <summary>
+    /// as configured: the lines name it as it is safe to log
+    /// </summary>
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public override bool Equals(object other) {
-      return Equals(other as Load);
+    public string Endpoint {
+      get { return endpoint_; }
+      set {
+        endpoint_ = pb::ProtoPreconditions.CheckNotNull(value, "value");
+      }
+    }
+
+    /// <summary>Field number for the "instance_uid" field.</summary>
+    public const int InstanceUidFieldNumber = 7;
+    private pb::ByteString instanceUid_ = pb::ByteString.Empty;
+    /// <summary>
+    /// 16 bytes
+    /// </summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public pb::ByteString InstanceUid {
+      get { return instanceUid_; }
+      set {
+        instanceUid_ = pb::ProtoPreconditions.CheckNotNull(value, "value");
+      }
+    }
+
+    /// <summary>Field number for the "hints" field.</summary>
+    public const int HintsFieldNumber = 8;
+    private global::Logfire.Fleet.Client.Sdk.AgentHints hints_;
+    /// <summary>
+    /// SetupStarted.hints
+    /// </summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public global::Logfire.Fleet.Client.Sdk.AgentHints Hints {
+      get { return hints_; }
+      set {
+        hints_ = value;
+      }
+    }
+
+    /// <summary>Field number for the "now_unix_ms" field.</summary>
+    public const int NowUnixMsFieldNumber = 9;
+    private ulong nowUnixMs_;
+    /// <summary>
+    /// the wall clock, in milliseconds since the Unix epoch
+    /// </summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public ulong NowUnixMs {
+      get { return nowUnixMs_; }
+      set {
+        nowUnixMs_ = value;
+      }
+    }
+
+    /// <summary>Field number for the "now_mono_ms" field.</summary>
+    public const int NowMonoMsFieldNumber = 10;
+    private ulong nowMonoMs_;
+    /// <summary>
+    /// a monotonic clock, in milliseconds
+    /// </summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public ulong NowMonoMs {
+      get { return nowMonoMs_; }
+      set {
+        nowMonoMs_ = value;
+      }
     }
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public bool Equals(Load other) {
+    public override bool Equals(object other) {
+      return Equals(other as AgentStart);
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public bool Equals(AgentStart other) {
       if (ReferenceEquals(other, null)) {
         return false;
       }
       if (ReferenceEquals(other, this)) {
         return true;
       }
-      if (Saved != other.Saved) return false;
       if (!object.Equals(Host, other.Host)) return false;
-      if (NowUnixMs != other.NowUnixMs) return false;
+      if (StateDir != other.StateDir) return false;
       if (CoreState != other.CoreState) return false;
+      if (Endpoint != other.Endpoint) return false;
+      if (InstanceUid != other.InstanceUid) return false;
+      if (!object.Equals(Hints, other.Hints)) return false;
+      if (NowUnixMs != other.NowUnixMs) return false;
+      if (NowMonoMs != other.NowMonoMs) return false;
       return Equals(_unknownFields, other._unknownFields);
     }
 
@@ -2394,10 +2471,14 @@ namespace Logfire.Fleet.Client.Sdk {
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public override int GetHashCode() {
       int hash = 1;
-      if (HasSaved) hash ^= Saved.GetHashCode();
       if (host_ != null) hash ^= Host.GetHashCode();
-      if (NowUnixMs != 0UL) hash ^= NowUnixMs.GetHashCode();
+      if (StateDir != false) hash ^= StateDir.GetHashCode();
       if (HasCoreState) hash ^= CoreState.GetHashCode();
+      if (Endpoint.Length != 0) hash ^= Endpoint.GetHashCode();
+      if (InstanceUid.Length != 0) hash ^= InstanceUid.GetHashCode();
+      if (hints_ != null) hash ^= Hints.GetHashCode();
+      if (NowUnixMs != 0UL) hash ^= NowUnixMs.GetHashCode();
+      if (NowMonoMs != 0UL) hash ^= NowMonoMs.GetHashCode();
       if (_unknownFields != null) {
         hash ^= _unknownFields.GetHashCode();
       }
@@ -2416,21 +2497,37 @@ namespace Logfire.Fleet.Client.Sdk {
     #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
       output.WriteRawMessage(this);
     #else
-      if (HasSaved) {
-        output.WriteRawTag(10);
-        output.WriteBytes(Saved);
-      }
       if (host_ != null) {
-        output.WriteRawTag(18);
+        output.WriteRawTag(10);
         output.WriteMessage(Host);
       }
-      if (NowUnixMs != 0UL) {
-        output.WriteRawTag(24);
-        output.WriteUInt64(NowUnixMs);
+      if (StateDir != false) {
+        output.WriteRawTag(16);
+        output.WriteBool(StateDir);
       }
       if (HasCoreState) {
-        output.WriteRawTag(34);
+        output.WriteRawTag(26);
         output.WriteBytes(CoreState);
+      }
+      if (Endpoint.Length != 0) {
+        output.WriteRawTag(42);
+        output.WriteString(Endpoint);
+      }
+      if (InstanceUid.Length != 0) {
+        output.WriteRawTag(58);
+        output.WriteBytes(InstanceUid);
+      }
+      if (hints_ != null) {
+        output.WriteRawTag(66);
+        output.WriteMessage(Hints);
+      }
+      if (NowUnixMs != 0UL) {
+        output.WriteRawTag(72);
+        output.WriteUInt64(NowUnixMs);
+      }
+      if (NowMonoMs != 0UL) {
+        output.WriteRawTag(80);
+        output.WriteUInt64(NowMonoMs);
       }
       if (_unknownFields != null) {
         _unknownFields.WriteTo(output);
@@ -2442,21 +2539,37 @@ namespace Logfire.Fleet.Client.Sdk {
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     void pb::IBufferMessage.InternalWriteTo(ref pb::WriteContext output) {
-      if (HasSaved) {
-        output.WriteRawTag(10);
-        output.WriteBytes(Saved);
-      }
       if (host_ != null) {
-        output.WriteRawTag(18);
+        output.WriteRawTag(10);
         output.WriteMessage(Host);
       }
-      if (NowUnixMs != 0UL) {
-        output.WriteRawTag(24);
-        output.WriteUInt64(NowUnixMs);
+      if (StateDir != false) {
+        output.WriteRawTag(16);
+        output.WriteBool(StateDir);
       }
       if (HasCoreState) {
-        output.WriteRawTag(34);
+        output.WriteRawTag(26);
         output.WriteBytes(CoreState);
+      }
+      if (Endpoint.Length != 0) {
+        output.WriteRawTag(42);
+        output.WriteString(Endpoint);
+      }
+      if (InstanceUid.Length != 0) {
+        output.WriteRawTag(58);
+        output.WriteBytes(InstanceUid);
+      }
+      if (hints_ != null) {
+        output.WriteRawTag(66);
+        output.WriteMessage(Hints);
+      }
+      if (NowUnixMs != 0UL) {
+        output.WriteRawTag(72);
+        output.WriteUInt64(NowUnixMs);
+      }
+      if (NowMonoMs != 0UL) {
+        output.WriteRawTag(80);
+        output.WriteUInt64(NowMonoMs);
       }
       if (_unknownFields != null) {
         _unknownFields.WriteTo(ref output);
@@ -2468,17 +2581,29 @@ namespace Logfire.Fleet.Client.Sdk {
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public int CalculateSize() {
       int size = 0;
-      if (HasSaved) {
-        size += 1 + pb::CodedOutputStream.ComputeBytesSize(Saved);
-      }
       if (host_ != null) {
         size += 1 + pb::CodedOutputStream.ComputeMessageSize(Host);
+      }
+      if (StateDir != false) {
+        size += 1 + 1;
+      }
+      if (HasCoreState) {
+        size += 1 + pb::CodedOutputStream.ComputeBytesSize(CoreState);
+      }
+      if (Endpoint.Length != 0) {
+        size += 1 + pb::CodedOutputStream.ComputeStringSize(Endpoint);
+      }
+      if (InstanceUid.Length != 0) {
+        size += 1 + pb::CodedOutputStream.ComputeBytesSize(InstanceUid);
+      }
+      if (hints_ != null) {
+        size += 1 + pb::CodedOutputStream.ComputeMessageSize(Hints);
       }
       if (NowUnixMs != 0UL) {
         size += 1 + pb::CodedOutputStream.ComputeUInt64Size(NowUnixMs);
       }
-      if (HasCoreState) {
-        size += 1 + pb::CodedOutputStream.ComputeBytesSize(CoreState);
+      if (NowMonoMs != 0UL) {
+        size += 1 + pb::CodedOutputStream.ComputeUInt64Size(NowMonoMs);
       }
       if (_unknownFields != null) {
         size += _unknownFields.CalculateSize();
@@ -2488,12 +2613,9 @@ namespace Logfire.Fleet.Client.Sdk {
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public void MergeFrom(Load other) {
+    public void MergeFrom(AgentStart other) {
       if (other == null) {
         return;
-      }
-      if (other.HasSaved) {
-        Saved = other.Saved;
       }
       if (other.host_ != null) {
         if (host_ == null) {
@@ -2501,11 +2623,29 @@ namespace Logfire.Fleet.Client.Sdk {
         }
         Host.MergeFrom(other.Host);
       }
-      if (other.NowUnixMs != 0UL) {
-        NowUnixMs = other.NowUnixMs;
+      if (other.StateDir != false) {
+        StateDir = other.StateDir;
       }
       if (other.HasCoreState) {
         CoreState = other.CoreState;
+      }
+      if (other.Endpoint.Length != 0) {
+        Endpoint = other.Endpoint;
+      }
+      if (other.InstanceUid.Length != 0) {
+        InstanceUid = other.InstanceUid;
+      }
+      if (other.hints_ != null) {
+        if (hints_ == null) {
+          Hints = new global::Logfire.Fleet.Client.Sdk.AgentHints();
+        }
+        Hints.MergeFrom(other.Hints);
+      }
+      if (other.NowUnixMs != 0UL) {
+        NowUnixMs = other.NowUnixMs;
+      }
+      if (other.NowMonoMs != 0UL) {
+        NowMonoMs = other.NowMonoMs;
       }
       _unknownFields = pb::UnknownFieldSet.MergeFrom(_unknownFields, other._unknownFields);
     }
@@ -2527,22 +2667,41 @@ namespace Logfire.Fleet.Client.Sdk {
             _unknownFields = pb::UnknownFieldSet.MergeFieldFrom(_unknownFields, input);
             break;
           case 10: {
-            Saved = input.ReadBytes();
-            break;
-          }
-          case 18: {
             if (host_ == null) {
               Host = new global::Logfire.Fleet.Client.Sdk.Host();
             }
             input.ReadMessage(Host);
             break;
           }
-          case 24: {
+          case 16: {
+            StateDir = input.ReadBool();
+            break;
+          }
+          case 26: {
+            CoreState = input.ReadBytes();
+            break;
+          }
+          case 42: {
+            Endpoint = input.ReadString();
+            break;
+          }
+          case 58: {
+            InstanceUid = input.ReadBytes();
+            break;
+          }
+          case 66: {
+            if (hints_ == null) {
+              Hints = new global::Logfire.Fleet.Client.Sdk.AgentHints();
+            }
+            input.ReadMessage(Hints);
+            break;
+          }
+          case 72: {
             NowUnixMs = input.ReadUInt64();
             break;
           }
-          case 34: {
-            CoreState = input.ReadBytes();
+          case 80: {
+            NowMonoMs = input.ReadUInt64();
             break;
           }
         }
@@ -2565,22 +2724,41 @@ namespace Logfire.Fleet.Client.Sdk {
             _unknownFields = pb::UnknownFieldSet.MergeFieldFrom(_unknownFields, ref input);
             break;
           case 10: {
-            Saved = input.ReadBytes();
-            break;
-          }
-          case 18: {
             if (host_ == null) {
               Host = new global::Logfire.Fleet.Client.Sdk.Host();
             }
             input.ReadMessage(Host);
             break;
           }
-          case 24: {
+          case 16: {
+            StateDir = input.ReadBool();
+            break;
+          }
+          case 26: {
+            CoreState = input.ReadBytes();
+            break;
+          }
+          case 42: {
+            Endpoint = input.ReadString();
+            break;
+          }
+          case 58: {
+            InstanceUid = input.ReadBytes();
+            break;
+          }
+          case 66: {
+            if (hints_ == null) {
+              Hints = new global::Logfire.Fleet.Client.Sdk.AgentHints();
+            }
+            input.ReadMessage(Hints);
+            break;
+          }
+          case 72: {
             NowUnixMs = input.ReadUInt64();
             break;
           }
-          case 34: {
-            CoreState = input.ReadBytes();
+          case 80: {
+            NowMonoMs = input.ReadUInt64();
             break;
           }
         }
@@ -2590,17 +2768,20 @@ namespace Logfire.Fleet.Client.Sdk {
 
   }
 
+  /// <summary>
+  /// What to check when the server can't be reached, as the core's Setup words it.
+  /// </summary>
   [global::System.Diagnostics.DebuggerDisplayAttribute("{ToString(),nq}")]
-  public sealed partial class Loaded : pb::IMessage<Loaded>
+  public sealed partial class AgentHints : pb::IMessage<AgentHints>
   #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
       , pb::IBufferMessage
   #endif
   {
-    private static readonly pb::MessageParser<Loaded> _parser = new pb::MessageParser<Loaded>(() => new Loaded());
+    private static readonly pb::MessageParser<AgentHints> _parser = new pb::MessageParser<AgentHints>(() => new AgentHints());
     private pb::UnknownFieldSet _unknownFields;
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public static pb::MessageParser<Loaded> Parser { get { return _parser; } }
+    public static pb::MessageParser<AgentHints> Parser { get { return _parser; } }
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
@@ -2616,7 +2797,7 @@ namespace Logfire.Fleet.Client.Sdk {
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public Loaded() {
+    public AgentHints() {
       OnConstruction();
     }
 
@@ -2624,1031 +2805,70 @@ namespace Logfire.Fleet.Client.Sdk {
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public Loaded(Loaded other) : this() {
-      settings_ = other.settings_ != null ? other.settings_.Clone() : null;
-      current_ = other.current_;
-      effective_ = other.effective_ != null ? other.effective_.Clone() : null;
-      warning_ = other.warning_;
-      refreshAtUnixMs_ = other.refreshAtUnixMs_;
-      _unknownFields = pb::UnknownFieldSet.Clone(other._unknownFields);
-    }
-
-    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
-    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public Loaded Clone() {
-      return new Loaded(this);
-    }
-
-    /// <summary>Field number for the "settings" field.</summary>
-    public const int SettingsFieldNumber = 1;
-    private global::Logfire.Fleet.Client.Sdk.Settings settings_;
-    /// <summary>
-    /// put all of it in force, next-start ones too
-    /// </summary>
-    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
-    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public global::Logfire.Fleet.Client.Sdk.Settings Settings {
-      get { return settings_; }
-      set {
-        settings_ = value;
-      }
-    }
-
-    /// <summary>Field number for the "current" field.</summary>
-    public const int CurrentFieldNumber = 2;
-    private pb::ByteString current_ = pb::ByteString.Empty;
-    /// <summary>
-    /// keep it: the document in force now
-    /// </summary>
-    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
-    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public pb::ByteString Current {
-      get { return current_; }
-      set {
-        current_ = pb::ProtoPreconditions.CheckNotNull(value, "value");
-      }
-    }
-
-    /// <summary>Field number for the "effective" field.</summary>
-    public const int EffectiveFieldNumber = 3;
-    private global::OpAmp.Proto.V1.EffectiveConfig effective_;
-    /// <summary>
-    /// report it
-    /// </summary>
-    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
-    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public global::OpAmp.Proto.V1.EffectiveConfig Effective {
-      get { return effective_; }
-      set {
-        effective_ = value;
-      }
-    }
-
-    /// <summary>Field number for the "warning" field.</summary>
-    public const int WarningFieldNumber = 4;
-    private string warning_ = "";
-    /// <summary>
-    /// the saved settings were unreadable, and why
-    /// </summary>
-    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
-    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public string Warning {
-      get { return warning_; }
-      set {
-        warning_ = pb::ProtoPreconditions.CheckNotNull(value, "value");
-      }
-    }
-
-    /// <summary>Field number for the "refresh_at_unix_ms" field.</summary>
-    public const int RefreshAtUnixMsFieldNumber = 5;
-    private ulong refreshAtUnixMs_;
-    /// <summary>
-    /// When to call Refresh (milliseconds since the Unix epoch): arm one timer for it, in place of
-    /// any earlier one. 0: nothing to wait for. See Refresh.
-    /// </summary>
-    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
-    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public ulong RefreshAtUnixMs {
-      get { return refreshAtUnixMs_; }
-      set {
-        refreshAtUnixMs_ = value;
-      }
-    }
-
-    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
-    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public override bool Equals(object other) {
-      return Equals(other as Loaded);
-    }
-
-    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
-    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public bool Equals(Loaded other) {
-      if (ReferenceEquals(other, null)) {
-        return false;
-      }
-      if (ReferenceEquals(other, this)) {
-        return true;
-      }
-      if (!object.Equals(Settings, other.Settings)) return false;
-      if (Current != other.Current) return false;
-      if (!object.Equals(Effective, other.Effective)) return false;
-      if (Warning != other.Warning) return false;
-      if (RefreshAtUnixMs != other.RefreshAtUnixMs) return false;
-      return Equals(_unknownFields, other._unknownFields);
-    }
-
-    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
-    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public override int GetHashCode() {
-      int hash = 1;
-      if (settings_ != null) hash ^= Settings.GetHashCode();
-      if (Current.Length != 0) hash ^= Current.GetHashCode();
-      if (effective_ != null) hash ^= Effective.GetHashCode();
-      if (Warning.Length != 0) hash ^= Warning.GetHashCode();
-      if (RefreshAtUnixMs != 0UL) hash ^= RefreshAtUnixMs.GetHashCode();
-      if (_unknownFields != null) {
-        hash ^= _unknownFields.GetHashCode();
-      }
-      return hash;
-    }
-
-    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
-    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public override string ToString() {
-      return pb::JsonFormatter.ToDiagnosticString(this);
-    }
-
-    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
-    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public void WriteTo(pb::CodedOutputStream output) {
-    #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
-      output.WriteRawMessage(this);
-    #else
-      if (settings_ != null) {
-        output.WriteRawTag(10);
-        output.WriteMessage(Settings);
-      }
-      if (Current.Length != 0) {
-        output.WriteRawTag(18);
-        output.WriteBytes(Current);
-      }
-      if (effective_ != null) {
-        output.WriteRawTag(26);
-        output.WriteMessage(Effective);
-      }
-      if (Warning.Length != 0) {
-        output.WriteRawTag(34);
-        output.WriteString(Warning);
-      }
-      if (RefreshAtUnixMs != 0UL) {
-        output.WriteRawTag(40);
-        output.WriteUInt64(RefreshAtUnixMs);
-      }
-      if (_unknownFields != null) {
-        _unknownFields.WriteTo(output);
-      }
-    #endif
-    }
-
-    #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
-    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
-    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    void pb::IBufferMessage.InternalWriteTo(ref pb::WriteContext output) {
-      if (settings_ != null) {
-        output.WriteRawTag(10);
-        output.WriteMessage(Settings);
-      }
-      if (Current.Length != 0) {
-        output.WriteRawTag(18);
-        output.WriteBytes(Current);
-      }
-      if (effective_ != null) {
-        output.WriteRawTag(26);
-        output.WriteMessage(Effective);
-      }
-      if (Warning.Length != 0) {
-        output.WriteRawTag(34);
-        output.WriteString(Warning);
-      }
-      if (RefreshAtUnixMs != 0UL) {
-        output.WriteRawTag(40);
-        output.WriteUInt64(RefreshAtUnixMs);
-      }
-      if (_unknownFields != null) {
-        _unknownFields.WriteTo(ref output);
-      }
-    }
-    #endif
-
-    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
-    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public int CalculateSize() {
-      int size = 0;
-      if (settings_ != null) {
-        size += 1 + pb::CodedOutputStream.ComputeMessageSize(Settings);
-      }
-      if (Current.Length != 0) {
-        size += 1 + pb::CodedOutputStream.ComputeBytesSize(Current);
-      }
-      if (effective_ != null) {
-        size += 1 + pb::CodedOutputStream.ComputeMessageSize(Effective);
-      }
-      if (Warning.Length != 0) {
-        size += 1 + pb::CodedOutputStream.ComputeStringSize(Warning);
-      }
-      if (RefreshAtUnixMs != 0UL) {
-        size += 1 + pb::CodedOutputStream.ComputeUInt64Size(RefreshAtUnixMs);
-      }
-      if (_unknownFields != null) {
-        size += _unknownFields.CalculateSize();
-      }
-      return size;
-    }
-
-    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
-    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public void MergeFrom(Loaded other) {
-      if (other == null) {
-        return;
-      }
-      if (other.settings_ != null) {
-        if (settings_ == null) {
-          Settings = new global::Logfire.Fleet.Client.Sdk.Settings();
-        }
-        Settings.MergeFrom(other.Settings);
-      }
-      if (other.Current.Length != 0) {
-        Current = other.Current;
-      }
-      if (other.effective_ != null) {
-        if (effective_ == null) {
-          Effective = new global::OpAmp.Proto.V1.EffectiveConfig();
-        }
-        Effective.MergeFrom(other.Effective);
-      }
-      if (other.Warning.Length != 0) {
-        Warning = other.Warning;
-      }
-      if (other.RefreshAtUnixMs != 0UL) {
-        RefreshAtUnixMs = other.RefreshAtUnixMs;
-      }
-      _unknownFields = pb::UnknownFieldSet.MergeFrom(_unknownFields, other._unknownFields);
-    }
-
-    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
-    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public void MergeFrom(pb::CodedInputStream input) {
-    #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
-      input.ReadRawMessage(this);
-    #else
-      uint tag;
-      while ((tag = input.ReadTag()) != 0) {
-      if ((tag & 7) == 4) {
-        // Abort on any end group tag.
-        return;
-      }
-      switch(tag) {
-          default:
-            _unknownFields = pb::UnknownFieldSet.MergeFieldFrom(_unknownFields, input);
-            break;
-          case 10: {
-            if (settings_ == null) {
-              Settings = new global::Logfire.Fleet.Client.Sdk.Settings();
-            }
-            input.ReadMessage(Settings);
-            break;
-          }
-          case 18: {
-            Current = input.ReadBytes();
-            break;
-          }
-          case 26: {
-            if (effective_ == null) {
-              Effective = new global::OpAmp.Proto.V1.EffectiveConfig();
-            }
-            input.ReadMessage(Effective);
-            break;
-          }
-          case 34: {
-            Warning = input.ReadString();
-            break;
-          }
-          case 40: {
-            RefreshAtUnixMs = input.ReadUInt64();
-            break;
-          }
-        }
-      }
-    #endif
-    }
-
-    #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
-    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
-    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    void pb::IBufferMessage.InternalMergeFrom(ref pb::ParseContext input) {
-      uint tag;
-      while ((tag = input.ReadTag()) != 0) {
-      if ((tag & 7) == 4) {
-        // Abort on any end group tag.
-        return;
-      }
-      switch(tag) {
-          default:
-            _unknownFields = pb::UnknownFieldSet.MergeFieldFrom(_unknownFields, ref input);
-            break;
-          case 10: {
-            if (settings_ == null) {
-              Settings = new global::Logfire.Fleet.Client.Sdk.Settings();
-            }
-            input.ReadMessage(Settings);
-            break;
-          }
-          case 18: {
-            Current = input.ReadBytes();
-            break;
-          }
-          case 26: {
-            if (effective_ == null) {
-              Effective = new global::OpAmp.Proto.V1.EffectiveConfig();
-            }
-            input.ReadMessage(Effective);
-            break;
-          }
-          case 34: {
-            Warning = input.ReadString();
-            break;
-          }
-          case 40: {
-            RefreshAtUnixMs = input.ReadUInt64();
-            break;
-          }
-        }
-      }
-    }
-    #endif
-
-  }
-
-  /// <summary>
-  /// A remote config arrived. Answered in two steps: Decide says what to save for the next start
-  /// (Plan); the host saves it, and Commit, with how that went, gives the answer (Decision). The
-  /// layer decides; the host only says what became of the save.
-  /// </summary>
-  [global::System.Diagnostics.DebuggerDisplayAttribute("{ToString(),nq}")]
-  public sealed partial class Decide : pb::IMessage<Decide>
-  #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
-      , pb::IBufferMessage
-  #endif
-  {
-    private static readonly pb::MessageParser<Decide> _parser = new pb::MessageParser<Decide>(() => new Decide());
-    private pb::UnknownFieldSet _unknownFields;
-    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
-    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public static pb::MessageParser<Decide> Parser { get { return _parser; } }
-
-    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
-    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public static pbr::MessageDescriptor Descriptor {
-      get { return global::Logfire.Fleet.Client.Sdk.SettingsReflection.Descriptor.MessageTypes[7]; }
-    }
-
-    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
-    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    pbr::MessageDescriptor pb::IMessage.Descriptor {
-      get { return Descriptor; }
-    }
-
-    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
-    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public Decide() {
-      OnConstruction();
-    }
-
-    partial void OnConstruction();
-
-    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
-    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public Decide(Decide other) : this() {
-      config_ = other.config_ != null ? other.config_.Clone() : null;
-      current_ = other.current_;
-      atStart_ = other.atStart_;
-      host_ = other.host_ != null ? other.host_.Clone() : null;
-      nowUnixMs_ = other.nowUnixMs_;
-      _unknownFields = pb::UnknownFieldSet.Clone(other._unknownFields);
-    }
-
-    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
-    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public Decide Clone() {
-      return new Decide(this);
-    }
-
-    /// <summary>Field number for the "config" field.</summary>
-    public const int ConfigFieldNumber = 1;
-    private global::OpAmp.Proto.V1.AgentRemoteConfig config_;
-    /// <summary>
-    /// required: without it the reply is an error
-    /// </summary>
-    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
-    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public global::OpAmp.Proto.V1.AgentRemoteConfig Config {
-      get { return config_; }
-      set {
-        config_ = value;
-      }
-    }
-
-    /// <summary>Field number for the "current" field.</summary>
-    public const int CurrentFieldNumber = 2;
-    private pb::ByteString current_ = pb::ByteString.Empty;
-    /// <summary>
-    /// from the last Loaded or Decision
-    /// </summary>
-    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
-    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public pb::ByteString Current {
-      get { return current_; }
-      set {
-        current_ = pb::ProtoPreconditions.CheckNotNull(value, "value");
-      }
-    }
-
-    /// <summary>Field number for the "at_start" field.</summary>
-    public const int AtStartFieldNumber = 3;
-    private pb::ByteString atStart_ = pb::ByteString.Empty;
-    /// <summary>
-    /// Loaded.current, as it was at start
-    /// </summary>
-    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
-    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public pb::ByteString AtStart {
-      get { return atStart_; }
-      set {
-        atStart_ = pb::ProtoPreconditions.CheckNotNull(value, "value");
-      }
-    }
-
-    /// <summary>Field number for the "host" field.</summary>
-    public const int HostFieldNumber = 5;
-    private global::Logfire.Fleet.Client.Sdk.Host host_;
-    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
-    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public global::Logfire.Fleet.Client.Sdk.Host Host {
-      get { return host_; }
-      set {
-        host_ = value;
-      }
-    }
-
-    /// <summary>Field number for the "now_unix_ms" field.</summary>
-    public const int NowUnixMsFieldNumber = 6;
-    private ulong nowUnixMs_;
-    /// <summary>
-    /// as Load's
-    /// </summary>
-    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
-    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public ulong NowUnixMs {
-      get { return nowUnixMs_; }
-      set {
-        nowUnixMs_ = value;
-      }
-    }
-
-    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
-    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public override bool Equals(object other) {
-      return Equals(other as Decide);
-    }
-
-    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
-    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public bool Equals(Decide other) {
-      if (ReferenceEquals(other, null)) {
-        return false;
-      }
-      if (ReferenceEquals(other, this)) {
-        return true;
-      }
-      if (!object.Equals(Config, other.Config)) return false;
-      if (Current != other.Current) return false;
-      if (AtStart != other.AtStart) return false;
-      if (!object.Equals(Host, other.Host)) return false;
-      if (NowUnixMs != other.NowUnixMs) return false;
-      return Equals(_unknownFields, other._unknownFields);
-    }
-
-    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
-    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public override int GetHashCode() {
-      int hash = 1;
-      if (config_ != null) hash ^= Config.GetHashCode();
-      if (Current.Length != 0) hash ^= Current.GetHashCode();
-      if (AtStart.Length != 0) hash ^= AtStart.GetHashCode();
-      if (host_ != null) hash ^= Host.GetHashCode();
-      if (NowUnixMs != 0UL) hash ^= NowUnixMs.GetHashCode();
-      if (_unknownFields != null) {
-        hash ^= _unknownFields.GetHashCode();
-      }
-      return hash;
-    }
-
-    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
-    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public override string ToString() {
-      return pb::JsonFormatter.ToDiagnosticString(this);
-    }
-
-    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
-    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public void WriteTo(pb::CodedOutputStream output) {
-    #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
-      output.WriteRawMessage(this);
-    #else
-      if (config_ != null) {
-        output.WriteRawTag(10);
-        output.WriteMessage(Config);
-      }
-      if (Current.Length != 0) {
-        output.WriteRawTag(18);
-        output.WriteBytes(Current);
-      }
-      if (AtStart.Length != 0) {
-        output.WriteRawTag(26);
-        output.WriteBytes(AtStart);
-      }
-      if (host_ != null) {
-        output.WriteRawTag(42);
-        output.WriteMessage(Host);
-      }
-      if (NowUnixMs != 0UL) {
-        output.WriteRawTag(48);
-        output.WriteUInt64(NowUnixMs);
-      }
-      if (_unknownFields != null) {
-        _unknownFields.WriteTo(output);
-      }
-    #endif
-    }
-
-    #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
-    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
-    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    void pb::IBufferMessage.InternalWriteTo(ref pb::WriteContext output) {
-      if (config_ != null) {
-        output.WriteRawTag(10);
-        output.WriteMessage(Config);
-      }
-      if (Current.Length != 0) {
-        output.WriteRawTag(18);
-        output.WriteBytes(Current);
-      }
-      if (AtStart.Length != 0) {
-        output.WriteRawTag(26);
-        output.WriteBytes(AtStart);
-      }
-      if (host_ != null) {
-        output.WriteRawTag(42);
-        output.WriteMessage(Host);
-      }
-      if (NowUnixMs != 0UL) {
-        output.WriteRawTag(48);
-        output.WriteUInt64(NowUnixMs);
-      }
-      if (_unknownFields != null) {
-        _unknownFields.WriteTo(ref output);
-      }
-    }
-    #endif
-
-    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
-    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public int CalculateSize() {
-      int size = 0;
-      if (config_ != null) {
-        size += 1 + pb::CodedOutputStream.ComputeMessageSize(Config);
-      }
-      if (Current.Length != 0) {
-        size += 1 + pb::CodedOutputStream.ComputeBytesSize(Current);
-      }
-      if (AtStart.Length != 0) {
-        size += 1 + pb::CodedOutputStream.ComputeBytesSize(AtStart);
-      }
-      if (host_ != null) {
-        size += 1 + pb::CodedOutputStream.ComputeMessageSize(Host);
-      }
-      if (NowUnixMs != 0UL) {
-        size += 1 + pb::CodedOutputStream.ComputeUInt64Size(NowUnixMs);
-      }
-      if (_unknownFields != null) {
-        size += _unknownFields.CalculateSize();
-      }
-      return size;
-    }
-
-    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
-    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public void MergeFrom(Decide other) {
-      if (other == null) {
-        return;
-      }
-      if (other.config_ != null) {
-        if (config_ == null) {
-          Config = new global::OpAmp.Proto.V1.AgentRemoteConfig();
-        }
-        Config.MergeFrom(other.Config);
-      }
-      if (other.Current.Length != 0) {
-        Current = other.Current;
-      }
-      if (other.AtStart.Length != 0) {
-        AtStart = other.AtStart;
-      }
-      if (other.host_ != null) {
-        if (host_ == null) {
-          Host = new global::Logfire.Fleet.Client.Sdk.Host();
-        }
-        Host.MergeFrom(other.Host);
-      }
-      if (other.NowUnixMs != 0UL) {
-        NowUnixMs = other.NowUnixMs;
-      }
-      _unknownFields = pb::UnknownFieldSet.MergeFrom(_unknownFields, other._unknownFields);
-    }
-
-    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
-    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public void MergeFrom(pb::CodedInputStream input) {
-    #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
-      input.ReadRawMessage(this);
-    #else
-      uint tag;
-      while ((tag = input.ReadTag()) != 0) {
-      if ((tag & 7) == 4) {
-        // Abort on any end group tag.
-        return;
-      }
-      switch(tag) {
-          default:
-            _unknownFields = pb::UnknownFieldSet.MergeFieldFrom(_unknownFields, input);
-            break;
-          case 10: {
-            if (config_ == null) {
-              Config = new global::OpAmp.Proto.V1.AgentRemoteConfig();
-            }
-            input.ReadMessage(Config);
-            break;
-          }
-          case 18: {
-            Current = input.ReadBytes();
-            break;
-          }
-          case 26: {
-            AtStart = input.ReadBytes();
-            break;
-          }
-          case 42: {
-            if (host_ == null) {
-              Host = new global::Logfire.Fleet.Client.Sdk.Host();
-            }
-            input.ReadMessage(Host);
-            break;
-          }
-          case 48: {
-            NowUnixMs = input.ReadUInt64();
-            break;
-          }
-        }
-      }
-    #endif
-    }
-
-    #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
-    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
-    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    void pb::IBufferMessage.InternalMergeFrom(ref pb::ParseContext input) {
-      uint tag;
-      while ((tag = input.ReadTag()) != 0) {
-      if ((tag & 7) == 4) {
-        // Abort on any end group tag.
-        return;
-      }
-      switch(tag) {
-          default:
-            _unknownFields = pb::UnknownFieldSet.MergeFieldFrom(_unknownFields, ref input);
-            break;
-          case 10: {
-            if (config_ == null) {
-              Config = new global::OpAmp.Proto.V1.AgentRemoteConfig();
-            }
-            input.ReadMessage(Config);
-            break;
-          }
-          case 18: {
-            Current = input.ReadBytes();
-            break;
-          }
-          case 26: {
-            AtStart = input.ReadBytes();
-            break;
-          }
-          case 42: {
-            if (host_ == null) {
-              Host = new global::Logfire.Fleet.Client.Sdk.Host();
-            }
-            input.ReadMessage(Host);
-            break;
-          }
-          case 48: {
-            NowUnixMs = input.ReadUInt64();
-            break;
-          }
-        }
-      }
-    }
-    #endif
-
-  }
-
-  [global::System.Diagnostics.DebuggerDisplayAttribute("{ToString(),nq}")]
-  public sealed partial class Plan : pb::IMessage<Plan>
-  #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
-      , pb::IBufferMessage
-  #endif
-  {
-    private static readonly pb::MessageParser<Plan> _parser = new pb::MessageParser<Plan>(() => new Plan());
-    private pb::UnknownFieldSet _unknownFields;
-    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
-    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public static pb::MessageParser<Plan> Parser { get { return _parser; } }
-
-    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
-    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public static pbr::MessageDescriptor Descriptor {
-      get { return global::Logfire.Fleet.Client.Sdk.SettingsReflection.Descriptor.MessageTypes[8]; }
-    }
-
-    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
-    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    pbr::MessageDescriptor pb::IMessage.Descriptor {
-      get { return Descriptor; }
-    }
-
-    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
-    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public Plan() {
-      OnConstruction();
-    }
-
-    partial void OnConstruction();
-
-    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
-    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public Plan(Plan other) : this() {
-      save_ = other.save_;
-      _unknownFields = pb::UnknownFieldSet.Clone(other._unknownFields);
-    }
-
-    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
-    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public Plan Clone() {
-      return new Plan(this);
-    }
-
-    /// <summary>Field number for the "save" field.</summary>
-    public const int SaveFieldNumber = 1;
-    private readonly static pb::ByteString SaveDefaultValue = pb::ByteString.Empty;
-
-    private pb::ByteString save_;
-    /// <summary>
-    /// Save it where the host keeps state, whole or not at all (Load reads it at the next start),
-    /// then Commit. Unset: the config is refused and there is nothing to save; Commit at once.
-    /// </summary>
-    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
-    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public pb::ByteString Save {
-      get { return save_ ?? SaveDefaultValue; }
-      set {
-        save_ = pb::ProtoPreconditions.CheckNotNull(value, "value");
-      }
-    }
-    /// <summary>Gets whether the "save" field is set</summary>
-    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
-    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public bool HasSave {
-      get { return save_ != null; }
-    }
-    /// <summary>Clears the value of the "save" field</summary>
-    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
-    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public void ClearSave() {
-      save_ = null;
-    }
-
-    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
-    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public override bool Equals(object other) {
-      return Equals(other as Plan);
-    }
-
-    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
-    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public bool Equals(Plan other) {
-      if (ReferenceEquals(other, null)) {
-        return false;
-      }
-      if (ReferenceEquals(other, this)) {
-        return true;
-      }
-      if (Save != other.Save) return false;
-      return Equals(_unknownFields, other._unknownFields);
-    }
-
-    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
-    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public override int GetHashCode() {
-      int hash = 1;
-      if (HasSave) hash ^= Save.GetHashCode();
-      if (_unknownFields != null) {
-        hash ^= _unknownFields.GetHashCode();
-      }
-      return hash;
-    }
-
-    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
-    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public override string ToString() {
-      return pb::JsonFormatter.ToDiagnosticString(this);
-    }
-
-    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
-    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public void WriteTo(pb::CodedOutputStream output) {
-    #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
-      output.WriteRawMessage(this);
-    #else
-      if (HasSave) {
-        output.WriteRawTag(10);
-        output.WriteBytes(Save);
-      }
-      if (_unknownFields != null) {
-        _unknownFields.WriteTo(output);
-      }
-    #endif
-    }
-
-    #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
-    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
-    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    void pb::IBufferMessage.InternalWriteTo(ref pb::WriteContext output) {
-      if (HasSave) {
-        output.WriteRawTag(10);
-        output.WriteBytes(Save);
-      }
-      if (_unknownFields != null) {
-        _unknownFields.WriteTo(ref output);
-      }
-    }
-    #endif
-
-    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
-    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public int CalculateSize() {
-      int size = 0;
-      if (HasSave) {
-        size += 1 + pb::CodedOutputStream.ComputeBytesSize(Save);
-      }
-      if (_unknownFields != null) {
-        size += _unknownFields.CalculateSize();
-      }
-      return size;
-    }
-
-    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
-    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public void MergeFrom(Plan other) {
-      if (other == null) {
-        return;
-      }
-      if (other.HasSave) {
-        Save = other.Save;
-      }
-      _unknownFields = pb::UnknownFieldSet.MergeFrom(_unknownFields, other._unknownFields);
-    }
-
-    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
-    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public void MergeFrom(pb::CodedInputStream input) {
-    #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
-      input.ReadRawMessage(this);
-    #else
-      uint tag;
-      while ((tag = input.ReadTag()) != 0) {
-      if ((tag & 7) == 4) {
-        // Abort on any end group tag.
-        return;
-      }
-      switch(tag) {
-          default:
-            _unknownFields = pb::UnknownFieldSet.MergeFieldFrom(_unknownFields, input);
-            break;
-          case 10: {
-            Save = input.ReadBytes();
-            break;
-          }
-        }
-      }
-    #endif
-    }
-
-    #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
-    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
-    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    void pb::IBufferMessage.InternalMergeFrom(ref pb::ParseContext input) {
-      uint tag;
-      while ((tag = input.ReadTag()) != 0) {
-      if ((tag & 7) == 4) {
-        // Abort on any end group tag.
-        return;
-      }
-      switch(tag) {
-          default:
-            _unknownFields = pb::UnknownFieldSet.MergeFieldFrom(_unknownFields, ref input);
-            break;
-          case 10: {
-            Save = input.ReadBytes();
-            break;
-          }
-        }
-      }
-    }
-    #endif
-
-  }
-
-  /// <summary>
-  /// The answer to a remote config, once the host has done what Plan asked.
-  /// </summary>
-  [global::System.Diagnostics.DebuggerDisplayAttribute("{ToString(),nq}")]
-  public sealed partial class Commit : pb::IMessage<Commit>
-  #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
-      , pb::IBufferMessage
-  #endif
-  {
-    private static readonly pb::MessageParser<Commit> _parser = new pb::MessageParser<Commit>(() => new Commit());
-    private pb::UnknownFieldSet _unknownFields;
-    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
-    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public static pb::MessageParser<Commit> Parser { get { return _parser; } }
-
-    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
-    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public static pbr::MessageDescriptor Descriptor {
-      get { return global::Logfire.Fleet.Client.Sdk.SettingsReflection.Descriptor.MessageTypes[9]; }
-    }
-
-    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
-    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    pbr::MessageDescriptor pb::IMessage.Descriptor {
-      get { return Descriptor; }
-    }
-
-    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
-    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public Commit() {
-      OnConstruction();
-    }
-
-    partial void OnConstruction();
-
-    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
-    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public Commit(Commit other) : this() {
-      decide_ = other.decide_ != null ? other.decide_.Clone() : null;
-      saved_ = other.saved_;
+    public AgentHints(AgentHints other) : this() {
+      refused_ = other.refused_;
+      notFound_ = other.notFound_;
+      unreachable_ = other.unreachable_;
       error_ = other.error_;
       _unknownFields = pb::UnknownFieldSet.Clone(other._unknownFields);
     }
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public Commit Clone() {
-      return new Commit(this);
+    public AgentHints Clone() {
+      return new AgentHints(this);
     }
 
-    /// <summary>Field number for the "decide" field.</summary>
-    public const int DecideFieldNumber = 1;
-    private global::Logfire.Fleet.Client.Sdk.Decide decide_;
+    /// <summary>Field number for the "refused" field.</summary>
+    public const int RefusedFieldNumber = 1;
+    private string refused_ = "";
     /// <summary>
-    /// required: the request Plan answered, as it was
+    /// HTTP 401 or 403
     /// </summary>
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public global::Logfire.Fleet.Client.Sdk.Decide Decide {
-      get { return decide_; }
+    public string Refused {
+      get { return refused_; }
       set {
-        decide_ = value;
+        refused_ = pb::ProtoPreconditions.CheckNotNull(value, "value");
       }
     }
 
-    /// <summary>Field number for the "saved" field.</summary>
-    public const int SavedFieldNumber = 2;
-    private global::Logfire.Fleet.Client.Sdk.Commit.Types.Saved saved_ = global::Logfire.Fleet.Client.Sdk.Commit.Types.Saved.Nowhere;
+    /// <summary>Field number for the "not_found" field.</summary>
+    public const int NotFoundFieldNumber = 2;
+    private string notFound_ = "";
+    /// <summary>
+    /// HTTP 404
+    /// </summary>
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public global::Logfire.Fleet.Client.Sdk.Commit.Types.Saved Saved {
-      get { return saved_; }
+    public string NotFound {
+      get { return notFound_; }
       set {
-        saved_ = value;
+        notFound_ = pb::ProtoPreconditions.CheckNotNull(value, "value");
+      }
+    }
+
+    /// <summary>Field number for the "unreachable" field.</summary>
+    public const int UnreachableFieldNumber = 3;
+    private string unreachable_ = "";
+    /// <summary>
+    /// no response
+    /// </summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public string Unreachable {
+      get { return unreachable_; }
+      set {
+        unreachable_ = pb::ProtoPreconditions.CheckNotNull(value, "value");
       }
     }
 
     /// <summary>Field number for the "error" field.</summary>
-    public const int ErrorFieldNumber = 3;
+    public const int ErrorFieldNumber = 4;
     private string error_ = "";
     /// <summary>
-    /// SAVED_FAILED: why
+    /// any other status
     /// </summary>
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
@@ -3662,20 +2882,21 @@ namespace Logfire.Fleet.Client.Sdk {
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public override bool Equals(object other) {
-      return Equals(other as Commit);
+      return Equals(other as AgentHints);
     }
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public bool Equals(Commit other) {
+    public bool Equals(AgentHints other) {
       if (ReferenceEquals(other, null)) {
         return false;
       }
       if (ReferenceEquals(other, this)) {
         return true;
       }
-      if (!object.Equals(Decide, other.Decide)) return false;
-      if (Saved != other.Saved) return false;
+      if (Refused != other.Refused) return false;
+      if (NotFound != other.NotFound) return false;
+      if (Unreachable != other.Unreachable) return false;
       if (Error != other.Error) return false;
       return Equals(_unknownFields, other._unknownFields);
     }
@@ -3684,8 +2905,9 @@ namespace Logfire.Fleet.Client.Sdk {
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public override int GetHashCode() {
       int hash = 1;
-      if (decide_ != null) hash ^= Decide.GetHashCode();
-      if (Saved != global::Logfire.Fleet.Client.Sdk.Commit.Types.Saved.Nowhere) hash ^= Saved.GetHashCode();
+      if (Refused.Length != 0) hash ^= Refused.GetHashCode();
+      if (NotFound.Length != 0) hash ^= NotFound.GetHashCode();
+      if (Unreachable.Length != 0) hash ^= Unreachable.GetHashCode();
       if (Error.Length != 0) hash ^= Error.GetHashCode();
       if (_unknownFields != null) {
         hash ^= _unknownFields.GetHashCode();
@@ -3705,16 +2927,20 @@ namespace Logfire.Fleet.Client.Sdk {
     #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
       output.WriteRawMessage(this);
     #else
-      if (decide_ != null) {
+      if (Refused.Length != 0) {
         output.WriteRawTag(10);
-        output.WriteMessage(Decide);
+        output.WriteString(Refused);
       }
-      if (Saved != global::Logfire.Fleet.Client.Sdk.Commit.Types.Saved.Nowhere) {
-        output.WriteRawTag(16);
-        output.WriteEnum((int) Saved);
+      if (NotFound.Length != 0) {
+        output.WriteRawTag(18);
+        output.WriteString(NotFound);
+      }
+      if (Unreachable.Length != 0) {
+        output.WriteRawTag(26);
+        output.WriteString(Unreachable);
       }
       if (Error.Length != 0) {
-        output.WriteRawTag(26);
+        output.WriteRawTag(34);
         output.WriteString(Error);
       }
       if (_unknownFields != null) {
@@ -3727,16 +2953,20 @@ namespace Logfire.Fleet.Client.Sdk {
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     void pb::IBufferMessage.InternalWriteTo(ref pb::WriteContext output) {
-      if (decide_ != null) {
+      if (Refused.Length != 0) {
         output.WriteRawTag(10);
-        output.WriteMessage(Decide);
+        output.WriteString(Refused);
       }
-      if (Saved != global::Logfire.Fleet.Client.Sdk.Commit.Types.Saved.Nowhere) {
-        output.WriteRawTag(16);
-        output.WriteEnum((int) Saved);
+      if (NotFound.Length != 0) {
+        output.WriteRawTag(18);
+        output.WriteString(NotFound);
+      }
+      if (Unreachable.Length != 0) {
+        output.WriteRawTag(26);
+        output.WriteString(Unreachable);
       }
       if (Error.Length != 0) {
-        output.WriteRawTag(26);
+        output.WriteRawTag(34);
         output.WriteString(Error);
       }
       if (_unknownFields != null) {
@@ -3749,11 +2979,14 @@ namespace Logfire.Fleet.Client.Sdk {
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public int CalculateSize() {
       int size = 0;
-      if (decide_ != null) {
-        size += 1 + pb::CodedOutputStream.ComputeMessageSize(Decide);
+      if (Refused.Length != 0) {
+        size += 1 + pb::CodedOutputStream.ComputeStringSize(Refused);
       }
-      if (Saved != global::Logfire.Fleet.Client.Sdk.Commit.Types.Saved.Nowhere) {
-        size += 1 + pb::CodedOutputStream.ComputeEnumSize((int) Saved);
+      if (NotFound.Length != 0) {
+        size += 1 + pb::CodedOutputStream.ComputeStringSize(NotFound);
+      }
+      if (Unreachable.Length != 0) {
+        size += 1 + pb::CodedOutputStream.ComputeStringSize(Unreachable);
       }
       if (Error.Length != 0) {
         size += 1 + pb::CodedOutputStream.ComputeStringSize(Error);
@@ -3766,18 +2999,18 @@ namespace Logfire.Fleet.Client.Sdk {
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public void MergeFrom(Commit other) {
+    public void MergeFrom(AgentHints other) {
       if (other == null) {
         return;
       }
-      if (other.decide_ != null) {
-        if (decide_ == null) {
-          Decide = new global::Logfire.Fleet.Client.Sdk.Decide();
-        }
-        Decide.MergeFrom(other.Decide);
+      if (other.Refused.Length != 0) {
+        Refused = other.Refused;
       }
-      if (other.Saved != global::Logfire.Fleet.Client.Sdk.Commit.Types.Saved.Nowhere) {
-        Saved = other.Saved;
+      if (other.NotFound.Length != 0) {
+        NotFound = other.NotFound;
+      }
+      if (other.Unreachable.Length != 0) {
+        Unreachable = other.Unreachable;
       }
       if (other.Error.Length != 0) {
         Error = other.Error;
@@ -3802,17 +3035,18 @@ namespace Logfire.Fleet.Client.Sdk {
             _unknownFields = pb::UnknownFieldSet.MergeFieldFrom(_unknownFields, input);
             break;
           case 10: {
-            if (decide_ == null) {
-              Decide = new global::Logfire.Fleet.Client.Sdk.Decide();
-            }
-            input.ReadMessage(Decide);
+            Refused = input.ReadString();
             break;
           }
-          case 16: {
-            Saved = (global::Logfire.Fleet.Client.Sdk.Commit.Types.Saved) input.ReadEnum();
+          case 18: {
+            NotFound = input.ReadString();
             break;
           }
           case 26: {
+            Unreachable = input.ReadString();
+            break;
+          }
+          case 34: {
             Error = input.ReadString();
             break;
           }
@@ -3836,17 +3070,18 @@ namespace Logfire.Fleet.Client.Sdk {
             _unknownFields = pb::UnknownFieldSet.MergeFieldFrom(_unknownFields, ref input);
             break;
           case 10: {
-            if (decide_ == null) {
-              Decide = new global::Logfire.Fleet.Client.Sdk.Decide();
-            }
-            input.ReadMessage(Decide);
+            Refused = input.ReadString();
             break;
           }
-          case 16: {
-            Saved = (global::Logfire.Fleet.Client.Sdk.Commit.Types.Saved) input.ReadEnum();
+          case 18: {
+            NotFound = input.ReadString();
             break;
           }
           case 26: {
+            Unreachable = input.ReadString();
+            break;
+          }
+          case 34: {
             Error = input.ReadString();
             break;
           }
@@ -3855,48 +3090,24 @@ namespace Logfire.Fleet.Client.Sdk {
     }
     #endif
 
-    #region Nested types
-    /// <summary>Container for nested types declared in the Commit message type.</summary>
-    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
-    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public static partial class Types {
-      public enum Saved {
-        /// <summary>
-        /// Nothing saved: the host keeps no state across restarts (no state directory), or Plan asked
-        /// for no save. A config that changes a next-start setting is then refused.
-        /// </summary>
-        [pbr::OriginalName("SAVED_NOWHERE")] Nowhere = 0,
-        /// <summary>
-        /// saved
-        /// </summary>
-        [pbr::OriginalName("SAVED_DONE")] Done = 1,
-        /// <summary>
-        /// the save failed: the config is refused
-        /// </summary>
-        [pbr::OriginalName("SAVED_FAILED")] Failed = 2,
-      }
-
-    }
-    #endregion
-
   }
 
   [global::System.Diagnostics.DebuggerDisplayAttribute("{ToString(),nq}")]
-  public sealed partial class Decision : pb::IMessage<Decision>
+  public sealed partial class AgentStep : pb::IMessage<AgentStep>
   #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
       , pb::IBufferMessage
   #endif
   {
-    private static readonly pb::MessageParser<Decision> _parser = new pb::MessageParser<Decision>(() => new Decision());
+    private static readonly pb::MessageParser<AgentStep> _parser = new pb::MessageParser<AgentStep>(() => new AgentStep());
     private pb::UnknownFieldSet _unknownFields;
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public static pb::MessageParser<Decision> Parser { get { return _parser; } }
+    public static pb::MessageParser<AgentStep> Parser { get { return _parser; } }
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public static pbr::MessageDescriptor Descriptor {
-      get { return global::Logfire.Fleet.Client.Sdk.SettingsReflection.Descriptor.MessageTypes[10]; }
+      get { return global::Logfire.Fleet.Client.Sdk.SettingsReflection.Descriptor.MessageTypes[7]; }
     }
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
@@ -3907,7 +3118,7 @@ namespace Logfire.Fleet.Client.Sdk {
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public Decision() {
+    public AgentStep() {
       OnConstruction();
     }
 
@@ -3915,488 +3126,76 @@ namespace Logfire.Fleet.Client.Sdk {
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public Decision(Decision other) : this() {
-      status_ = other.status_ != null ? other.status_.Clone() : null;
-      apply_ = other.apply_ != null ? other.apply_.Clone() : null;
-      current_ = other.current_;
-      effective_ = other.effective_ != null ? other.effective_.Clone() : null;
-      pendingRestart_ = other.pendingRestart_.Clone();
-      refreshAtUnixMs_ = other.refreshAtUnixMs_;
-      _unknownFields = pb::UnknownFieldSet.Clone(other._unknownFields);
-    }
-
-    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
-    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public Decision Clone() {
-      return new Decision(this);
-    }
-
-    /// <summary>Field number for the "status" field.</summary>
-    public const int StatusFieldNumber = 1;
-    private global::OpAmp.Proto.V1.RemoteConfigStatus status_;
-    /// <summary>
-    /// APPLIED or FAILED, with the config's hash: report it
-    /// </summary>
-    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
-    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public global::OpAmp.Proto.V1.RemoteConfigStatus Status {
-      get { return status_; }
-      set {
-        status_ = value;
-      }
-    }
-
-    /// <summary>Field number for the "apply" field.</summary>
-    public const int ApplyFieldNumber = 2;
-    private global::Logfire.Fleet.Client.Sdk.Settings apply_;
-    /// <summary>
-    /// APPLIED: put the live ones in force; unset when FAILED
-    /// </summary>
-    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
-    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public global::Logfire.Fleet.Client.Sdk.Settings Apply {
-      get { return apply_; }
-      set {
-        apply_ = value;
-      }
-    }
-
-    /// <summary>Field number for the "current" field.</summary>
-    public const int CurrentFieldNumber = 3;
-    private pb::ByteString current_ = pb::ByteString.Empty;
-    /// <summary>
-    /// keep it: the document in force now
-    /// </summary>
-    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
-    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public pb::ByteString Current {
-      get { return current_; }
-      set {
-        current_ = pb::ProtoPreconditions.CheckNotNull(value, "value");
-      }
-    }
-
-    /// <summary>Field number for the "effective" field.</summary>
-    public const int EffectiveFieldNumber = 5;
-    private global::OpAmp.Proto.V1.EffectiveConfig effective_;
-    /// <summary>
-    /// report it
-    /// </summary>
-    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
-    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public global::OpAmp.Proto.V1.EffectiveConfig Effective {
-      get { return effective_; }
-      set {
-        effective_ = value;
-      }
-    }
-
-    /// <summary>Field number for the "pending_restart" field.</summary>
-    public const int PendingRestartFieldNumber = 6;
-    private static readonly pb::FieldCodec<string> _repeated_pendingRestart_codec
-        = pb::FieldCodec.ForString(50);
-    private readonly pbc::RepeatedField<string> pendingRestart_ = new pbc::RepeatedField<string>();
-    /// <summary>
-    /// next-start settings in force after a restart
-    /// </summary>
-    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
-    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public pbc::RepeatedField<string> PendingRestart {
-      get { return pendingRestart_; }
-    }
-
-    /// <summary>Field number for the "refresh_at_unix_ms" field.</summary>
-    public const int RefreshAtUnixMsFieldNumber = 7;
-    private ulong refreshAtUnixMs_;
-    /// <summary>
-    /// as Loaded's
-    /// </summary>
-    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
-    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public ulong RefreshAtUnixMs {
-      get { return refreshAtUnixMs_; }
-      set {
-        refreshAtUnixMs_ = value;
-      }
-    }
-
-    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
-    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public override bool Equals(object other) {
-      return Equals(other as Decision);
-    }
-
-    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
-    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public bool Equals(Decision other) {
-      if (ReferenceEquals(other, null)) {
-        return false;
-      }
-      if (ReferenceEquals(other, this)) {
-        return true;
-      }
-      if (!object.Equals(Status, other.Status)) return false;
-      if (!object.Equals(Apply, other.Apply)) return false;
-      if (Current != other.Current) return false;
-      if (!object.Equals(Effective, other.Effective)) return false;
-      if(!pendingRestart_.Equals(other.pendingRestart_)) return false;
-      if (RefreshAtUnixMs != other.RefreshAtUnixMs) return false;
-      return Equals(_unknownFields, other._unknownFields);
-    }
-
-    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
-    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public override int GetHashCode() {
-      int hash = 1;
-      if (status_ != null) hash ^= Status.GetHashCode();
-      if (apply_ != null) hash ^= Apply.GetHashCode();
-      if (Current.Length != 0) hash ^= Current.GetHashCode();
-      if (effective_ != null) hash ^= Effective.GetHashCode();
-      hash ^= pendingRestart_.GetHashCode();
-      if (RefreshAtUnixMs != 0UL) hash ^= RefreshAtUnixMs.GetHashCode();
-      if (_unknownFields != null) {
-        hash ^= _unknownFields.GetHashCode();
-      }
-      return hash;
-    }
-
-    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
-    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public override string ToString() {
-      return pb::JsonFormatter.ToDiagnosticString(this);
-    }
-
-    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
-    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public void WriteTo(pb::CodedOutputStream output) {
-    #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
-      output.WriteRawMessage(this);
-    #else
-      if (status_ != null) {
-        output.WriteRawTag(10);
-        output.WriteMessage(Status);
-      }
-      if (apply_ != null) {
-        output.WriteRawTag(18);
-        output.WriteMessage(Apply);
-      }
-      if (Current.Length != 0) {
-        output.WriteRawTag(26);
-        output.WriteBytes(Current);
-      }
-      if (effective_ != null) {
-        output.WriteRawTag(42);
-        output.WriteMessage(Effective);
-      }
-      pendingRestart_.WriteTo(output, _repeated_pendingRestart_codec);
-      if (RefreshAtUnixMs != 0UL) {
-        output.WriteRawTag(56);
-        output.WriteUInt64(RefreshAtUnixMs);
-      }
-      if (_unknownFields != null) {
-        _unknownFields.WriteTo(output);
-      }
-    #endif
-    }
-
-    #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
-    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
-    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    void pb::IBufferMessage.InternalWriteTo(ref pb::WriteContext output) {
-      if (status_ != null) {
-        output.WriteRawTag(10);
-        output.WriteMessage(Status);
-      }
-      if (apply_ != null) {
-        output.WriteRawTag(18);
-        output.WriteMessage(Apply);
-      }
-      if (Current.Length != 0) {
-        output.WriteRawTag(26);
-        output.WriteBytes(Current);
-      }
-      if (effective_ != null) {
-        output.WriteRawTag(42);
-        output.WriteMessage(Effective);
-      }
-      pendingRestart_.WriteTo(ref output, _repeated_pendingRestart_codec);
-      if (RefreshAtUnixMs != 0UL) {
-        output.WriteRawTag(56);
-        output.WriteUInt64(RefreshAtUnixMs);
-      }
-      if (_unknownFields != null) {
-        _unknownFields.WriteTo(ref output);
-      }
-    }
-    #endif
-
-    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
-    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public int CalculateSize() {
-      int size = 0;
-      if (status_ != null) {
-        size += 1 + pb::CodedOutputStream.ComputeMessageSize(Status);
-      }
-      if (apply_ != null) {
-        size += 1 + pb::CodedOutputStream.ComputeMessageSize(Apply);
-      }
-      if (Current.Length != 0) {
-        size += 1 + pb::CodedOutputStream.ComputeBytesSize(Current);
-      }
-      if (effective_ != null) {
-        size += 1 + pb::CodedOutputStream.ComputeMessageSize(Effective);
-      }
-      size += pendingRestart_.CalculateSize(_repeated_pendingRestart_codec);
-      if (RefreshAtUnixMs != 0UL) {
-        size += 1 + pb::CodedOutputStream.ComputeUInt64Size(RefreshAtUnixMs);
-      }
-      if (_unknownFields != null) {
-        size += _unknownFields.CalculateSize();
-      }
-      return size;
-    }
-
-    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
-    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public void MergeFrom(Decision other) {
-      if (other == null) {
-        return;
-      }
-      if (other.status_ != null) {
-        if (status_ == null) {
-          Status = new global::OpAmp.Proto.V1.RemoteConfigStatus();
-        }
-        Status.MergeFrom(other.Status);
-      }
-      if (other.apply_ != null) {
-        if (apply_ == null) {
-          Apply = new global::Logfire.Fleet.Client.Sdk.Settings();
-        }
-        Apply.MergeFrom(other.Apply);
-      }
-      if (other.Current.Length != 0) {
-        Current = other.Current;
-      }
-      if (other.effective_ != null) {
-        if (effective_ == null) {
-          Effective = new global::OpAmp.Proto.V1.EffectiveConfig();
-        }
-        Effective.MergeFrom(other.Effective);
-      }
-      pendingRestart_.Add(other.pendingRestart_);
-      if (other.RefreshAtUnixMs != 0UL) {
-        RefreshAtUnixMs = other.RefreshAtUnixMs;
-      }
-      _unknownFields = pb::UnknownFieldSet.MergeFrom(_unknownFields, other._unknownFields);
-    }
-
-    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
-    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public void MergeFrom(pb::CodedInputStream input) {
-    #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
-      input.ReadRawMessage(this);
-    #else
-      uint tag;
-      while ((tag = input.ReadTag()) != 0) {
-      if ((tag & 7) == 4) {
-        // Abort on any end group tag.
-        return;
-      }
-      switch(tag) {
-          default:
-            _unknownFields = pb::UnknownFieldSet.MergeFieldFrom(_unknownFields, input);
-            break;
-          case 10: {
-            if (status_ == null) {
-              Status = new global::OpAmp.Proto.V1.RemoteConfigStatus();
-            }
-            input.ReadMessage(Status);
-            break;
-          }
-          case 18: {
-            if (apply_ == null) {
-              Apply = new global::Logfire.Fleet.Client.Sdk.Settings();
-            }
-            input.ReadMessage(Apply);
-            break;
-          }
-          case 26: {
-            Current = input.ReadBytes();
-            break;
-          }
-          case 42: {
-            if (effective_ == null) {
-              Effective = new global::OpAmp.Proto.V1.EffectiveConfig();
-            }
-            input.ReadMessage(Effective);
-            break;
-          }
-          case 50: {
-            pendingRestart_.AddEntriesFrom(input, _repeated_pendingRestart_codec);
-            break;
-          }
-          case 56: {
-            RefreshAtUnixMs = input.ReadUInt64();
-            break;
-          }
-        }
-      }
-    #endif
-    }
-
-    #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
-    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
-    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    void pb::IBufferMessage.InternalMergeFrom(ref pb::ParseContext input) {
-      uint tag;
-      while ((tag = input.ReadTag()) != 0) {
-      if ((tag & 7) == 4) {
-        // Abort on any end group tag.
-        return;
-      }
-      switch(tag) {
-          default:
-            _unknownFields = pb::UnknownFieldSet.MergeFieldFrom(_unknownFields, ref input);
-            break;
-          case 10: {
-            if (status_ == null) {
-              Status = new global::OpAmp.Proto.V1.RemoteConfigStatus();
-            }
-            input.ReadMessage(Status);
-            break;
-          }
-          case 18: {
-            if (apply_ == null) {
-              Apply = new global::Logfire.Fleet.Client.Sdk.Settings();
-            }
-            input.ReadMessage(Apply);
-            break;
-          }
-          case 26: {
-            Current = input.ReadBytes();
-            break;
-          }
-          case 42: {
-            if (effective_ == null) {
-              Effective = new global::OpAmp.Proto.V1.EffectiveConfig();
-            }
-            input.ReadMessage(Effective);
-            break;
-          }
-          case 50: {
-            pendingRestart_.AddEntriesFrom(ref input, _repeated_pendingRestart_codec);
-            break;
-          }
-          case 56: {
-            RefreshAtUnixMs = input.ReadUInt64();
-            break;
-          }
-        }
-      }
-    }
-    #endif
-
-  }
-
-  /// <summary>
-  /// The timer from refresh_at_unix_ms went off: what is in force now. Debug mode ends here, with
-  /// or without the server. Call it under the same lock as Decide and Commit, and drop a timer's call
-  /// when a Commit came after the timer was armed (a generation counter): that Commit armed its own.
-  /// Apply the settings and report the effective config, as after a Commit.
-  /// </summary>
-  [global::System.Diagnostics.DebuggerDisplayAttribute("{ToString(),nq}")]
-  public sealed partial class Refresh : pb::IMessage<Refresh>
-  #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
-      , pb::IBufferMessage
-  #endif
-  {
-    private static readonly pb::MessageParser<Refresh> _parser = new pb::MessageParser<Refresh>(() => new Refresh());
-    private pb::UnknownFieldSet _unknownFields;
-    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
-    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public static pb::MessageParser<Refresh> Parser { get { return _parser; } }
-
-    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
-    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public static pbr::MessageDescriptor Descriptor {
-      get { return global::Logfire.Fleet.Client.Sdk.SettingsReflection.Descriptor.MessageTypes[11]; }
-    }
-
-    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
-    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    pbr::MessageDescriptor pb::IMessage.Descriptor {
-      get { return Descriptor; }
-    }
-
-    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
-    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public Refresh() {
-      OnConstruction();
-    }
-
-    partial void OnConstruction();
-
-    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
-    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public Refresh(Refresh other) : this() {
-      current_ = other.current_;
-      atStart_ = other.atStart_;
-      host_ = other.host_ != null ? other.host_.Clone() : null;
+    public AgentStep(AgentStep other) : this() {
+      agent_ = other.agent_;
       nowUnixMs_ = other.nowUnixMs_;
+      nowMonoMs_ = other.nowMonoMs_;
+      switch (other.InputCase) {
+        case InputOneofCase.RemoteConfig:
+          RemoteConfig = other.RemoteConfig.Clone();
+          break;
+        case InputOneofCase.Connected:
+          Connected = other.Connected.Clone();
+          break;
+        case InputOneofCase.ConnectFailed:
+          ConnectFailed = other.ConnectFailed.Clone();
+          break;
+        case InputOneofCase.InstanceUidChanged:
+          InstanceUidChanged = other.InstanceUidChanged;
+          break;
+        case InputOneofCase.UidNotSaved:
+          UidNotSaved = other.UidNotSaved;
+          break;
+        case InputOneofCase.StateFromNewerVersion:
+          StateFromNewerVersion = other.StateFromNewerVersion;
+          break;
+        case InputOneofCase.Stopped:
+          Stopped = other.Stopped.Clone();
+          break;
+        case InputOneofCase.Timer:
+          Timer = other.Timer.Clone();
+          break;
+        case InputOneofCase.Exporters:
+          Exporters = other.Exporters.Clone();
+          break;
+        case InputOneofCase.Host:
+          Host = other.Host.Clone();
+          break;
+        case InputOneofCase.Built:
+          Built = other.Built.Clone();
+          break;
+      }
+
       _unknownFields = pb::UnknownFieldSet.Clone(other._unknownFields);
     }
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public Refresh Clone() {
-      return new Refresh(this);
+    public AgentStep Clone() {
+      return new AgentStep(this);
     }
 
-    /// <summary>Field number for the "current" field.</summary>
-    public const int CurrentFieldNumber = 1;
-    private pb::ByteString current_ = pb::ByteString.Empty;
+    /// <summary>Field number for the "agent" field.</summary>
+    public const int AgentFieldNumber = 1;
+    private pb::ByteString agent_ = pb::ByteString.Empty;
     /// <summary>
-    /// from the last Loaded or Decision
+    /// the last AgentOutput.agent, as it came
     /// </summary>
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public pb::ByteString Current {
-      get { return current_; }
+    public pb::ByteString Agent {
+      get { return agent_; }
       set {
-        current_ = pb::ProtoPreconditions.CheckNotNull(value, "value");
-      }
-    }
-
-    /// <summary>Field number for the "at_start" field.</summary>
-    public const int AtStartFieldNumber = 2;
-    private pb::ByteString atStart_ = pb::ByteString.Empty;
-    /// <summary>
-    /// Loaded.current, as it was at start
-    /// </summary>
-    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
-    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public pb::ByteString AtStart {
-      get { return atStart_; }
-      set {
-        atStart_ = pb::ProtoPreconditions.CheckNotNull(value, "value");
-      }
-    }
-
-    /// <summary>Field number for the "host" field.</summary>
-    public const int HostFieldNumber = 3;
-    private global::Logfire.Fleet.Client.Sdk.Host host_;
-    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
-    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public global::Logfire.Fleet.Client.Sdk.Host Host {
-      get { return host_; }
-      set {
-        host_ = value;
+        agent_ = pb::ProtoPreconditions.CheckNotNull(value, "value");
       }
     }
 
     /// <summary>Field number for the "now_unix_ms" field.</summary>
-    public const int NowUnixMsFieldNumber = 4;
+    public const int NowUnixMsFieldNumber = 2;
     private ulong nowUnixMs_;
+    /// <summary>
+    /// as AgentStart's
+    /// </summary>
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public ulong NowUnixMs {
@@ -4406,25 +3205,276 @@ namespace Logfire.Fleet.Client.Sdk {
       }
     }
 
+    /// <summary>Field number for the "now_mono_ms" field.</summary>
+    public const int NowMonoMsFieldNumber = 3;
+    private ulong nowMonoMs_;
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public override bool Equals(object other) {
-      return Equals(other as Refresh);
+    public ulong NowMonoMs {
+      get { return nowMonoMs_; }
+      set {
+        nowMonoMs_ = value;
+      }
+    }
+
+    /// <summary>Field number for the "remote_config" field.</summary>
+    public const int RemoteConfigFieldNumber = 4;
+    /// <summary>
+    /// the client's remote config notification
+    /// </summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public global::OpAmp.Proto.V1.AgentRemoteConfig RemoteConfig {
+      get { return inputCase_ == InputOneofCase.RemoteConfig ? (global::OpAmp.Proto.V1.AgentRemoteConfig) input_ : null; }
+      set {
+        input_ = value;
+        inputCase_ = value == null ? InputOneofCase.None : InputOneofCase.RemoteConfig;
+      }
+    }
+
+    /// <summary>Field number for the "connected" field.</summary>
+    public const int ConnectedFieldNumber = 5;
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public global::Logfire.Fleet.Client.Sdk.AgentConnected Connected {
+      get { return inputCase_ == InputOneofCase.Connected ? (global::Logfire.Fleet.Client.Sdk.AgentConnected) input_ : null; }
+      set {
+        input_ = value;
+        inputCase_ = value == null ? InputOneofCase.None : InputOneofCase.Connected;
+      }
+    }
+
+    /// <summary>Field number for the "connect_failed" field.</summary>
+    public const int ConnectFailedFieldNumber = 6;
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public global::Logfire.Fleet.Client.Sdk.AgentConnectFailed ConnectFailed {
+      get { return inputCase_ == InputOneofCase.ConnectFailed ? (global::Logfire.Fleet.Client.Sdk.AgentConnectFailed) input_ : null; }
+      set {
+        input_ = value;
+        inputCase_ = value == null ? InputOneofCase.None : InputOneofCase.ConnectFailed;
+      }
+    }
+
+    /// <summary>Field number for the "instance_uid_changed" field.</summary>
+    public const int InstanceUidChangedFieldNumber = 7;
+    /// <summary>
+    /// 16 bytes: the server named the instance anew
+    /// </summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public pb::ByteString InstanceUidChanged {
+      get { return HasInstanceUidChanged ? (pb::ByteString) input_ : pb::ByteString.Empty; }
+      set {
+        input_ = pb::ProtoPreconditions.CheckNotNull(value, "value");
+        inputCase_ = InputOneofCase.InstanceUidChanged;
+      }
+    }
+    /// <summary>Gets whether the "instance_uid_changed" field is set</summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public bool HasInstanceUidChanged {
+      get { return inputCase_ == InputOneofCase.InstanceUidChanged; }
+    }
+    /// <summary> Clears the value of the oneof if it's currently set to "instance_uid_changed" </summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public void ClearInstanceUidChanged() {
+      if (HasInstanceUidChanged) {
+        ClearInput();
+      }
+    }
+
+    /// <summary>Field number for the "uid_not_saved" field.</summary>
+    public const int UidNotSavedFieldNumber = 8;
+    /// <summary>
+    /// SaveUid failed, and why
+    /// </summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public string UidNotSaved {
+      get { return HasUidNotSaved ? (string) input_ : ""; }
+      set {
+        input_ = pb::ProtoPreconditions.CheckNotNull(value, "value");
+        inputCase_ = InputOneofCase.UidNotSaved;
+      }
+    }
+    /// <summary>Gets whether the "uid_not_saved" field is set</summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public bool HasUidNotSaved {
+      get { return inputCase_ == InputOneofCase.UidNotSaved; }
+    }
+    /// <summary> Clears the value of the oneof if it's currently set to "uid_not_saved" </summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public void ClearUidNotSaved() {
+      if (HasUidNotSaved) {
+        ClearInput();
+      }
+    }
+
+    /// <summary>Field number for the "state_from_newer_version" field.</summary>
+    public const int StateFromNewerVersionFieldNumber = 9;
+    /// <summary>
+    /// the notification's state format
+    /// </summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public uint StateFromNewerVersion {
+      get { return HasStateFromNewerVersion ? (uint) input_ : 0; }
+      set {
+        input_ = value;
+        inputCase_ = InputOneofCase.StateFromNewerVersion;
+      }
+    }
+    /// <summary>Gets whether the "state_from_newer_version" field is set</summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public bool HasStateFromNewerVersion {
+      get { return inputCase_ == InputOneofCase.StateFromNewerVersion; }
+    }
+    /// <summary> Clears the value of the oneof if it's currently set to "state_from_newer_version" </summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public void ClearStateFromNewerVersion() {
+      if (HasStateFromNewerVersion) {
+        ClearInput();
+      }
+    }
+
+    /// <summary>Field number for the "stopped" field.</summary>
+    public const int StoppedFieldNumber = 10;
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public global::Logfire.Fleet.Client.Sdk.AgentStopped Stopped {
+      get { return inputCase_ == InputOneofCase.Stopped ? (global::Logfire.Fleet.Client.Sdk.AgentStopped) input_ : null; }
+      set {
+        input_ = value;
+        inputCase_ = value == null ? InputOneofCase.None : InputOneofCase.Stopped;
+      }
+    }
+
+    /// <summary>Field number for the "timer" field.</summary>
+    public const int TimerFieldNumber = 11;
+    /// <summary>
+    /// wake_at_mono_ms came: what the gates counted since start
+    /// </summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public global::Logfire.Fleet.Client.Sdk.ExportCounts Timer {
+      get { return inputCase_ == InputOneofCase.Timer ? (global::Logfire.Fleet.Client.Sdk.ExportCounts) input_ : null; }
+      set {
+        input_ = value;
+        inputCase_ = value == null ? InputOneofCase.None : InputOneofCase.Timer;
+      }
+    }
+
+    /// <summary>Field number for the "exporters" field.</summary>
+    public const int ExportersFieldNumber = 12;
+    /// <summary>
+    /// the inventory's exporters changed
+    /// </summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public global::Logfire.Fleet.Client.Sdk.AgentExporters Exporters {
+      get { return inputCase_ == InputOneofCase.Exporters ? (global::Logfire.Fleet.Client.Sdk.AgentExporters) input_ : null; }
+      set {
+        input_ = value;
+        inputCase_ = value == null ? InputOneofCase.None : InputOneofCase.Exporters;
+      }
+    }
+
+    /// <summary>Field number for the "host" field.</summary>
+    public const int HostFieldNumber = 13;
+    /// <summary>
+    /// what the host carries out changed
+    /// </summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public global::Logfire.Fleet.Client.Sdk.Host Host {
+      get { return inputCase_ == InputOneofCase.Host ? (global::Logfire.Fleet.Client.Sdk.Host) input_ : null; }
+      set {
+        input_ = value;
+        inputCase_ = value == null ? InputOneofCase.None : InputOneofCase.Host;
+      }
+    }
+
+    /// <summary>Field number for the "built" field.</summary>
+    public const int BuiltFieldNumber = 14;
+    /// <summary>
+    /// the SDK is built, before the client starts
+    /// </summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public global::Logfire.Fleet.Client.Sdk.AgentBuilt Built {
+      get { return inputCase_ == InputOneofCase.Built ? (global::Logfire.Fleet.Client.Sdk.AgentBuilt) input_ : null; }
+      set {
+        input_ = value;
+        inputCase_ = value == null ? InputOneofCase.None : InputOneofCase.Built;
+      }
+    }
+
+    private object input_;
+    /// <summary>Enum of possible cases for the "input" oneof.</summary>
+    public enum InputOneofCase {
+      None = 0,
+      RemoteConfig = 4,
+      Connected = 5,
+      ConnectFailed = 6,
+      InstanceUidChanged = 7,
+      UidNotSaved = 8,
+      StateFromNewerVersion = 9,
+      Stopped = 10,
+      Timer = 11,
+      Exporters = 12,
+      Host = 13,
+      Built = 14,
+    }
+    private InputOneofCase inputCase_ = InputOneofCase.None;
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public InputOneofCase InputCase {
+      get { return inputCase_; }
     }
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public bool Equals(Refresh other) {
+    public void ClearInput() {
+      inputCase_ = InputOneofCase.None;
+      input_ = null;
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public override bool Equals(object other) {
+      return Equals(other as AgentStep);
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public bool Equals(AgentStep other) {
       if (ReferenceEquals(other, null)) {
         return false;
       }
       if (ReferenceEquals(other, this)) {
         return true;
       }
-      if (Current != other.Current) return false;
-      if (AtStart != other.AtStart) return false;
-      if (!object.Equals(Host, other.Host)) return false;
+      if (Agent != other.Agent) return false;
       if (NowUnixMs != other.NowUnixMs) return false;
+      if (NowMonoMs != other.NowMonoMs) return false;
+      if (!object.Equals(RemoteConfig, other.RemoteConfig)) return false;
+      if (!object.Equals(Connected, other.Connected)) return false;
+      if (!object.Equals(ConnectFailed, other.ConnectFailed)) return false;
+      if (InstanceUidChanged != other.InstanceUidChanged) return false;
+      if (UidNotSaved != other.UidNotSaved) return false;
+      if (StateFromNewerVersion != other.StateFromNewerVersion) return false;
+      if (!object.Equals(Stopped, other.Stopped)) return false;
+      if (!object.Equals(Timer, other.Timer)) return false;
+      if (!object.Equals(Exporters, other.Exporters)) return false;
+      if (!object.Equals(Host, other.Host)) return false;
+      if (!object.Equals(Built, other.Built)) return false;
+      if (InputCase != other.InputCase) return false;
       return Equals(_unknownFields, other._unknownFields);
     }
 
@@ -4432,10 +3482,21 @@ namespace Logfire.Fleet.Client.Sdk {
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public override int GetHashCode() {
       int hash = 1;
-      if (Current.Length != 0) hash ^= Current.GetHashCode();
-      if (AtStart.Length != 0) hash ^= AtStart.GetHashCode();
-      if (host_ != null) hash ^= Host.GetHashCode();
+      if (Agent.Length != 0) hash ^= Agent.GetHashCode();
       if (NowUnixMs != 0UL) hash ^= NowUnixMs.GetHashCode();
+      if (NowMonoMs != 0UL) hash ^= NowMonoMs.GetHashCode();
+      if (inputCase_ == InputOneofCase.RemoteConfig) hash ^= RemoteConfig.GetHashCode();
+      if (inputCase_ == InputOneofCase.Connected) hash ^= Connected.GetHashCode();
+      if (inputCase_ == InputOneofCase.ConnectFailed) hash ^= ConnectFailed.GetHashCode();
+      if (HasInstanceUidChanged) hash ^= InstanceUidChanged.GetHashCode();
+      if (HasUidNotSaved) hash ^= UidNotSaved.GetHashCode();
+      if (HasStateFromNewerVersion) hash ^= StateFromNewerVersion.GetHashCode();
+      if (inputCase_ == InputOneofCase.Stopped) hash ^= Stopped.GetHashCode();
+      if (inputCase_ == InputOneofCase.Timer) hash ^= Timer.GetHashCode();
+      if (inputCase_ == InputOneofCase.Exporters) hash ^= Exporters.GetHashCode();
+      if (inputCase_ == InputOneofCase.Host) hash ^= Host.GetHashCode();
+      if (inputCase_ == InputOneofCase.Built) hash ^= Built.GetHashCode();
+      hash ^= (int) inputCase_;
       if (_unknownFields != null) {
         hash ^= _unknownFields.GetHashCode();
       }
@@ -4454,21 +3515,61 @@ namespace Logfire.Fleet.Client.Sdk {
     #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
       output.WriteRawMessage(this);
     #else
-      if (Current.Length != 0) {
+      if (Agent.Length != 0) {
         output.WriteRawTag(10);
-        output.WriteBytes(Current);
-      }
-      if (AtStart.Length != 0) {
-        output.WriteRawTag(18);
-        output.WriteBytes(AtStart);
-      }
-      if (host_ != null) {
-        output.WriteRawTag(26);
-        output.WriteMessage(Host);
+        output.WriteBytes(Agent);
       }
       if (NowUnixMs != 0UL) {
-        output.WriteRawTag(32);
+        output.WriteRawTag(16);
         output.WriteUInt64(NowUnixMs);
+      }
+      if (NowMonoMs != 0UL) {
+        output.WriteRawTag(24);
+        output.WriteUInt64(NowMonoMs);
+      }
+      if (inputCase_ == InputOneofCase.RemoteConfig) {
+        output.WriteRawTag(34);
+        output.WriteMessage(RemoteConfig);
+      }
+      if (inputCase_ == InputOneofCase.Connected) {
+        output.WriteRawTag(42);
+        output.WriteMessage(Connected);
+      }
+      if (inputCase_ == InputOneofCase.ConnectFailed) {
+        output.WriteRawTag(50);
+        output.WriteMessage(ConnectFailed);
+      }
+      if (HasInstanceUidChanged) {
+        output.WriteRawTag(58);
+        output.WriteBytes(InstanceUidChanged);
+      }
+      if (HasUidNotSaved) {
+        output.WriteRawTag(66);
+        output.WriteString(UidNotSaved);
+      }
+      if (HasStateFromNewerVersion) {
+        output.WriteRawTag(72);
+        output.WriteUInt32(StateFromNewerVersion);
+      }
+      if (inputCase_ == InputOneofCase.Stopped) {
+        output.WriteRawTag(82);
+        output.WriteMessage(Stopped);
+      }
+      if (inputCase_ == InputOneofCase.Timer) {
+        output.WriteRawTag(90);
+        output.WriteMessage(Timer);
+      }
+      if (inputCase_ == InputOneofCase.Exporters) {
+        output.WriteRawTag(98);
+        output.WriteMessage(Exporters);
+      }
+      if (inputCase_ == InputOneofCase.Host) {
+        output.WriteRawTag(106);
+        output.WriteMessage(Host);
+      }
+      if (inputCase_ == InputOneofCase.Built) {
+        output.WriteRawTag(114);
+        output.WriteMessage(Built);
       }
       if (_unknownFields != null) {
         _unknownFields.WriteTo(output);
@@ -4480,21 +3581,61 @@ namespace Logfire.Fleet.Client.Sdk {
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     void pb::IBufferMessage.InternalWriteTo(ref pb::WriteContext output) {
-      if (Current.Length != 0) {
+      if (Agent.Length != 0) {
         output.WriteRawTag(10);
-        output.WriteBytes(Current);
-      }
-      if (AtStart.Length != 0) {
-        output.WriteRawTag(18);
-        output.WriteBytes(AtStart);
-      }
-      if (host_ != null) {
-        output.WriteRawTag(26);
-        output.WriteMessage(Host);
+        output.WriteBytes(Agent);
       }
       if (NowUnixMs != 0UL) {
-        output.WriteRawTag(32);
+        output.WriteRawTag(16);
         output.WriteUInt64(NowUnixMs);
+      }
+      if (NowMonoMs != 0UL) {
+        output.WriteRawTag(24);
+        output.WriteUInt64(NowMonoMs);
+      }
+      if (inputCase_ == InputOneofCase.RemoteConfig) {
+        output.WriteRawTag(34);
+        output.WriteMessage(RemoteConfig);
+      }
+      if (inputCase_ == InputOneofCase.Connected) {
+        output.WriteRawTag(42);
+        output.WriteMessage(Connected);
+      }
+      if (inputCase_ == InputOneofCase.ConnectFailed) {
+        output.WriteRawTag(50);
+        output.WriteMessage(ConnectFailed);
+      }
+      if (HasInstanceUidChanged) {
+        output.WriteRawTag(58);
+        output.WriteBytes(InstanceUidChanged);
+      }
+      if (HasUidNotSaved) {
+        output.WriteRawTag(66);
+        output.WriteString(UidNotSaved);
+      }
+      if (HasStateFromNewerVersion) {
+        output.WriteRawTag(72);
+        output.WriteUInt32(StateFromNewerVersion);
+      }
+      if (inputCase_ == InputOneofCase.Stopped) {
+        output.WriteRawTag(82);
+        output.WriteMessage(Stopped);
+      }
+      if (inputCase_ == InputOneofCase.Timer) {
+        output.WriteRawTag(90);
+        output.WriteMessage(Timer);
+      }
+      if (inputCase_ == InputOneofCase.Exporters) {
+        output.WriteRawTag(98);
+        output.WriteMessage(Exporters);
+      }
+      if (inputCase_ == InputOneofCase.Host) {
+        output.WriteRawTag(106);
+        output.WriteMessage(Host);
+      }
+      if (inputCase_ == InputOneofCase.Built) {
+        output.WriteRawTag(114);
+        output.WriteMessage(Built);
       }
       if (_unknownFields != null) {
         _unknownFields.WriteTo(ref output);
@@ -4506,18 +3647,48 @@ namespace Logfire.Fleet.Client.Sdk {
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public int CalculateSize() {
       int size = 0;
-      if (Current.Length != 0) {
-        size += 1 + pb::CodedOutputStream.ComputeBytesSize(Current);
-      }
-      if (AtStart.Length != 0) {
-        size += 1 + pb::CodedOutputStream.ComputeBytesSize(AtStart);
-      }
-      if (host_ != null) {
-        size += 1 + pb::CodedOutputStream.ComputeMessageSize(Host);
+      if (Agent.Length != 0) {
+        size += 1 + pb::CodedOutputStream.ComputeBytesSize(Agent);
       }
       if (NowUnixMs != 0UL) {
         size += 1 + pb::CodedOutputStream.ComputeUInt64Size(NowUnixMs);
       }
+      if (NowMonoMs != 0UL) {
+        size += 1 + pb::CodedOutputStream.ComputeUInt64Size(NowMonoMs);
+      }
+      if (inputCase_ == InputOneofCase.RemoteConfig) {
+        size += 1 + pb::CodedOutputStream.ComputeMessageSize(RemoteConfig);
+      }
+      if (inputCase_ == InputOneofCase.Connected) {
+        size += 1 + pb::CodedOutputStream.ComputeMessageSize(Connected);
+      }
+      if (inputCase_ == InputOneofCase.ConnectFailed) {
+        size += 1 + pb::CodedOutputStream.ComputeMessageSize(ConnectFailed);
+      }
+      if (HasInstanceUidChanged) {
+        size += 1 + pb::CodedOutputStream.ComputeBytesSize(InstanceUidChanged);
+      }
+      if (HasUidNotSaved) {
+        size += 1 + pb::CodedOutputStream.ComputeStringSize(UidNotSaved);
+      }
+      if (HasStateFromNewerVersion) {
+        size += 1 + pb::CodedOutputStream.ComputeUInt32Size(StateFromNewerVersion);
+      }
+      if (inputCase_ == InputOneofCase.Stopped) {
+        size += 1 + pb::CodedOutputStream.ComputeMessageSize(Stopped);
+      }
+      if (inputCase_ == InputOneofCase.Timer) {
+        size += 1 + pb::CodedOutputStream.ComputeMessageSize(Timer);
+      }
+      if (inputCase_ == InputOneofCase.Exporters) {
+        size += 1 + pb::CodedOutputStream.ComputeMessageSize(Exporters);
+      }
+      if (inputCase_ == InputOneofCase.Host) {
+        size += 1 + pb::CodedOutputStream.ComputeMessageSize(Host);
+      }
+      if (inputCase_ == InputOneofCase.Built) {
+        size += 1 + pb::CodedOutputStream.ComputeMessageSize(Built);
+      }
       if (_unknownFields != null) {
         size += _unknownFields.CalculateSize();
       }
@@ -4526,25 +3697,79 @@ namespace Logfire.Fleet.Client.Sdk {
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public void MergeFrom(Refresh other) {
+    public void MergeFrom(AgentStep other) {
       if (other == null) {
         return;
       }
-      if (other.Current.Length != 0) {
-        Current = other.Current;
-      }
-      if (other.AtStart.Length != 0) {
-        AtStart = other.AtStart;
-      }
-      if (other.host_ != null) {
-        if (host_ == null) {
-          Host = new global::Logfire.Fleet.Client.Sdk.Host();
-        }
-        Host.MergeFrom(other.Host);
+      if (other.Agent.Length != 0) {
+        Agent = other.Agent;
       }
       if (other.NowUnixMs != 0UL) {
         NowUnixMs = other.NowUnixMs;
       }
+      if (other.NowMonoMs != 0UL) {
+        NowMonoMs = other.NowMonoMs;
+      }
+      switch (other.InputCase) {
+        case InputOneofCase.RemoteConfig:
+          if (RemoteConfig == null) {
+            RemoteConfig = new global::OpAmp.Proto.V1.AgentRemoteConfig();
+          }
+          RemoteConfig.MergeFrom(other.RemoteConfig);
+          break;
+        case InputOneofCase.Connected:
+          if (Connected == null) {
+            Connected = new global::Logfire.Fleet.Client.Sdk.AgentConnected();
+          }
+          Connected.MergeFrom(other.Connected);
+          break;
+        case InputOneofCase.ConnectFailed:
+          if (ConnectFailed == null) {
+            ConnectFailed = new global::Logfire.Fleet.Client.Sdk.AgentConnectFailed();
+          }
+          ConnectFailed.MergeFrom(other.ConnectFailed);
+          break;
+        case InputOneofCase.InstanceUidChanged:
+          InstanceUidChanged = other.InstanceUidChanged;
+          break;
+        case InputOneofCase.UidNotSaved:
+          UidNotSaved = other.UidNotSaved;
+          break;
+        case InputOneofCase.StateFromNewerVersion:
+          StateFromNewerVersion = other.StateFromNewerVersion;
+          break;
+        case InputOneofCase.Stopped:
+          if (Stopped == null) {
+            Stopped = new global::Logfire.Fleet.Client.Sdk.AgentStopped();
+          }
+          Stopped.MergeFrom(other.Stopped);
+          break;
+        case InputOneofCase.Timer:
+          if (Timer == null) {
+            Timer = new global::Logfire.Fleet.Client.Sdk.ExportCounts();
+          }
+          Timer.MergeFrom(other.Timer);
+          break;
+        case InputOneofCase.Exporters:
+          if (Exporters == null) {
+            Exporters = new global::Logfire.Fleet.Client.Sdk.AgentExporters();
+          }
+          Exporters.MergeFrom(other.Exporters);
+          break;
+        case InputOneofCase.Host:
+          if (Host == null) {
+            Host = new global::Logfire.Fleet.Client.Sdk.Host();
+          }
+          Host.MergeFrom(other.Host);
+          break;
+        case InputOneofCase.Built:
+          if (Built == null) {
+            Built = new global::Logfire.Fleet.Client.Sdk.AgentBuilt();
+          }
+          Built.MergeFrom(other.Built);
+          break;
+      }
+
       _unknownFields = pb::UnknownFieldSet.MergeFrom(_unknownFields, other._unknownFields);
     }
 
@@ -4565,22 +3790,99 @@ namespace Logfire.Fleet.Client.Sdk {
             _unknownFields = pb::UnknownFieldSet.MergeFieldFrom(_unknownFields, input);
             break;
           case 10: {
-            Current = input.ReadBytes();
+            Agent = input.ReadBytes();
             break;
           }
-          case 18: {
-            AtStart = input.ReadBytes();
-            break;
-          }
-          case 26: {
-            if (host_ == null) {
-              Host = new global::Logfire.Fleet.Client.Sdk.Host();
-            }
-            input.ReadMessage(Host);
-            break;
-          }
-          case 32: {
+          case 16: {
             NowUnixMs = input.ReadUInt64();
+            break;
+          }
+          case 24: {
+            NowMonoMs = input.ReadUInt64();
+            break;
+          }
+          case 34: {
+            global::OpAmp.Proto.V1.AgentRemoteConfig subBuilder = new global::OpAmp.Proto.V1.AgentRemoteConfig();
+            if (inputCase_ == InputOneofCase.RemoteConfig) {
+              subBuilder.MergeFrom(RemoteConfig);
+            }
+            input.ReadMessage(subBuilder);
+            RemoteConfig = subBuilder;
+            break;
+          }
+          case 42: {
+            global::Logfire.Fleet.Client.Sdk.AgentConnected subBuilder = new global::Logfire.Fleet.Client.Sdk.AgentConnected();
+            if (inputCase_ == InputOneofCase.Connected) {
+              subBuilder.MergeFrom(Connected);
+            }
+            input.ReadMessage(subBuilder);
+            Connected = subBuilder;
+            break;
+          }
+          case 50: {
+            global::Logfire.Fleet.Client.Sdk.AgentConnectFailed subBuilder = new global::Logfire.Fleet.Client.Sdk.AgentConnectFailed();
+            if (inputCase_ == InputOneofCase.ConnectFailed) {
+              subBuilder.MergeFrom(ConnectFailed);
+            }
+            input.ReadMessage(subBuilder);
+            ConnectFailed = subBuilder;
+            break;
+          }
+          case 58: {
+            InstanceUidChanged = input.ReadBytes();
+            break;
+          }
+          case 66: {
+            UidNotSaved = input.ReadString();
+            break;
+          }
+          case 72: {
+            StateFromNewerVersion = input.ReadUInt32();
+            break;
+          }
+          case 82: {
+            global::Logfire.Fleet.Client.Sdk.AgentStopped subBuilder = new global::Logfire.Fleet.Client.Sdk.AgentStopped();
+            if (inputCase_ == InputOneofCase.Stopped) {
+              subBuilder.MergeFrom(Stopped);
+            }
+            input.ReadMessage(subBuilder);
+            Stopped = subBuilder;
+            break;
+          }
+          case 90: {
+            global::Logfire.Fleet.Client.Sdk.ExportCounts subBuilder = new global::Logfire.Fleet.Client.Sdk.ExportCounts();
+            if (inputCase_ == InputOneofCase.Timer) {
+              subBuilder.MergeFrom(Timer);
+            }
+            input.ReadMessage(subBuilder);
+            Timer = subBuilder;
+            break;
+          }
+          case 98: {
+            global::Logfire.Fleet.Client.Sdk.AgentExporters subBuilder = new global::Logfire.Fleet.Client.Sdk.AgentExporters();
+            if (inputCase_ == InputOneofCase.Exporters) {
+              subBuilder.MergeFrom(Exporters);
+            }
+            input.ReadMessage(subBuilder);
+            Exporters = subBuilder;
+            break;
+          }
+          case 106: {
+            global::Logfire.Fleet.Client.Sdk.Host subBuilder = new global::Logfire.Fleet.Client.Sdk.Host();
+            if (inputCase_ == InputOneofCase.Host) {
+              subBuilder.MergeFrom(Host);
+            }
+            input.ReadMessage(subBuilder);
+            Host = subBuilder;
+            break;
+          }
+          case 114: {
+            global::Logfire.Fleet.Client.Sdk.AgentBuilt subBuilder = new global::Logfire.Fleet.Client.Sdk.AgentBuilt();
+            if (inputCase_ == InputOneofCase.Built) {
+              subBuilder.MergeFrom(Built);
+            }
+            input.ReadMessage(subBuilder);
+            Built = subBuilder;
             break;
           }
         }
@@ -4603,24 +3905,101 @@ namespace Logfire.Fleet.Client.Sdk {
             _unknownFields = pb::UnknownFieldSet.MergeFieldFrom(_unknownFields, ref input);
             break;
           case 10: {
-            Current = input.ReadBytes();
+            Agent = input.ReadBytes();
             break;
           }
-          case 18: {
-            AtStart = input.ReadBytes();
-            break;
-          }
-          case 26: {
-            if (host_ == null) {
-              Host = new global::Logfire.Fleet.Client.Sdk.Host();
-            }
-            input.ReadMessage(Host);
-            break;
-          }
-          case 32: {
+          case 16: {
             NowUnixMs = input.ReadUInt64();
             break;
           }
+          case 24: {
+            NowMonoMs = input.ReadUInt64();
+            break;
+          }
+          case 34: {
+            global::OpAmp.Proto.V1.AgentRemoteConfig subBuilder = new global::OpAmp.Proto.V1.AgentRemoteConfig();
+            if (inputCase_ == InputOneofCase.RemoteConfig) {
+              subBuilder.MergeFrom(RemoteConfig);
+            }
+            input.ReadMessage(subBuilder);
+            RemoteConfig = subBuilder;
+            break;
+          }
+          case 42: {
+            global::Logfire.Fleet.Client.Sdk.AgentConnected subBuilder = new global::Logfire.Fleet.Client.Sdk.AgentConnected();
+            if (inputCase_ == InputOneofCase.Connected) {
+              subBuilder.MergeFrom(Connected);
+            }
+            input.ReadMessage(subBuilder);
+            Connected = subBuilder;
+            break;
+          }
+          case 50: {
+            global::Logfire.Fleet.Client.Sdk.AgentConnectFailed subBuilder = new global::Logfire.Fleet.Client.Sdk.AgentConnectFailed();
+            if (inputCase_ == InputOneofCase.ConnectFailed) {
+              subBuilder.MergeFrom(ConnectFailed);
+            }
+            input.ReadMessage(subBuilder);
+            ConnectFailed = subBuilder;
+            break;
+          }
+          case 58: {
+            InstanceUidChanged = input.ReadBytes();
+            break;
+          }
+          case 66: {
+            UidNotSaved = input.ReadString();
+            break;
+          }
+          case 72: {
+            StateFromNewerVersion = input.ReadUInt32();
+            break;
+          }
+          case 82: {
+            global::Logfire.Fleet.Client.Sdk.AgentStopped subBuilder = new global::Logfire.Fleet.Client.Sdk.AgentStopped();
+            if (inputCase_ == InputOneofCase.Stopped) {
+              subBuilder.MergeFrom(Stopped);
+            }
+            input.ReadMessage(subBuilder);
+            Stopped = subBuilder;
+            break;
+          }
+          case 90: {
+            global::Logfire.Fleet.Client.Sdk.ExportCounts subBuilder = new global::Logfire.Fleet.Client.Sdk.ExportCounts();
+            if (inputCase_ == InputOneofCase.Timer) {
+              subBuilder.MergeFrom(Timer);
+            }
+            input.ReadMessage(subBuilder);
+            Timer = subBuilder;
+            break;
+          }
+          case 98: {
+            global::Logfire.Fleet.Client.Sdk.AgentExporters subBuilder = new global::Logfire.Fleet.Client.Sdk.AgentExporters();
+            if (inputCase_ == InputOneofCase.Exporters) {
+              subBuilder.MergeFrom(Exporters);
+            }
+            input.ReadMessage(subBuilder);
+            Exporters = subBuilder;
+            break;
+          }
+          case 106: {
+            global::Logfire.Fleet.Client.Sdk.Host subBuilder = new global::Logfire.Fleet.Client.Sdk.Host();
+            if (inputCase_ == InputOneofCase.Host) {
+              subBuilder.MergeFrom(Host);
+            }
+            input.ReadMessage(subBuilder);
+            Host = subBuilder;
+            break;
+          }
+          case 114: {
+            global::Logfire.Fleet.Client.Sdk.AgentBuilt subBuilder = new global::Logfire.Fleet.Client.Sdk.AgentBuilt();
+            if (inputCase_ == InputOneofCase.Built) {
+              subBuilder.MergeFrom(Built);
+            }
+            input.ReadMessage(subBuilder);
+            Built = subBuilder;
+            break;
+          }
         }
       }
     }
@@ -4629,21 +4008,21 @@ namespace Logfire.Fleet.Client.Sdk {
   }
 
   [global::System.Diagnostics.DebuggerDisplayAttribute("{ToString(),nq}")]
-  public sealed partial class Refreshed : pb::IMessage<Refreshed>
+  public sealed partial class AgentBuilt : pb::IMessage<AgentBuilt>
   #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
       , pb::IBufferMessage
   #endif
   {
-    private static readonly pb::MessageParser<Refreshed> _parser = new pb::MessageParser<Refreshed>(() => new Refreshed());
+    private static readonly pb::MessageParser<AgentBuilt> _parser = new pb::MessageParser<AgentBuilt>(() => new AgentBuilt());
     private pb::UnknownFieldSet _unknownFields;
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public static pb::MessageParser<Refreshed> Parser { get { return _parser; } }
+    public static pb::MessageParser<AgentBuilt> Parser { get { return _parser; } }
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public static pbr::MessageDescriptor Descriptor {
-      get { return global::Logfire.Fleet.Client.Sdk.SettingsReflection.Descriptor.MessageTypes[12]; }
+      get { return global::Logfire.Fleet.Client.Sdk.SettingsReflection.Descriptor.MessageTypes[8]; }
     }
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
@@ -4654,7 +4033,7 @@ namespace Logfire.Fleet.Client.Sdk {
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public Refreshed() {
+    public AgentBuilt() {
       OnConstruction();
     }
 
@@ -4662,430 +4041,40 @@ namespace Logfire.Fleet.Client.Sdk {
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public Refreshed(Refreshed other) : this() {
-      settings_ = other.settings_ != null ? other.settings_.Clone() : null;
-      effective_ = other.effective_ != null ? other.effective_.Clone() : null;
-      refreshAtUnixMs_ = other.refreshAtUnixMs_;
-      warning_ = other.warning_;
-      _unknownFields = pb::UnknownFieldSet.Clone(other._unknownFields);
-    }
-
-    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
-    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public Refreshed Clone() {
-      return new Refreshed(this);
-    }
-
-    /// <summary>Field number for the "settings" field.</summary>
-    public const int SettingsFieldNumber = 1;
-    private global::Logfire.Fleet.Client.Sdk.Settings settings_;
-    /// <summary>
-    /// put the live ones in force
-    /// </summary>
-    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
-    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public global::Logfire.Fleet.Client.Sdk.Settings Settings {
-      get { return settings_; }
-      set {
-        settings_ = value;
-      }
-    }
-
-    /// <summary>Field number for the "effective" field.</summary>
-    public const int EffectiveFieldNumber = 2;
-    private global::OpAmp.Proto.V1.EffectiveConfig effective_;
-    /// <summary>
-    /// report it
-    /// </summary>
-    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
-    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public global::OpAmp.Proto.V1.EffectiveConfig Effective {
-      get { return effective_; }
-      set {
-        effective_ = value;
-      }
-    }
-
-    /// <summary>Field number for the "refresh_at_unix_ms" field.</summary>
-    public const int RefreshAtUnixMsFieldNumber = 3;
-    private ulong refreshAtUnixMs_;
-    /// <summary>
-    /// as Loaded's
-    /// </summary>
-    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
-    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public ulong RefreshAtUnixMs {
-      get { return refreshAtUnixMs_; }
-      set {
-        refreshAtUnixMs_ = value;
-      }
-    }
-
-    /// <summary>Field number for the "warning" field.</summary>
-    public const int WarningFieldNumber = 4;
-    private string warning_ = "";
-    /// <summary>
-    /// `current` no longer reads on this clock, and why: the SDK's own settings
-    /// </summary>
-    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
-    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public string Warning {
-      get { return warning_; }
-      set {
-        warning_ = pb::ProtoPreconditions.CheckNotNull(value, "value");
-      }
-    }
-
-    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
-    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public override bool Equals(object other) {
-      return Equals(other as Refreshed);
-    }
-
-    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
-    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public bool Equals(Refreshed other) {
-      if (ReferenceEquals(other, null)) {
-        return false;
-      }
-      if (ReferenceEquals(other, this)) {
-        return true;
-      }
-      if (!object.Equals(Settings, other.Settings)) return false;
-      if (!object.Equals(Effective, other.Effective)) return false;
-      if (RefreshAtUnixMs != other.RefreshAtUnixMs) return false;
-      if (Warning != other.Warning) return false;
-      return Equals(_unknownFields, other._unknownFields);
-    }
-
-    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
-    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public override int GetHashCode() {
-      int hash = 1;
-      if (settings_ != null) hash ^= Settings.GetHashCode();
-      if (effective_ != null) hash ^= Effective.GetHashCode();
-      if (RefreshAtUnixMs != 0UL) hash ^= RefreshAtUnixMs.GetHashCode();
-      if (Warning.Length != 0) hash ^= Warning.GetHashCode();
-      if (_unknownFields != null) {
-        hash ^= _unknownFields.GetHashCode();
-      }
-      return hash;
-    }
-
-    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
-    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public override string ToString() {
-      return pb::JsonFormatter.ToDiagnosticString(this);
-    }
-
-    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
-    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public void WriteTo(pb::CodedOutputStream output) {
-    #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
-      output.WriteRawMessage(this);
-    #else
-      if (settings_ != null) {
-        output.WriteRawTag(10);
-        output.WriteMessage(Settings);
-      }
-      if (effective_ != null) {
-        output.WriteRawTag(18);
-        output.WriteMessage(Effective);
-      }
-      if (RefreshAtUnixMs != 0UL) {
-        output.WriteRawTag(24);
-        output.WriteUInt64(RefreshAtUnixMs);
-      }
-      if (Warning.Length != 0) {
-        output.WriteRawTag(34);
-        output.WriteString(Warning);
-      }
-      if (_unknownFields != null) {
-        _unknownFields.WriteTo(output);
-      }
-    #endif
-    }
-
-    #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
-    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
-    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    void pb::IBufferMessage.InternalWriteTo(ref pb::WriteContext output) {
-      if (settings_ != null) {
-        output.WriteRawTag(10);
-        output.WriteMessage(Settings);
-      }
-      if (effective_ != null) {
-        output.WriteRawTag(18);
-        output.WriteMessage(Effective);
-      }
-      if (RefreshAtUnixMs != 0UL) {
-        output.WriteRawTag(24);
-        output.WriteUInt64(RefreshAtUnixMs);
-      }
-      if (Warning.Length != 0) {
-        output.WriteRawTag(34);
-        output.WriteString(Warning);
-      }
-      if (_unknownFields != null) {
-        _unknownFields.WriteTo(ref output);
-      }
-    }
-    #endif
-
-    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
-    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public int CalculateSize() {
-      int size = 0;
-      if (settings_ != null) {
-        size += 1 + pb::CodedOutputStream.ComputeMessageSize(Settings);
-      }
-      if (effective_ != null) {
-        size += 1 + pb::CodedOutputStream.ComputeMessageSize(Effective);
-      }
-      if (RefreshAtUnixMs != 0UL) {
-        size += 1 + pb::CodedOutputStream.ComputeUInt64Size(RefreshAtUnixMs);
-      }
-      if (Warning.Length != 0) {
-        size += 1 + pb::CodedOutputStream.ComputeStringSize(Warning);
-      }
-      if (_unknownFields != null) {
-        size += _unknownFields.CalculateSize();
-      }
-      return size;
-    }
-
-    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
-    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public void MergeFrom(Refreshed other) {
-      if (other == null) {
-        return;
-      }
-      if (other.settings_ != null) {
-        if (settings_ == null) {
-          Settings = new global::Logfire.Fleet.Client.Sdk.Settings();
-        }
-        Settings.MergeFrom(other.Settings);
-      }
-      if (other.effective_ != null) {
-        if (effective_ == null) {
-          Effective = new global::OpAmp.Proto.V1.EffectiveConfig();
-        }
-        Effective.MergeFrom(other.Effective);
-      }
-      if (other.RefreshAtUnixMs != 0UL) {
-        RefreshAtUnixMs = other.RefreshAtUnixMs;
-      }
-      if (other.Warning.Length != 0) {
-        Warning = other.Warning;
-      }
-      _unknownFields = pb::UnknownFieldSet.MergeFrom(_unknownFields, other._unknownFields);
-    }
-
-    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
-    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public void MergeFrom(pb::CodedInputStream input) {
-    #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
-      input.ReadRawMessage(this);
-    #else
-      uint tag;
-      while ((tag = input.ReadTag()) != 0) {
-      if ((tag & 7) == 4) {
-        // Abort on any end group tag.
-        return;
-      }
-      switch(tag) {
-          default:
-            _unknownFields = pb::UnknownFieldSet.MergeFieldFrom(_unknownFields, input);
-            break;
-          case 10: {
-            if (settings_ == null) {
-              Settings = new global::Logfire.Fleet.Client.Sdk.Settings();
-            }
-            input.ReadMessage(Settings);
-            break;
-          }
-          case 18: {
-            if (effective_ == null) {
-              Effective = new global::OpAmp.Proto.V1.EffectiveConfig();
-            }
-            input.ReadMessage(Effective);
-            break;
-          }
-          case 24: {
-            RefreshAtUnixMs = input.ReadUInt64();
-            break;
-          }
-          case 34: {
-            Warning = input.ReadString();
-            break;
-          }
-        }
-      }
-    #endif
-    }
-
-    #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
-    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
-    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    void pb::IBufferMessage.InternalMergeFrom(ref pb::ParseContext input) {
-      uint tag;
-      while ((tag = input.ReadTag()) != 0) {
-      if ((tag & 7) == 4) {
-        // Abort on any end group tag.
-        return;
-      }
-      switch(tag) {
-          default:
-            _unknownFields = pb::UnknownFieldSet.MergeFieldFrom(_unknownFields, ref input);
-            break;
-          case 10: {
-            if (settings_ == null) {
-              Settings = new global::Logfire.Fleet.Client.Sdk.Settings();
-            }
-            input.ReadMessage(Settings);
-            break;
-          }
-          case 18: {
-            if (effective_ == null) {
-              Effective = new global::OpAmp.Proto.V1.EffectiveConfig();
-            }
-            input.ReadMessage(Effective);
-            break;
-          }
-          case 24: {
-            RefreshAtUnixMs = input.ReadUInt64();
-            break;
-          }
-          case 34: {
-            Warning = input.ReadString();
-            break;
-          }
-        }
-      }
-    }
-    #endif
-
-  }
-
-  /// <summary>
-  /// Export health, from the counts the gates keep: call it from the same timer as Refresh, every
-  /// 30 s, and pass back the report it answered last time. When `send`, put `exporters` under the
-  /// agent's health `component_health_map["exporters"]` (the top-level `healthy` stays the
-  /// application's) and call set_health; otherwise send nothing.
-  /// </summary>
-  [global::System.Diagnostics.DebuggerDisplayAttribute("{ToString(),nq}")]
-  public sealed partial class Health : pb::IMessage<Health>
-  #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
-      , pb::IBufferMessage
-  #endif
-  {
-    private static readonly pb::MessageParser<Health> _parser = new pb::MessageParser<Health>(() => new Health());
-    private pb::UnknownFieldSet _unknownFields;
-    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
-    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public static pb::MessageParser<Health> Parser { get { return _parser; } }
-
-    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
-    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public static pbr::MessageDescriptor Descriptor {
-      get { return global::Logfire.Fleet.Client.Sdk.SettingsReflection.Descriptor.MessageTypes[13]; }
-    }
-
-    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
-    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    pbr::MessageDescriptor pb::IMessage.Descriptor {
-      get { return Descriptor; }
-    }
-
-    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
-    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public Health() {
-      OnConstruction();
-    }
-
-    partial void OnConstruction();
-
-    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
-    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public Health(Health other) : this() {
-      counts_ = other.counts_ != null ? other.counts_.Clone() : null;
-      previous_ = other.previous_ != null ? other.previous_.Clone() : null;
-      nowUnixMs_ = other.nowUnixMs_;
-      settings_ = other.settings_ != null ? other.settings_.Clone() : null;
+    public AgentBuilt(AgentBuilt other) : this() {
+      service_ = other.service_;
       exporters_ = other.exporters_.Clone();
       _unknownFields = pb::UnknownFieldSet.Clone(other._unknownFields);
     }
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public Health Clone() {
-      return new Health(this);
+    public AgentBuilt Clone() {
+      return new AgentBuilt(this);
     }
 
-    /// <summary>Field number for the "counts" field.</summary>
-    public const int CountsFieldNumber = 1;
-    private global::Logfire.Fleet.Client.Sdk.ExportCounts counts_;
+    /// <summary>Field number for the "service" field.</summary>
+    public const int ServiceFieldNumber = 1;
+    private string service_ = "";
     /// <summary>
-    /// cumulative since start
+    /// the resource's service.name; empty: none
     /// </summary>
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public global::Logfire.Fleet.Client.Sdk.ExportCounts Counts {
-      get { return counts_; }
+    public string Service {
+      get { return service_; }
       set {
-        counts_ = value;
-      }
-    }
-
-    /// <summary>Field number for the "previous" field.</summary>
-    public const int PreviousFieldNumber = 2;
-    private global::Logfire.Fleet.Client.Sdk.HealthReport previous_;
-    /// <summary>
-    /// the last HealthReport answered; none at the first call
-    /// </summary>
-    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
-    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public global::Logfire.Fleet.Client.Sdk.HealthReport Previous {
-      get { return previous_; }
-      set {
-        previous_ = value;
-      }
-    }
-
-    /// <summary>Field number for the "now_unix_ms" field.</summary>
-    public const int NowUnixMsFieldNumber = 3;
-    private ulong nowUnixMs_;
-    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
-    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public ulong NowUnixMs {
-      get { return nowUnixMs_; }
-      set {
-        nowUnixMs_ = value;
-      }
-    }
-
-    /// <summary>Field number for the "settings" field.</summary>
-    public const int SettingsFieldNumber = 4;
-    private global::Logfire.Fleet.Client.Sdk.Settings settings_;
-    /// <summary>
-    /// in force: a send_* false reports that signal off
-    /// </summary>
-    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
-    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public global::Logfire.Fleet.Client.Sdk.Settings Settings {
-      get { return settings_; }
-      set {
-        settings_ = value;
+        service_ = pb::ProtoPreconditions.CheckNotNull(value, "value");
       }
     }
 
     /// <summary>Field number for the "exporters" field.</summary>
-    public const int ExportersFieldNumber = 5;
+    public const int ExportersFieldNumber = 2;
     private static readonly pb::FieldCodec<global::Logfire.Fleet.Client.Sdk.Exporter> _repeated_exporters_codec
-        = pb::FieldCodec.ForMessage(42, global::Logfire.Fleet.Client.Sdk.Exporter.Parser);
+        = pb::FieldCodec.ForMessage(18, global::Logfire.Fleet.Client.Sdk.Exporter.Parser);
     private readonly pbc::RepeatedField<global::Logfire.Fleet.Client.Sdk.Exporter> exporters_ = new pbc::RepeatedField<global::Logfire.Fleet.Client.Sdk.Exporter>();
     /// <summary>
-    /// as the inventory lists them: one child each under its signal
+    /// as the inventory lists them (Exporters' answer)
     /// </summary>
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
@@ -5096,22 +4085,19 @@ namespace Logfire.Fleet.Client.Sdk {
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public override bool Equals(object other) {
-      return Equals(other as Health);
+      return Equals(other as AgentBuilt);
     }
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public bool Equals(Health other) {
+    public bool Equals(AgentBuilt other) {
       if (ReferenceEquals(other, null)) {
         return false;
       }
       if (ReferenceEquals(other, this)) {
         return true;
       }
-      if (!object.Equals(Counts, other.Counts)) return false;
-      if (!object.Equals(Previous, other.Previous)) return false;
-      if (NowUnixMs != other.NowUnixMs) return false;
-      if (!object.Equals(Settings, other.Settings)) return false;
+      if (Service != other.Service) return false;
       if(!exporters_.Equals(other.exporters_)) return false;
       return Equals(_unknownFields, other._unknownFields);
     }
@@ -5120,10 +4106,7 @@ namespace Logfire.Fleet.Client.Sdk {
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public override int GetHashCode() {
       int hash = 1;
-      if (counts_ != null) hash ^= Counts.GetHashCode();
-      if (previous_ != null) hash ^= Previous.GetHashCode();
-      if (NowUnixMs != 0UL) hash ^= NowUnixMs.GetHashCode();
-      if (settings_ != null) hash ^= Settings.GetHashCode();
+      if (Service.Length != 0) hash ^= Service.GetHashCode();
       hash ^= exporters_.GetHashCode();
       if (_unknownFields != null) {
         hash ^= _unknownFields.GetHashCode();
@@ -5143,21 +4126,9 @@ namespace Logfire.Fleet.Client.Sdk {
     #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
       output.WriteRawMessage(this);
     #else
-      if (counts_ != null) {
+      if (Service.Length != 0) {
         output.WriteRawTag(10);
-        output.WriteMessage(Counts);
-      }
-      if (previous_ != null) {
-        output.WriteRawTag(18);
-        output.WriteMessage(Previous);
-      }
-      if (NowUnixMs != 0UL) {
-        output.WriteRawTag(24);
-        output.WriteUInt64(NowUnixMs);
-      }
-      if (settings_ != null) {
-        output.WriteRawTag(34);
-        output.WriteMessage(Settings);
+        output.WriteString(Service);
       }
       exporters_.WriteTo(output, _repeated_exporters_codec);
       if (_unknownFields != null) {
@@ -5170,21 +4141,9 @@ namespace Logfire.Fleet.Client.Sdk {
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     void pb::IBufferMessage.InternalWriteTo(ref pb::WriteContext output) {
-      if (counts_ != null) {
+      if (Service.Length != 0) {
         output.WriteRawTag(10);
-        output.WriteMessage(Counts);
-      }
-      if (previous_ != null) {
-        output.WriteRawTag(18);
-        output.WriteMessage(Previous);
-      }
-      if (NowUnixMs != 0UL) {
-        output.WriteRawTag(24);
-        output.WriteUInt64(NowUnixMs);
-      }
-      if (settings_ != null) {
-        output.WriteRawTag(34);
-        output.WriteMessage(Settings);
+        output.WriteString(Service);
       }
       exporters_.WriteTo(ref output, _repeated_exporters_codec);
       if (_unknownFields != null) {
@@ -5197,17 +4156,8 @@ namespace Logfire.Fleet.Client.Sdk {
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public int CalculateSize() {
       int size = 0;
-      if (counts_ != null) {
-        size += 1 + pb::CodedOutputStream.ComputeMessageSize(Counts);
-      }
-      if (previous_ != null) {
-        size += 1 + pb::CodedOutputStream.ComputeMessageSize(Previous);
-      }
-      if (NowUnixMs != 0UL) {
-        size += 1 + pb::CodedOutputStream.ComputeUInt64Size(NowUnixMs);
-      }
-      if (settings_ != null) {
-        size += 1 + pb::CodedOutputStream.ComputeMessageSize(Settings);
+      if (Service.Length != 0) {
+        size += 1 + pb::CodedOutputStream.ComputeStringSize(Service);
       }
       size += exporters_.CalculateSize(_repeated_exporters_codec);
       if (_unknownFields != null) {
@@ -5218,30 +4168,12 @@ namespace Logfire.Fleet.Client.Sdk {
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public void MergeFrom(Health other) {
+    public void MergeFrom(AgentBuilt other) {
       if (other == null) {
         return;
       }
-      if (other.counts_ != null) {
-        if (counts_ == null) {
-          Counts = new global::Logfire.Fleet.Client.Sdk.ExportCounts();
-        }
-        Counts.MergeFrom(other.Counts);
-      }
-      if (other.previous_ != null) {
-        if (previous_ == null) {
-          Previous = new global::Logfire.Fleet.Client.Sdk.HealthReport();
-        }
-        Previous.MergeFrom(other.Previous);
-      }
-      if (other.NowUnixMs != 0UL) {
-        NowUnixMs = other.NowUnixMs;
-      }
-      if (other.settings_ != null) {
-        if (settings_ == null) {
-          Settings = new global::Logfire.Fleet.Client.Sdk.Settings();
-        }
-        Settings.MergeFrom(other.Settings);
+      if (other.Service.Length != 0) {
+        Service = other.Service;
       }
       exporters_.Add(other.exporters_);
       _unknownFields = pb::UnknownFieldSet.MergeFrom(_unknownFields, other._unknownFields);
@@ -5264,31 +4196,10 @@ namespace Logfire.Fleet.Client.Sdk {
             _unknownFields = pb::UnknownFieldSet.MergeFieldFrom(_unknownFields, input);
             break;
           case 10: {
-            if (counts_ == null) {
-              Counts = new global::Logfire.Fleet.Client.Sdk.ExportCounts();
-            }
-            input.ReadMessage(Counts);
+            Service = input.ReadString();
             break;
           }
           case 18: {
-            if (previous_ == null) {
-              Previous = new global::Logfire.Fleet.Client.Sdk.HealthReport();
-            }
-            input.ReadMessage(Previous);
-            break;
-          }
-          case 24: {
-            NowUnixMs = input.ReadUInt64();
-            break;
-          }
-          case 34: {
-            if (settings_ == null) {
-              Settings = new global::Logfire.Fleet.Client.Sdk.Settings();
-            }
-            input.ReadMessage(Settings);
-            break;
-          }
-          case 42: {
             exporters_.AddEntriesFrom(input, _repeated_exporters_codec);
             break;
           }
@@ -5312,32 +4223,2950 @@ namespace Logfire.Fleet.Client.Sdk {
             _unknownFields = pb::UnknownFieldSet.MergeFieldFrom(_unknownFields, ref input);
             break;
           case 10: {
+            Service = input.ReadString();
+            break;
+          }
+          case 18: {
+            exporters_.AddEntriesFrom(ref input, _repeated_exporters_codec);
+            break;
+          }
+        }
+      }
+    }
+    #endif
+
+  }
+
+  [global::System.Diagnostics.DebuggerDisplayAttribute("{ToString(),nq}")]
+  public sealed partial class AgentConnected : pb::IMessage<AgentConnected>
+  #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
+      , pb::IBufferMessage
+  #endif
+  {
+    private static readonly pb::MessageParser<AgentConnected> _parser = new pb::MessageParser<AgentConnected>(() => new AgentConnected());
+    private pb::UnknownFieldSet _unknownFields;
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public static pb::MessageParser<AgentConnected> Parser { get { return _parser; } }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public static pbr::MessageDescriptor Descriptor {
+      get { return global::Logfire.Fleet.Client.Sdk.SettingsReflection.Descriptor.MessageTypes[9]; }
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    pbr::MessageDescriptor pb::IMessage.Descriptor {
+      get { return Descriptor; }
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public AgentConnected() {
+      OnConstruction();
+    }
+
+    partial void OnConstruction();
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public AgentConnected(AgentConnected other) : this() {
+      endpoint_ = other.endpoint_;
+      _unknownFields = pb::UnknownFieldSet.Clone(other._unknownFields);
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public AgentConnected Clone() {
+      return new AgentConnected(this);
+    }
+
+    /// <summary>Field number for the "endpoint" field.</summary>
+    public const int EndpointFieldNumber = 1;
+    private string endpoint_ = "";
+    /// <summary>
+    /// the one the client uses now; empty: the configured one
+    /// </summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public string Endpoint {
+      get { return endpoint_; }
+      set {
+        endpoint_ = pb::ProtoPreconditions.CheckNotNull(value, "value");
+      }
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public override bool Equals(object other) {
+      return Equals(other as AgentConnected);
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public bool Equals(AgentConnected other) {
+      if (ReferenceEquals(other, null)) {
+        return false;
+      }
+      if (ReferenceEquals(other, this)) {
+        return true;
+      }
+      if (Endpoint != other.Endpoint) return false;
+      return Equals(_unknownFields, other._unknownFields);
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public override int GetHashCode() {
+      int hash = 1;
+      if (Endpoint.Length != 0) hash ^= Endpoint.GetHashCode();
+      if (_unknownFields != null) {
+        hash ^= _unknownFields.GetHashCode();
+      }
+      return hash;
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public override string ToString() {
+      return pb::JsonFormatter.ToDiagnosticString(this);
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public void WriteTo(pb::CodedOutputStream output) {
+    #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
+      output.WriteRawMessage(this);
+    #else
+      if (Endpoint.Length != 0) {
+        output.WriteRawTag(10);
+        output.WriteString(Endpoint);
+      }
+      if (_unknownFields != null) {
+        _unknownFields.WriteTo(output);
+      }
+    #endif
+    }
+
+    #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    void pb::IBufferMessage.InternalWriteTo(ref pb::WriteContext output) {
+      if (Endpoint.Length != 0) {
+        output.WriteRawTag(10);
+        output.WriteString(Endpoint);
+      }
+      if (_unknownFields != null) {
+        _unknownFields.WriteTo(ref output);
+      }
+    }
+    #endif
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public int CalculateSize() {
+      int size = 0;
+      if (Endpoint.Length != 0) {
+        size += 1 + pb::CodedOutputStream.ComputeStringSize(Endpoint);
+      }
+      if (_unknownFields != null) {
+        size += _unknownFields.CalculateSize();
+      }
+      return size;
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public void MergeFrom(AgentConnected other) {
+      if (other == null) {
+        return;
+      }
+      if (other.Endpoint.Length != 0) {
+        Endpoint = other.Endpoint;
+      }
+      _unknownFields = pb::UnknownFieldSet.MergeFrom(_unknownFields, other._unknownFields);
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public void MergeFrom(pb::CodedInputStream input) {
+    #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
+      input.ReadRawMessage(this);
+    #else
+      uint tag;
+      while ((tag = input.ReadTag()) != 0) {
+      if ((tag & 7) == 4) {
+        // Abort on any end group tag.
+        return;
+      }
+      switch(tag) {
+          default:
+            _unknownFields = pb::UnknownFieldSet.MergeFieldFrom(_unknownFields, input);
+            break;
+          case 10: {
+            Endpoint = input.ReadString();
+            break;
+          }
+        }
+      }
+    #endif
+    }
+
+    #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    void pb::IBufferMessage.InternalMergeFrom(ref pb::ParseContext input) {
+      uint tag;
+      while ((tag = input.ReadTag()) != 0) {
+      if ((tag & 7) == 4) {
+        // Abort on any end group tag.
+        return;
+      }
+      switch(tag) {
+          default:
+            _unknownFields = pb::UnknownFieldSet.MergeFieldFrom(_unknownFields, ref input);
+            break;
+          case 10: {
+            Endpoint = input.ReadString();
+            break;
+          }
+        }
+      }
+    }
+    #endif
+
+  }
+
+  [global::System.Diagnostics.DebuggerDisplayAttribute("{ToString(),nq}")]
+  public sealed partial class AgentConnectFailed : pb::IMessage<AgentConnectFailed>
+  #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
+      , pb::IBufferMessage
+  #endif
+  {
+    private static readonly pb::MessageParser<AgentConnectFailed> _parser = new pb::MessageParser<AgentConnectFailed>(() => new AgentConnectFailed());
+    private pb::UnknownFieldSet _unknownFields;
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public static pb::MessageParser<AgentConnectFailed> Parser { get { return _parser; } }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public static pbr::MessageDescriptor Descriptor {
+      get { return global::Logfire.Fleet.Client.Sdk.SettingsReflection.Descriptor.MessageTypes[10]; }
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    pbr::MessageDescriptor pb::IMessage.Descriptor {
+      get { return Descriptor; }
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public AgentConnectFailed() {
+      OnConstruction();
+    }
+
+    partial void OnConstruction();
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public AgentConnectFailed(AgentConnectFailed other) : this() {
+      endpoint_ = other.endpoint_;
+      status_ = other.status_;
+      detail_ = other.detail_;
+      _unknownFields = pb::UnknownFieldSet.Clone(other._unknownFields);
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public AgentConnectFailed Clone() {
+      return new AgentConnectFailed(this);
+    }
+
+    /// <summary>Field number for the "endpoint" field.</summary>
+    public const int EndpointFieldNumber = 1;
+    private string endpoint_ = "";
+    /// <summary>
+    /// as AgentConnected's
+    /// </summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public string Endpoint {
+      get { return endpoint_; }
+      set {
+        endpoint_ = pb::ProtoPreconditions.CheckNotNull(value, "value");
+      }
+    }
+
+    /// <summary>Field number for the "status" field.</summary>
+    public const int StatusFieldNumber = 2;
+    private uint status_;
+    /// <summary>
+    /// the HTTP status; 0: no response
+    /// </summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public uint Status {
+      get { return status_; }
+      set {
+        status_ = value;
+      }
+    }
+
+    /// <summary>Field number for the "detail" field.</summary>
+    public const int DetailFieldNumber = 3;
+    private string detail_ = "";
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public string Detail {
+      get { return detail_; }
+      set {
+        detail_ = pb::ProtoPreconditions.CheckNotNull(value, "value");
+      }
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public override bool Equals(object other) {
+      return Equals(other as AgentConnectFailed);
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public bool Equals(AgentConnectFailed other) {
+      if (ReferenceEquals(other, null)) {
+        return false;
+      }
+      if (ReferenceEquals(other, this)) {
+        return true;
+      }
+      if (Endpoint != other.Endpoint) return false;
+      if (Status != other.Status) return false;
+      if (Detail != other.Detail) return false;
+      return Equals(_unknownFields, other._unknownFields);
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public override int GetHashCode() {
+      int hash = 1;
+      if (Endpoint.Length != 0) hash ^= Endpoint.GetHashCode();
+      if (Status != 0) hash ^= Status.GetHashCode();
+      if (Detail.Length != 0) hash ^= Detail.GetHashCode();
+      if (_unknownFields != null) {
+        hash ^= _unknownFields.GetHashCode();
+      }
+      return hash;
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public override string ToString() {
+      return pb::JsonFormatter.ToDiagnosticString(this);
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public void WriteTo(pb::CodedOutputStream output) {
+    #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
+      output.WriteRawMessage(this);
+    #else
+      if (Endpoint.Length != 0) {
+        output.WriteRawTag(10);
+        output.WriteString(Endpoint);
+      }
+      if (Status != 0) {
+        output.WriteRawTag(16);
+        output.WriteUInt32(Status);
+      }
+      if (Detail.Length != 0) {
+        output.WriteRawTag(26);
+        output.WriteString(Detail);
+      }
+      if (_unknownFields != null) {
+        _unknownFields.WriteTo(output);
+      }
+    #endif
+    }
+
+    #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    void pb::IBufferMessage.InternalWriteTo(ref pb::WriteContext output) {
+      if (Endpoint.Length != 0) {
+        output.WriteRawTag(10);
+        output.WriteString(Endpoint);
+      }
+      if (Status != 0) {
+        output.WriteRawTag(16);
+        output.WriteUInt32(Status);
+      }
+      if (Detail.Length != 0) {
+        output.WriteRawTag(26);
+        output.WriteString(Detail);
+      }
+      if (_unknownFields != null) {
+        _unknownFields.WriteTo(ref output);
+      }
+    }
+    #endif
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public int CalculateSize() {
+      int size = 0;
+      if (Endpoint.Length != 0) {
+        size += 1 + pb::CodedOutputStream.ComputeStringSize(Endpoint);
+      }
+      if (Status != 0) {
+        size += 1 + pb::CodedOutputStream.ComputeUInt32Size(Status);
+      }
+      if (Detail.Length != 0) {
+        size += 1 + pb::CodedOutputStream.ComputeStringSize(Detail);
+      }
+      if (_unknownFields != null) {
+        size += _unknownFields.CalculateSize();
+      }
+      return size;
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public void MergeFrom(AgentConnectFailed other) {
+      if (other == null) {
+        return;
+      }
+      if (other.Endpoint.Length != 0) {
+        Endpoint = other.Endpoint;
+      }
+      if (other.Status != 0) {
+        Status = other.Status;
+      }
+      if (other.Detail.Length != 0) {
+        Detail = other.Detail;
+      }
+      _unknownFields = pb::UnknownFieldSet.MergeFrom(_unknownFields, other._unknownFields);
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public void MergeFrom(pb::CodedInputStream input) {
+    #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
+      input.ReadRawMessage(this);
+    #else
+      uint tag;
+      while ((tag = input.ReadTag()) != 0) {
+      if ((tag & 7) == 4) {
+        // Abort on any end group tag.
+        return;
+      }
+      switch(tag) {
+          default:
+            _unknownFields = pb::UnknownFieldSet.MergeFieldFrom(_unknownFields, input);
+            break;
+          case 10: {
+            Endpoint = input.ReadString();
+            break;
+          }
+          case 16: {
+            Status = input.ReadUInt32();
+            break;
+          }
+          case 26: {
+            Detail = input.ReadString();
+            break;
+          }
+        }
+      }
+    #endif
+    }
+
+    #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    void pb::IBufferMessage.InternalMergeFrom(ref pb::ParseContext input) {
+      uint tag;
+      while ((tag = input.ReadTag()) != 0) {
+      if ((tag & 7) == 4) {
+        // Abort on any end group tag.
+        return;
+      }
+      switch(tag) {
+          default:
+            _unknownFields = pb::UnknownFieldSet.MergeFieldFrom(_unknownFields, ref input);
+            break;
+          case 10: {
+            Endpoint = input.ReadString();
+            break;
+          }
+          case 16: {
+            Status = input.ReadUInt32();
+            break;
+          }
+          case 26: {
+            Detail = input.ReadString();
+            break;
+          }
+        }
+      }
+    }
+    #endif
+
+  }
+
+  [global::System.Diagnostics.DebuggerDisplayAttribute("{ToString(),nq}")]
+  public sealed partial class AgentStopped : pb::IMessage<AgentStopped>
+  #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
+      , pb::IBufferMessage
+  #endif
+  {
+    private static readonly pb::MessageParser<AgentStopped> _parser = new pb::MessageParser<AgentStopped>(() => new AgentStopped());
+    private pb::UnknownFieldSet _unknownFields;
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public static pb::MessageParser<AgentStopped> Parser { get { return _parser; } }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public static pbr::MessageDescriptor Descriptor {
+      get { return global::Logfire.Fleet.Client.Sdk.SettingsReflection.Descriptor.MessageTypes[11]; }
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    pbr::MessageDescriptor pb::IMessage.Descriptor {
+      get { return Descriptor; }
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public AgentStopped() {
+      OnConstruction();
+    }
+
+    partial void OnConstruction();
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public AgentStopped(AgentStopped other) : this() {
+      error_ = other.error_;
+      _unknownFields = pb::UnknownFieldSet.Clone(other._unknownFields);
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public AgentStopped Clone() {
+      return new AgentStopped(this);
+    }
+
+    /// <summary>Field number for the "error" field.</summary>
+    public const int ErrorFieldNumber = 1;
+    private string error_ = "";
+    /// <summary>
+    /// why it stopped on its own; empty: it was asked to
+    /// </summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public string Error {
+      get { return error_; }
+      set {
+        error_ = pb::ProtoPreconditions.CheckNotNull(value, "value");
+      }
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public override bool Equals(object other) {
+      return Equals(other as AgentStopped);
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public bool Equals(AgentStopped other) {
+      if (ReferenceEquals(other, null)) {
+        return false;
+      }
+      if (ReferenceEquals(other, this)) {
+        return true;
+      }
+      if (Error != other.Error) return false;
+      return Equals(_unknownFields, other._unknownFields);
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public override int GetHashCode() {
+      int hash = 1;
+      if (Error.Length != 0) hash ^= Error.GetHashCode();
+      if (_unknownFields != null) {
+        hash ^= _unknownFields.GetHashCode();
+      }
+      return hash;
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public override string ToString() {
+      return pb::JsonFormatter.ToDiagnosticString(this);
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public void WriteTo(pb::CodedOutputStream output) {
+    #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
+      output.WriteRawMessage(this);
+    #else
+      if (Error.Length != 0) {
+        output.WriteRawTag(10);
+        output.WriteString(Error);
+      }
+      if (_unknownFields != null) {
+        _unknownFields.WriteTo(output);
+      }
+    #endif
+    }
+
+    #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    void pb::IBufferMessage.InternalWriteTo(ref pb::WriteContext output) {
+      if (Error.Length != 0) {
+        output.WriteRawTag(10);
+        output.WriteString(Error);
+      }
+      if (_unknownFields != null) {
+        _unknownFields.WriteTo(ref output);
+      }
+    }
+    #endif
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public int CalculateSize() {
+      int size = 0;
+      if (Error.Length != 0) {
+        size += 1 + pb::CodedOutputStream.ComputeStringSize(Error);
+      }
+      if (_unknownFields != null) {
+        size += _unknownFields.CalculateSize();
+      }
+      return size;
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public void MergeFrom(AgentStopped other) {
+      if (other == null) {
+        return;
+      }
+      if (other.Error.Length != 0) {
+        Error = other.Error;
+      }
+      _unknownFields = pb::UnknownFieldSet.MergeFrom(_unknownFields, other._unknownFields);
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public void MergeFrom(pb::CodedInputStream input) {
+    #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
+      input.ReadRawMessage(this);
+    #else
+      uint tag;
+      while ((tag = input.ReadTag()) != 0) {
+      if ((tag & 7) == 4) {
+        // Abort on any end group tag.
+        return;
+      }
+      switch(tag) {
+          default:
+            _unknownFields = pb::UnknownFieldSet.MergeFieldFrom(_unknownFields, input);
+            break;
+          case 10: {
+            Error = input.ReadString();
+            break;
+          }
+        }
+      }
+    #endif
+    }
+
+    #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    void pb::IBufferMessage.InternalMergeFrom(ref pb::ParseContext input) {
+      uint tag;
+      while ((tag = input.ReadTag()) != 0) {
+      if ((tag & 7) == 4) {
+        // Abort on any end group tag.
+        return;
+      }
+      switch(tag) {
+          default:
+            _unknownFields = pb::UnknownFieldSet.MergeFieldFrom(_unknownFields, ref input);
+            break;
+          case 10: {
+            Error = input.ReadString();
+            break;
+          }
+        }
+      }
+    }
+    #endif
+
+  }
+
+  /// <summary>
+  /// Export health is asked again at once, from `counts`.
+  /// </summary>
+  [global::System.Diagnostics.DebuggerDisplayAttribute("{ToString(),nq}")]
+  public sealed partial class AgentExporters : pb::IMessage<AgentExporters>
+  #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
+      , pb::IBufferMessage
+  #endif
+  {
+    private static readonly pb::MessageParser<AgentExporters> _parser = new pb::MessageParser<AgentExporters>(() => new AgentExporters());
+    private pb::UnknownFieldSet _unknownFields;
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public static pb::MessageParser<AgentExporters> Parser { get { return _parser; } }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public static pbr::MessageDescriptor Descriptor {
+      get { return global::Logfire.Fleet.Client.Sdk.SettingsReflection.Descriptor.MessageTypes[12]; }
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    pbr::MessageDescriptor pb::IMessage.Descriptor {
+      get { return Descriptor; }
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public AgentExporters() {
+      OnConstruction();
+    }
+
+    partial void OnConstruction();
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public AgentExporters(AgentExporters other) : this() {
+      exporters_ = other.exporters_.Clone();
+      counts_ = other.counts_ != null ? other.counts_.Clone() : null;
+      _unknownFields = pb::UnknownFieldSet.Clone(other._unknownFields);
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public AgentExporters Clone() {
+      return new AgentExporters(this);
+    }
+
+    /// <summary>Field number for the "exporters" field.</summary>
+    public const int ExportersFieldNumber = 1;
+    private static readonly pb::FieldCodec<global::Logfire.Fleet.Client.Sdk.Exporter> _repeated_exporters_codec
+        = pb::FieldCodec.ForMessage(10, global::Logfire.Fleet.Client.Sdk.Exporter.Parser);
+    private readonly pbc::RepeatedField<global::Logfire.Fleet.Client.Sdk.Exporter> exporters_ = new pbc::RepeatedField<global::Logfire.Fleet.Client.Sdk.Exporter>();
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public pbc::RepeatedField<global::Logfire.Fleet.Client.Sdk.Exporter> Exporters {
+      get { return exporters_; }
+    }
+
+    /// <summary>Field number for the "counts" field.</summary>
+    public const int CountsFieldNumber = 2;
+    private global::Logfire.Fleet.Client.Sdk.ExportCounts counts_;
+    /// <summary>
+    /// as timer's
+    /// </summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public global::Logfire.Fleet.Client.Sdk.ExportCounts Counts {
+      get { return counts_; }
+      set {
+        counts_ = value;
+      }
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public override bool Equals(object other) {
+      return Equals(other as AgentExporters);
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public bool Equals(AgentExporters other) {
+      if (ReferenceEquals(other, null)) {
+        return false;
+      }
+      if (ReferenceEquals(other, this)) {
+        return true;
+      }
+      if(!exporters_.Equals(other.exporters_)) return false;
+      if (!object.Equals(Counts, other.Counts)) return false;
+      return Equals(_unknownFields, other._unknownFields);
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public override int GetHashCode() {
+      int hash = 1;
+      hash ^= exporters_.GetHashCode();
+      if (counts_ != null) hash ^= Counts.GetHashCode();
+      if (_unknownFields != null) {
+        hash ^= _unknownFields.GetHashCode();
+      }
+      return hash;
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public override string ToString() {
+      return pb::JsonFormatter.ToDiagnosticString(this);
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public void WriteTo(pb::CodedOutputStream output) {
+    #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
+      output.WriteRawMessage(this);
+    #else
+      exporters_.WriteTo(output, _repeated_exporters_codec);
+      if (counts_ != null) {
+        output.WriteRawTag(18);
+        output.WriteMessage(Counts);
+      }
+      if (_unknownFields != null) {
+        _unknownFields.WriteTo(output);
+      }
+    #endif
+    }
+
+    #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    void pb::IBufferMessage.InternalWriteTo(ref pb::WriteContext output) {
+      exporters_.WriteTo(ref output, _repeated_exporters_codec);
+      if (counts_ != null) {
+        output.WriteRawTag(18);
+        output.WriteMessage(Counts);
+      }
+      if (_unknownFields != null) {
+        _unknownFields.WriteTo(ref output);
+      }
+    }
+    #endif
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public int CalculateSize() {
+      int size = 0;
+      size += exporters_.CalculateSize(_repeated_exporters_codec);
+      if (counts_ != null) {
+        size += 1 + pb::CodedOutputStream.ComputeMessageSize(Counts);
+      }
+      if (_unknownFields != null) {
+        size += _unknownFields.CalculateSize();
+      }
+      return size;
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public void MergeFrom(AgentExporters other) {
+      if (other == null) {
+        return;
+      }
+      exporters_.Add(other.exporters_);
+      if (other.counts_ != null) {
+        if (counts_ == null) {
+          Counts = new global::Logfire.Fleet.Client.Sdk.ExportCounts();
+        }
+        Counts.MergeFrom(other.Counts);
+      }
+      _unknownFields = pb::UnknownFieldSet.MergeFrom(_unknownFields, other._unknownFields);
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public void MergeFrom(pb::CodedInputStream input) {
+    #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
+      input.ReadRawMessage(this);
+    #else
+      uint tag;
+      while ((tag = input.ReadTag()) != 0) {
+      if ((tag & 7) == 4) {
+        // Abort on any end group tag.
+        return;
+      }
+      switch(tag) {
+          default:
+            _unknownFields = pb::UnknownFieldSet.MergeFieldFrom(_unknownFields, input);
+            break;
+          case 10: {
+            exporters_.AddEntriesFrom(input, _repeated_exporters_codec);
+            break;
+          }
+          case 18: {
             if (counts_ == null) {
               Counts = new global::Logfire.Fleet.Client.Sdk.ExportCounts();
             }
             input.ReadMessage(Counts);
             break;
           }
+        }
+      }
+    #endif
+    }
+
+    #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    void pb::IBufferMessage.InternalMergeFrom(ref pb::ParseContext input) {
+      uint tag;
+      while ((tag = input.ReadTag()) != 0) {
+      if ((tag & 7) == 4) {
+        // Abort on any end group tag.
+        return;
+      }
+      switch(tag) {
+          default:
+            _unknownFields = pb::UnknownFieldSet.MergeFieldFrom(_unknownFields, ref input);
+            break;
+          case 10: {
+            exporters_.AddEntriesFrom(ref input, _repeated_exporters_codec);
+            break;
+          }
           case 18: {
-            if (previous_ == null) {
-              Previous = new global::Logfire.Fleet.Client.Sdk.HealthReport();
+            if (counts_ == null) {
+              Counts = new global::Logfire.Fleet.Client.Sdk.ExportCounts();
             }
-            input.ReadMessage(Previous);
+            input.ReadMessage(Counts);
+            break;
+          }
+        }
+      }
+    }
+    #endif
+
+  }
+
+  [global::System.Diagnostics.DebuggerDisplayAttribute("{ToString(),nq}")]
+  public sealed partial class AgentOutput : pb::IMessage<AgentOutput>
+  #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
+      , pb::IBufferMessage
+  #endif
+  {
+    private static readonly pb::MessageParser<AgentOutput> _parser = new pb::MessageParser<AgentOutput>(() => new AgentOutput());
+    private pb::UnknownFieldSet _unknownFields;
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public static pb::MessageParser<AgentOutput> Parser { get { return _parser; } }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public static pbr::MessageDescriptor Descriptor {
+      get { return global::Logfire.Fleet.Client.Sdk.SettingsReflection.Descriptor.MessageTypes[13]; }
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    pbr::MessageDescriptor pb::IMessage.Descriptor {
+      get { return Descriptor; }
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public AgentOutput() {
+      OnConstruction();
+    }
+
+    partial void OnConstruction();
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public AgentOutput(AgentOutput other) : this() {
+      agent_ = other.agent_;
+      effects_ = other.effects_.Clone();
+      wakeAtMonoMs_ = other.wakeAtMonoMs_;
+      effective_ = other.effective_ != null ? other.effective_.Clone() : null;
+      _unknownFields = pb::UnknownFieldSet.Clone(other._unknownFields);
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public AgentOutput Clone() {
+      return new AgentOutput(this);
+    }
+
+    /// <summary>Field number for the "agent" field.</summary>
+    public const int AgentFieldNumber = 1;
+    private pb::ByteString agent_ = pb::ByteString.Empty;
+    /// <summary>
+    /// keep it and pass it back; never read it
+    /// </summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public pb::ByteString Agent {
+      get { return agent_; }
+      set {
+        agent_ = pb::ProtoPreconditions.CheckNotNull(value, "value");
+      }
+    }
+
+    /// <summary>Field number for the "effects" field.</summary>
+    public const int EffectsFieldNumber = 2;
+    private static readonly pb::FieldCodec<global::Logfire.Fleet.Client.Sdk.AgentEffect> _repeated_effects_codec
+        = pb::FieldCodec.ForMessage(18, global::Logfire.Fleet.Client.Sdk.AgentEffect.Parser);
+    private readonly pbc::RepeatedField<global::Logfire.Fleet.Client.Sdk.AgentEffect> effects_ = new pbc::RepeatedField<global::Logfire.Fleet.Client.Sdk.AgentEffect>();
+    /// <summary>
+    /// carry them out in order
+    /// </summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public pbc::RepeatedField<global::Logfire.Fleet.Client.Sdk.AgentEffect> Effects {
+      get { return effects_; }
+    }
+
+    /// <summary>Field number for the "wake_at_mono_ms" field.</summary>
+    public const int WakeAtMonoMsFieldNumber = 3;
+    private ulong wakeAtMonoMs_;
+    /// <summary>
+    /// step with timer then; 0: only on an input
+    /// </summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public ulong WakeAtMonoMs {
+      get { return wakeAtMonoMs_; }
+      set {
+        wakeAtMonoMs_ = value;
+      }
+    }
+
+    /// <summary>Field number for the "effective" field.</summary>
+    public const int EffectiveFieldNumber = 4;
+    private global::OpAmp.Proto.V1.EffectiveConfig effective_;
+    /// <summary>
+    /// in force now (the client's first status takes it)
+    /// </summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public global::OpAmp.Proto.V1.EffectiveConfig Effective {
+      get { return effective_; }
+      set {
+        effective_ = value;
+      }
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public override bool Equals(object other) {
+      return Equals(other as AgentOutput);
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public bool Equals(AgentOutput other) {
+      if (ReferenceEquals(other, null)) {
+        return false;
+      }
+      if (ReferenceEquals(other, this)) {
+        return true;
+      }
+      if (Agent != other.Agent) return false;
+      if(!effects_.Equals(other.effects_)) return false;
+      if (WakeAtMonoMs != other.WakeAtMonoMs) return false;
+      if (!object.Equals(Effective, other.Effective)) return false;
+      return Equals(_unknownFields, other._unknownFields);
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public override int GetHashCode() {
+      int hash = 1;
+      if (Agent.Length != 0) hash ^= Agent.GetHashCode();
+      hash ^= effects_.GetHashCode();
+      if (WakeAtMonoMs != 0UL) hash ^= WakeAtMonoMs.GetHashCode();
+      if (effective_ != null) hash ^= Effective.GetHashCode();
+      if (_unknownFields != null) {
+        hash ^= _unknownFields.GetHashCode();
+      }
+      return hash;
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public override string ToString() {
+      return pb::JsonFormatter.ToDiagnosticString(this);
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public void WriteTo(pb::CodedOutputStream output) {
+    #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
+      output.WriteRawMessage(this);
+    #else
+      if (Agent.Length != 0) {
+        output.WriteRawTag(10);
+        output.WriteBytes(Agent);
+      }
+      effects_.WriteTo(output, _repeated_effects_codec);
+      if (WakeAtMonoMs != 0UL) {
+        output.WriteRawTag(24);
+        output.WriteUInt64(WakeAtMonoMs);
+      }
+      if (effective_ != null) {
+        output.WriteRawTag(34);
+        output.WriteMessage(Effective);
+      }
+      if (_unknownFields != null) {
+        _unknownFields.WriteTo(output);
+      }
+    #endif
+    }
+
+    #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    void pb::IBufferMessage.InternalWriteTo(ref pb::WriteContext output) {
+      if (Agent.Length != 0) {
+        output.WriteRawTag(10);
+        output.WriteBytes(Agent);
+      }
+      effects_.WriteTo(ref output, _repeated_effects_codec);
+      if (WakeAtMonoMs != 0UL) {
+        output.WriteRawTag(24);
+        output.WriteUInt64(WakeAtMonoMs);
+      }
+      if (effective_ != null) {
+        output.WriteRawTag(34);
+        output.WriteMessage(Effective);
+      }
+      if (_unknownFields != null) {
+        _unknownFields.WriteTo(ref output);
+      }
+    }
+    #endif
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public int CalculateSize() {
+      int size = 0;
+      if (Agent.Length != 0) {
+        size += 1 + pb::CodedOutputStream.ComputeBytesSize(Agent);
+      }
+      size += effects_.CalculateSize(_repeated_effects_codec);
+      if (WakeAtMonoMs != 0UL) {
+        size += 1 + pb::CodedOutputStream.ComputeUInt64Size(WakeAtMonoMs);
+      }
+      if (effective_ != null) {
+        size += 1 + pb::CodedOutputStream.ComputeMessageSize(Effective);
+      }
+      if (_unknownFields != null) {
+        size += _unknownFields.CalculateSize();
+      }
+      return size;
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public void MergeFrom(AgentOutput other) {
+      if (other == null) {
+        return;
+      }
+      if (other.Agent.Length != 0) {
+        Agent = other.Agent;
+      }
+      effects_.Add(other.effects_);
+      if (other.WakeAtMonoMs != 0UL) {
+        WakeAtMonoMs = other.WakeAtMonoMs;
+      }
+      if (other.effective_ != null) {
+        if (effective_ == null) {
+          Effective = new global::OpAmp.Proto.V1.EffectiveConfig();
+        }
+        Effective.MergeFrom(other.Effective);
+      }
+      _unknownFields = pb::UnknownFieldSet.MergeFrom(_unknownFields, other._unknownFields);
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public void MergeFrom(pb::CodedInputStream input) {
+    #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
+      input.ReadRawMessage(this);
+    #else
+      uint tag;
+      while ((tag = input.ReadTag()) != 0) {
+      if ((tag & 7) == 4) {
+        // Abort on any end group tag.
+        return;
+      }
+      switch(tag) {
+          default:
+            _unknownFields = pb::UnknownFieldSet.MergeFieldFrom(_unknownFields, input);
+            break;
+          case 10: {
+            Agent = input.ReadBytes();
+            break;
+          }
+          case 18: {
+            effects_.AddEntriesFrom(input, _repeated_effects_codec);
             break;
           }
           case 24: {
-            NowUnixMs = input.ReadUInt64();
+            WakeAtMonoMs = input.ReadUInt64();
             break;
           }
           case 34: {
-            if (settings_ == null) {
-              Settings = new global::Logfire.Fleet.Client.Sdk.Settings();
+            if (effective_ == null) {
+              Effective = new global::OpAmp.Proto.V1.EffectiveConfig();
             }
-            input.ReadMessage(Settings);
+            input.ReadMessage(Effective);
+            break;
+          }
+        }
+      }
+    #endif
+    }
+
+    #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    void pb::IBufferMessage.InternalMergeFrom(ref pb::ParseContext input) {
+      uint tag;
+      while ((tag = input.ReadTag()) != 0) {
+      if ((tag & 7) == 4) {
+        // Abort on any end group tag.
+        return;
+      }
+      switch(tag) {
+          default:
+            _unknownFields = pb::UnknownFieldSet.MergeFieldFrom(_unknownFields, ref input);
+            break;
+          case 10: {
+            Agent = input.ReadBytes();
+            break;
+          }
+          case 18: {
+            effects_.AddEntriesFrom(ref input, _repeated_effects_codec);
+            break;
+          }
+          case 24: {
+            WakeAtMonoMs = input.ReadUInt64();
+            break;
+          }
+          case 34: {
+            if (effective_ == null) {
+              Effective = new global::OpAmp.Proto.V1.EffectiveConfig();
+            }
+            input.ReadMessage(Effective);
+            break;
+          }
+        }
+      }
+    }
+    #endif
+
+  }
+
+  [global::System.Diagnostics.DebuggerDisplayAttribute("{ToString(),nq}")]
+  public sealed partial class AgentEffect : pb::IMessage<AgentEffect>
+  #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
+      , pb::IBufferMessage
+  #endif
+  {
+    private static readonly pb::MessageParser<AgentEffect> _parser = new pb::MessageParser<AgentEffect>(() => new AgentEffect());
+    private pb::UnknownFieldSet _unknownFields;
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public static pb::MessageParser<AgentEffect> Parser { get { return _parser; } }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public static pbr::MessageDescriptor Descriptor {
+      get { return global::Logfire.Fleet.Client.Sdk.SettingsReflection.Descriptor.MessageTypes[14]; }
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    pbr::MessageDescriptor pb::IMessage.Descriptor {
+      get { return Descriptor; }
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public AgentEffect() {
+      OnConstruction();
+    }
+
+    partial void OnConstruction();
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public AgentEffect(AgentEffect other) : this() {
+      switch (other.EffectCase) {
+        case EffectOneofCase.Apply:
+          Apply = other.Apply.Clone();
+          break;
+        case EffectOneofCase.Effective:
+          Effective = other.Effective.Clone();
+          break;
+        case EffectOneofCase.Status:
+          Status = other.Status.Clone();
+          break;
+        case EffectOneofCase.Health:
+          Health = other.Health.Clone();
+          break;
+        case EffectOneofCase.SaveUid:
+          SaveUid = other.SaveUid;
+          break;
+        case EffectOneofCase.Log:
+          Log = other.Log.Clone();
+          break;
+      }
+
+      _unknownFields = pb::UnknownFieldSet.Clone(other._unknownFields);
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public AgentEffect Clone() {
+      return new AgentEffect(this);
+    }
+
+    /// <summary>Field number for the "apply" field.</summary>
+    public const int ApplyFieldNumber = 1;
+    /// <summary>
+    /// put in force: live settings, next-start ones and custom
+    /// </summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public global::Logfire.Fleet.Client.Sdk.Settings Apply {
+      get { return effectCase_ == EffectOneofCase.Apply ? (global::Logfire.Fleet.Client.Sdk.Settings) effect_ : null; }
+      set {
+        effect_ = value;
+        effectCase_ = value == null ? EffectOneofCase.None : EffectOneofCase.Apply;
+      }
+    }
+
+    /// <summary>Field number for the "effective" field.</summary>
+    public const int EffectiveFieldNumber = 2;
+    /// <summary>
+    /// set_effective_config
+    /// </summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public global::OpAmp.Proto.V1.EffectiveConfig Effective {
+      get { return effectCase_ == EffectOneofCase.Effective ? (global::OpAmp.Proto.V1.EffectiveConfig) effect_ : null; }
+      set {
+        effect_ = value;
+        effectCase_ = value == null ? EffectOneofCase.None : EffectOneofCase.Effective;
+      }
+    }
+
+    /// <summary>Field number for the "status" field.</summary>
+    public const int StatusFieldNumber = 3;
+    /// <summary>
+    /// set_remote_config_status
+    /// </summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public global::OpAmp.Proto.V1.RemoteConfigStatus Status {
+      get { return effectCase_ == EffectOneofCase.Status ? (global::OpAmp.Proto.V1.RemoteConfigStatus) effect_ : null; }
+      set {
+        effect_ = value;
+        effectCase_ = value == null ? EffectOneofCase.None : EffectOneofCase.Status;
+      }
+    }
+
+    /// <summary>Field number for the "health" field.</summary>
+    public const int HealthFieldNumber = 4;
+    /// <summary>
+    /// set_health (merge the application's own status in, if any)
+    /// </summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public global::OpAmp.Proto.V1.ComponentHealth Health {
+      get { return effectCase_ == EffectOneofCase.Health ? (global::OpAmp.Proto.V1.ComponentHealth) effect_ : null; }
+      set {
+        effect_ = value;
+        effectCase_ = value == null ? EffectOneofCase.None : EffectOneofCase.Health;
+      }
+    }
+
+    /// <summary>Field number for the "save_uid" field.</summary>
+    public const int SaveUidFieldNumber = 5;
+    /// <summary>
+    /// write it to the state directory's instance-uid; on failure, uid_not_saved
+    /// </summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public string SaveUid {
+      get { return HasSaveUid ? (string) effect_ : ""; }
+      set {
+        effect_ = pb::ProtoPreconditions.CheckNotNull(value, "value");
+        effectCase_ = EffectOneofCase.SaveUid;
+      }
+    }
+    /// <summary>Gets whether the "save_uid" field is set</summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public bool HasSaveUid {
+      get { return effectCase_ == EffectOneofCase.SaveUid; }
+    }
+    /// <summary> Clears the value of the oneof if it's currently set to "save_uid" </summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public void ClearSaveUid() {
+      if (HasSaveUid) {
+        ClearEffect();
+      }
+    }
+
+    /// <summary>Field number for the "log" field.</summary>
+    public const int LogFieldNumber = 6;
+    /// <summary>
+    /// say it, prefixed as the integration prefixes its lines
+    /// </summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public global::Logfire.Fleet.Client.Sdk.AgentLog Log {
+      get { return effectCase_ == EffectOneofCase.Log ? (global::Logfire.Fleet.Client.Sdk.AgentLog) effect_ : null; }
+      set {
+        effect_ = value;
+        effectCase_ = value == null ? EffectOneofCase.None : EffectOneofCase.Log;
+      }
+    }
+
+    private object effect_;
+    /// <summary>Enum of possible cases for the "effect" oneof.</summary>
+    public enum EffectOneofCase {
+      None = 0,
+      Apply = 1,
+      Effective = 2,
+      Status = 3,
+      Health = 4,
+      SaveUid = 5,
+      Log = 6,
+    }
+    private EffectOneofCase effectCase_ = EffectOneofCase.None;
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public EffectOneofCase EffectCase {
+      get { return effectCase_; }
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public void ClearEffect() {
+      effectCase_ = EffectOneofCase.None;
+      effect_ = null;
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public override bool Equals(object other) {
+      return Equals(other as AgentEffect);
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public bool Equals(AgentEffect other) {
+      if (ReferenceEquals(other, null)) {
+        return false;
+      }
+      if (ReferenceEquals(other, this)) {
+        return true;
+      }
+      if (!object.Equals(Apply, other.Apply)) return false;
+      if (!object.Equals(Effective, other.Effective)) return false;
+      if (!object.Equals(Status, other.Status)) return false;
+      if (!object.Equals(Health, other.Health)) return false;
+      if (SaveUid != other.SaveUid) return false;
+      if (!object.Equals(Log, other.Log)) return false;
+      if (EffectCase != other.EffectCase) return false;
+      return Equals(_unknownFields, other._unknownFields);
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public override int GetHashCode() {
+      int hash = 1;
+      if (effectCase_ == EffectOneofCase.Apply) hash ^= Apply.GetHashCode();
+      if (effectCase_ == EffectOneofCase.Effective) hash ^= Effective.GetHashCode();
+      if (effectCase_ == EffectOneofCase.Status) hash ^= Status.GetHashCode();
+      if (effectCase_ == EffectOneofCase.Health) hash ^= Health.GetHashCode();
+      if (HasSaveUid) hash ^= SaveUid.GetHashCode();
+      if (effectCase_ == EffectOneofCase.Log) hash ^= Log.GetHashCode();
+      hash ^= (int) effectCase_;
+      if (_unknownFields != null) {
+        hash ^= _unknownFields.GetHashCode();
+      }
+      return hash;
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public override string ToString() {
+      return pb::JsonFormatter.ToDiagnosticString(this);
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public void WriteTo(pb::CodedOutputStream output) {
+    #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
+      output.WriteRawMessage(this);
+    #else
+      if (effectCase_ == EffectOneofCase.Apply) {
+        output.WriteRawTag(10);
+        output.WriteMessage(Apply);
+      }
+      if (effectCase_ == EffectOneofCase.Effective) {
+        output.WriteRawTag(18);
+        output.WriteMessage(Effective);
+      }
+      if (effectCase_ == EffectOneofCase.Status) {
+        output.WriteRawTag(26);
+        output.WriteMessage(Status);
+      }
+      if (effectCase_ == EffectOneofCase.Health) {
+        output.WriteRawTag(34);
+        output.WriteMessage(Health);
+      }
+      if (HasSaveUid) {
+        output.WriteRawTag(42);
+        output.WriteString(SaveUid);
+      }
+      if (effectCase_ == EffectOneofCase.Log) {
+        output.WriteRawTag(50);
+        output.WriteMessage(Log);
+      }
+      if (_unknownFields != null) {
+        _unknownFields.WriteTo(output);
+      }
+    #endif
+    }
+
+    #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    void pb::IBufferMessage.InternalWriteTo(ref pb::WriteContext output) {
+      if (effectCase_ == EffectOneofCase.Apply) {
+        output.WriteRawTag(10);
+        output.WriteMessage(Apply);
+      }
+      if (effectCase_ == EffectOneofCase.Effective) {
+        output.WriteRawTag(18);
+        output.WriteMessage(Effective);
+      }
+      if (effectCase_ == EffectOneofCase.Status) {
+        output.WriteRawTag(26);
+        output.WriteMessage(Status);
+      }
+      if (effectCase_ == EffectOneofCase.Health) {
+        output.WriteRawTag(34);
+        output.WriteMessage(Health);
+      }
+      if (HasSaveUid) {
+        output.WriteRawTag(42);
+        output.WriteString(SaveUid);
+      }
+      if (effectCase_ == EffectOneofCase.Log) {
+        output.WriteRawTag(50);
+        output.WriteMessage(Log);
+      }
+      if (_unknownFields != null) {
+        _unknownFields.WriteTo(ref output);
+      }
+    }
+    #endif
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public int CalculateSize() {
+      int size = 0;
+      if (effectCase_ == EffectOneofCase.Apply) {
+        size += 1 + pb::CodedOutputStream.ComputeMessageSize(Apply);
+      }
+      if (effectCase_ == EffectOneofCase.Effective) {
+        size += 1 + pb::CodedOutputStream.ComputeMessageSize(Effective);
+      }
+      if (effectCase_ == EffectOneofCase.Status) {
+        size += 1 + pb::CodedOutputStream.ComputeMessageSize(Status);
+      }
+      if (effectCase_ == EffectOneofCase.Health) {
+        size += 1 + pb::CodedOutputStream.ComputeMessageSize(Health);
+      }
+      if (HasSaveUid) {
+        size += 1 + pb::CodedOutputStream.ComputeStringSize(SaveUid);
+      }
+      if (effectCase_ == EffectOneofCase.Log) {
+        size += 1 + pb::CodedOutputStream.ComputeMessageSize(Log);
+      }
+      if (_unknownFields != null) {
+        size += _unknownFields.CalculateSize();
+      }
+      return size;
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public void MergeFrom(AgentEffect other) {
+      if (other == null) {
+        return;
+      }
+      switch (other.EffectCase) {
+        case EffectOneofCase.Apply:
+          if (Apply == null) {
+            Apply = new global::Logfire.Fleet.Client.Sdk.Settings();
+          }
+          Apply.MergeFrom(other.Apply);
+          break;
+        case EffectOneofCase.Effective:
+          if (Effective == null) {
+            Effective = new global::OpAmp.Proto.V1.EffectiveConfig();
+          }
+          Effective.MergeFrom(other.Effective);
+          break;
+        case EffectOneofCase.Status:
+          if (Status == null) {
+            Status = new global::OpAmp.Proto.V1.RemoteConfigStatus();
+          }
+          Status.MergeFrom(other.Status);
+          break;
+        case EffectOneofCase.Health:
+          if (Health == null) {
+            Health = new global::OpAmp.Proto.V1.ComponentHealth();
+          }
+          Health.MergeFrom(other.Health);
+          break;
+        case EffectOneofCase.SaveUid:
+          SaveUid = other.SaveUid;
+          break;
+        case EffectOneofCase.Log:
+          if (Log == null) {
+            Log = new global::Logfire.Fleet.Client.Sdk.AgentLog();
+          }
+          Log.MergeFrom(other.Log);
+          break;
+      }
+
+      _unknownFields = pb::UnknownFieldSet.MergeFrom(_unknownFields, other._unknownFields);
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public void MergeFrom(pb::CodedInputStream input) {
+    #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
+      input.ReadRawMessage(this);
+    #else
+      uint tag;
+      while ((tag = input.ReadTag()) != 0) {
+      if ((tag & 7) == 4) {
+        // Abort on any end group tag.
+        return;
+      }
+      switch(tag) {
+          default:
+            _unknownFields = pb::UnknownFieldSet.MergeFieldFrom(_unknownFields, input);
+            break;
+          case 10: {
+            global::Logfire.Fleet.Client.Sdk.Settings subBuilder = new global::Logfire.Fleet.Client.Sdk.Settings();
+            if (effectCase_ == EffectOneofCase.Apply) {
+              subBuilder.MergeFrom(Apply);
+            }
+            input.ReadMessage(subBuilder);
+            Apply = subBuilder;
+            break;
+          }
+          case 18: {
+            global::OpAmp.Proto.V1.EffectiveConfig subBuilder = new global::OpAmp.Proto.V1.EffectiveConfig();
+            if (effectCase_ == EffectOneofCase.Effective) {
+              subBuilder.MergeFrom(Effective);
+            }
+            input.ReadMessage(subBuilder);
+            Effective = subBuilder;
+            break;
+          }
+          case 26: {
+            global::OpAmp.Proto.V1.RemoteConfigStatus subBuilder = new global::OpAmp.Proto.V1.RemoteConfigStatus();
+            if (effectCase_ == EffectOneofCase.Status) {
+              subBuilder.MergeFrom(Status);
+            }
+            input.ReadMessage(subBuilder);
+            Status = subBuilder;
+            break;
+          }
+          case 34: {
+            global::OpAmp.Proto.V1.ComponentHealth subBuilder = new global::OpAmp.Proto.V1.ComponentHealth();
+            if (effectCase_ == EffectOneofCase.Health) {
+              subBuilder.MergeFrom(Health);
+            }
+            input.ReadMessage(subBuilder);
+            Health = subBuilder;
             break;
           }
           case 42: {
+            SaveUid = input.ReadString();
+            break;
+          }
+          case 50: {
+            global::Logfire.Fleet.Client.Sdk.AgentLog subBuilder = new global::Logfire.Fleet.Client.Sdk.AgentLog();
+            if (effectCase_ == EffectOneofCase.Log) {
+              subBuilder.MergeFrom(Log);
+            }
+            input.ReadMessage(subBuilder);
+            Log = subBuilder;
+            break;
+          }
+        }
+      }
+    #endif
+    }
+
+    #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    void pb::IBufferMessage.InternalMergeFrom(ref pb::ParseContext input) {
+      uint tag;
+      while ((tag = input.ReadTag()) != 0) {
+      if ((tag & 7) == 4) {
+        // Abort on any end group tag.
+        return;
+      }
+      switch(tag) {
+          default:
+            _unknownFields = pb::UnknownFieldSet.MergeFieldFrom(_unknownFields, ref input);
+            break;
+          case 10: {
+            global::Logfire.Fleet.Client.Sdk.Settings subBuilder = new global::Logfire.Fleet.Client.Sdk.Settings();
+            if (effectCase_ == EffectOneofCase.Apply) {
+              subBuilder.MergeFrom(Apply);
+            }
+            input.ReadMessage(subBuilder);
+            Apply = subBuilder;
+            break;
+          }
+          case 18: {
+            global::OpAmp.Proto.V1.EffectiveConfig subBuilder = new global::OpAmp.Proto.V1.EffectiveConfig();
+            if (effectCase_ == EffectOneofCase.Effective) {
+              subBuilder.MergeFrom(Effective);
+            }
+            input.ReadMessage(subBuilder);
+            Effective = subBuilder;
+            break;
+          }
+          case 26: {
+            global::OpAmp.Proto.V1.RemoteConfigStatus subBuilder = new global::OpAmp.Proto.V1.RemoteConfigStatus();
+            if (effectCase_ == EffectOneofCase.Status) {
+              subBuilder.MergeFrom(Status);
+            }
+            input.ReadMessage(subBuilder);
+            Status = subBuilder;
+            break;
+          }
+          case 34: {
+            global::OpAmp.Proto.V1.ComponentHealth subBuilder = new global::OpAmp.Proto.V1.ComponentHealth();
+            if (effectCase_ == EffectOneofCase.Health) {
+              subBuilder.MergeFrom(Health);
+            }
+            input.ReadMessage(subBuilder);
+            Health = subBuilder;
+            break;
+          }
+          case 42: {
+            SaveUid = input.ReadString();
+            break;
+          }
+          case 50: {
+            global::Logfire.Fleet.Client.Sdk.AgentLog subBuilder = new global::Logfire.Fleet.Client.Sdk.AgentLog();
+            if (effectCase_ == EffectOneofCase.Log) {
+              subBuilder.MergeFrom(Log);
+            }
+            input.ReadMessage(subBuilder);
+            Log = subBuilder;
+            break;
+          }
+        }
+      }
+    }
+    #endif
+
+  }
+
+  [global::System.Diagnostics.DebuggerDisplayAttribute("{ToString(),nq}")]
+  public sealed partial class AgentLog : pb::IMessage<AgentLog>
+  #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
+      , pb::IBufferMessage
+  #endif
+  {
+    private static readonly pb::MessageParser<AgentLog> _parser = new pb::MessageParser<AgentLog>(() => new AgentLog());
+    private pb::UnknownFieldSet _unknownFields;
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public static pb::MessageParser<AgentLog> Parser { get { return _parser; } }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public static pbr::MessageDescriptor Descriptor {
+      get { return global::Logfire.Fleet.Client.Sdk.SettingsReflection.Descriptor.MessageTypes[15]; }
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    pbr::MessageDescriptor pb::IMessage.Descriptor {
+      get { return Descriptor; }
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public AgentLog() {
+      OnConstruction();
+    }
+
+    partial void OnConstruction();
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public AgentLog(AgentLog other) : this() {
+      level_ = other.level_;
+      text_ = other.text_;
+      _unknownFields = pb::UnknownFieldSet.Clone(other._unknownFields);
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public AgentLog Clone() {
+      return new AgentLog(this);
+    }
+
+    /// <summary>Field number for the "level" field.</summary>
+    public const int LevelFieldNumber = 1;
+    private global::Logfire.Fleet.Client.Sdk.AgentLog.Types.Level level_ = global::Logfire.Fleet.Client.Sdk.AgentLog.Types.Level.Debug;
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public global::Logfire.Fleet.Client.Sdk.AgentLog.Types.Level Level {
+      get { return level_; }
+      set {
+        level_ = value;
+      }
+    }
+
+    /// <summary>Field number for the "text" field.</summary>
+    public const int TextFieldNumber = 2;
+    private string text_ = "";
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public string Text {
+      get { return text_; }
+      set {
+        text_ = pb::ProtoPreconditions.CheckNotNull(value, "value");
+      }
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public override bool Equals(object other) {
+      return Equals(other as AgentLog);
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public bool Equals(AgentLog other) {
+      if (ReferenceEquals(other, null)) {
+        return false;
+      }
+      if (ReferenceEquals(other, this)) {
+        return true;
+      }
+      if (Level != other.Level) return false;
+      if (Text != other.Text) return false;
+      return Equals(_unknownFields, other._unknownFields);
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public override int GetHashCode() {
+      int hash = 1;
+      if (Level != global::Logfire.Fleet.Client.Sdk.AgentLog.Types.Level.Debug) hash ^= Level.GetHashCode();
+      if (Text.Length != 0) hash ^= Text.GetHashCode();
+      if (_unknownFields != null) {
+        hash ^= _unknownFields.GetHashCode();
+      }
+      return hash;
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public override string ToString() {
+      return pb::JsonFormatter.ToDiagnosticString(this);
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public void WriteTo(pb::CodedOutputStream output) {
+    #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
+      output.WriteRawMessage(this);
+    #else
+      if (Level != global::Logfire.Fleet.Client.Sdk.AgentLog.Types.Level.Debug) {
+        output.WriteRawTag(8);
+        output.WriteEnum((int) Level);
+      }
+      if (Text.Length != 0) {
+        output.WriteRawTag(18);
+        output.WriteString(Text);
+      }
+      if (_unknownFields != null) {
+        _unknownFields.WriteTo(output);
+      }
+    #endif
+    }
+
+    #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    void pb::IBufferMessage.InternalWriteTo(ref pb::WriteContext output) {
+      if (Level != global::Logfire.Fleet.Client.Sdk.AgentLog.Types.Level.Debug) {
+        output.WriteRawTag(8);
+        output.WriteEnum((int) Level);
+      }
+      if (Text.Length != 0) {
+        output.WriteRawTag(18);
+        output.WriteString(Text);
+      }
+      if (_unknownFields != null) {
+        _unknownFields.WriteTo(ref output);
+      }
+    }
+    #endif
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public int CalculateSize() {
+      int size = 0;
+      if (Level != global::Logfire.Fleet.Client.Sdk.AgentLog.Types.Level.Debug) {
+        size += 1 + pb::CodedOutputStream.ComputeEnumSize((int) Level);
+      }
+      if (Text.Length != 0) {
+        size += 1 + pb::CodedOutputStream.ComputeStringSize(Text);
+      }
+      if (_unknownFields != null) {
+        size += _unknownFields.CalculateSize();
+      }
+      return size;
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public void MergeFrom(AgentLog other) {
+      if (other == null) {
+        return;
+      }
+      if (other.Level != global::Logfire.Fleet.Client.Sdk.AgentLog.Types.Level.Debug) {
+        Level = other.Level;
+      }
+      if (other.Text.Length != 0) {
+        Text = other.Text;
+      }
+      _unknownFields = pb::UnknownFieldSet.MergeFrom(_unknownFields, other._unknownFields);
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public void MergeFrom(pb::CodedInputStream input) {
+    #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
+      input.ReadRawMessage(this);
+    #else
+      uint tag;
+      while ((tag = input.ReadTag()) != 0) {
+      if ((tag & 7) == 4) {
+        // Abort on any end group tag.
+        return;
+      }
+      switch(tag) {
+          default:
+            _unknownFields = pb::UnknownFieldSet.MergeFieldFrom(_unknownFields, input);
+            break;
+          case 8: {
+            Level = (global::Logfire.Fleet.Client.Sdk.AgentLog.Types.Level) input.ReadEnum();
+            break;
+          }
+          case 18: {
+            Text = input.ReadString();
+            break;
+          }
+        }
+      }
+    #endif
+    }
+
+    #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    void pb::IBufferMessage.InternalMergeFrom(ref pb::ParseContext input) {
+      uint tag;
+      while ((tag = input.ReadTag()) != 0) {
+      if ((tag & 7) == 4) {
+        // Abort on any end group tag.
+        return;
+      }
+      switch(tag) {
+          default:
+            _unknownFields = pb::UnknownFieldSet.MergeFieldFrom(_unknownFields, ref input);
+            break;
+          case 8: {
+            Level = (global::Logfire.Fleet.Client.Sdk.AgentLog.Types.Level) input.ReadEnum();
+            break;
+          }
+          case 18: {
+            Text = input.ReadString();
+            break;
+          }
+        }
+      }
+    }
+    #endif
+
+    #region Nested types
+    /// <summary>Container for nested types declared in the AgentLog message type.</summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public static partial class Types {
+      public enum Level {
+        /// <summary>
+        /// only with the integration's debug output on
+        /// </summary>
+        [pbr::OriginalName("DEBUG")] Debug = 0,
+        [pbr::OriginalName("INFO")] Info = 1,
+        /// <summary>
+        /// info said even where no logger is set up
+        /// </summary>
+        [pbr::OriginalName("NOTICE")] Notice = 2,
+        [pbr::OriginalName("WARN")] Warn = 3,
+        /// <summary>
+        /// the SDK is no longer managed
+        /// </summary>
+        [pbr::OriginalName("ERROR")] Error = 4,
+      }
+
+    }
+    #endregion
+
+  }
+
+  /// <summary>
+  /// AgentOutput.agent, decoded: the agent between steps. Hosts keep it as bytes and never read it.
+  /// It lives only as long as the process, so its fields may change in any release.
+  /// </summary>
+  [global::System.Diagnostics.DebuggerDisplayAttribute("{ToString(),nq}")]
+  public sealed partial class AgentState : pb::IMessage<AgentState>
+  #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
+      , pb::IBufferMessage
+  #endif
+  {
+    private static readonly pb::MessageParser<AgentState> _parser = new pb::MessageParser<AgentState>(() => new AgentState());
+    private pb::UnknownFieldSet _unknownFields;
+    private int _hasBits0;
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public static pb::MessageParser<AgentState> Parser { get { return _parser; } }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public static pbr::MessageDescriptor Descriptor {
+      get { return global::Logfire.Fleet.Client.Sdk.SettingsReflection.Descriptor.MessageTypes[16]; }
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    pbr::MessageDescriptor pb::IMessage.Descriptor {
+      get { return Descriptor; }
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public AgentState() {
+      OnConstruction();
+    }
+
+    partial void OnConstruction();
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public AgentState(AgentState other) : this() {
+      _hasBits0 = other._hasBits0;
+      host_ = other.host_ != null ? other.host_.Clone() : null;
+      stateDir_ = other.stateDir_;
+      current_ = other.current_;
+      atStart_ = other.atStart_;
+      effective_ = other.effective_;
+      exporters_ = other.exporters_.Clone();
+      health_ = other.health_ != null ? other.health_.Clone() : null;
+      refreshAtUnixMs_ = other.refreshAtUnixMs_;
+      refreshDueMonoMs_ = other.refreshDueMonoMs_;
+      healthDueMonoMs_ = other.healthDueMonoMs_;
+      startedUnixMs_ = other.startedUnixMs_;
+      endpoint_ = other.endpoint_;
+      service_ = other.service_;
+      uid_ = other.uid_;
+      hints_ = other.hints_ != null ? other.hints_.Clone() : null;
+      ever_ = other.ever_;
+      failing_ = other.failing_;
+      askedUnixMs_ = other.askedUnixMs_;
+      askedMonoMs_ = other.askedMonoMs_;
+      _unknownFields = pb::UnknownFieldSet.Clone(other._unknownFields);
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public AgentState Clone() {
+      return new AgentState(this);
+    }
+
+    /// <summary>Field number for the "host" field.</summary>
+    public const int HostFieldNumber = 1;
+    private global::Logfire.Fleet.Client.Sdk.Host host_;
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public global::Logfire.Fleet.Client.Sdk.Host Host {
+      get { return host_; }
+      set {
+        host_ = value;
+      }
+    }
+
+    /// <summary>Field number for the "state_dir" field.</summary>
+    public const int StateDirFieldNumber = 2;
+    private bool stateDir_;
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public bool StateDir {
+      get { return stateDir_; }
+      set {
+        stateDir_ = value;
+      }
+    }
+
+    /// <summary>Field number for the "current" field.</summary>
+    public const int CurrentFieldNumber = 3;
+    private pb::ByteString current_ = pb::ByteString.Empty;
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public pb::ByteString Current {
+      get { return current_; }
+      set {
+        current_ = pb::ProtoPreconditions.CheckNotNull(value, "value");
+      }
+    }
+
+    /// <summary>Field number for the "at_start" field.</summary>
+    public const int AtStartFieldNumber = 4;
+    private pb::ByteString atStart_ = pb::ByteString.Empty;
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public pb::ByteString AtStart {
+      get { return atStart_; }
+      set {
+        atStart_ = pb::ProtoPreconditions.CheckNotNull(value, "value");
+      }
+    }
+
+    /// <summary>Field number for the "effective" field.</summary>
+    public const int EffectiveFieldNumber = 5;
+    private string effective_ = "";
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public string Effective {
+      get { return effective_; }
+      set {
+        effective_ = pb::ProtoPreconditions.CheckNotNull(value, "value");
+      }
+    }
+
+    /// <summary>Field number for the "exporters" field.</summary>
+    public const int ExportersFieldNumber = 6;
+    private static readonly pb::FieldCodec<global::Logfire.Fleet.Client.Sdk.Exporter> _repeated_exporters_codec
+        = pb::FieldCodec.ForMessage(50, global::Logfire.Fleet.Client.Sdk.Exporter.Parser);
+    private readonly pbc::RepeatedField<global::Logfire.Fleet.Client.Sdk.Exporter> exporters_ = new pbc::RepeatedField<global::Logfire.Fleet.Client.Sdk.Exporter>();
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public pbc::RepeatedField<global::Logfire.Fleet.Client.Sdk.Exporter> Exporters {
+      get { return exporters_; }
+    }
+
+    /// <summary>Field number for the "health" field.</summary>
+    public const int HealthFieldNumber = 7;
+    private global::Logfire.Fleet.Client.Sdk.HealthReport health_;
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public global::Logfire.Fleet.Client.Sdk.HealthReport Health {
+      get { return health_; }
+      set {
+        health_ = value;
+      }
+    }
+
+    /// <summary>Field number for the "refresh_at_unix_ms" field.</summary>
+    public const int RefreshAtUnixMsFieldNumber = 8;
+    private readonly static ulong RefreshAtUnixMsDefaultValue = 0UL;
+
+    private ulong refreshAtUnixMs_;
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public ulong RefreshAtUnixMs {
+      get { if ((_hasBits0 & 1) != 0) { return refreshAtUnixMs_; } else { return RefreshAtUnixMsDefaultValue; } }
+      set {
+        _hasBits0 |= 1;
+        refreshAtUnixMs_ = value;
+      }
+    }
+    /// <summary>Gets whether the "refresh_at_unix_ms" field is set</summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public bool HasRefreshAtUnixMs {
+      get { return (_hasBits0 & 1) != 0; }
+    }
+    /// <summary>Clears the value of the "refresh_at_unix_ms" field</summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public void ClearRefreshAtUnixMs() {
+      _hasBits0 &= ~1;
+    }
+
+    /// <summary>Field number for the "refresh_due_mono_ms" field.</summary>
+    public const int RefreshDueMonoMsFieldNumber = 9;
+    private readonly static ulong RefreshDueMonoMsDefaultValue = 0UL;
+
+    private ulong refreshDueMonoMs_;
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public ulong RefreshDueMonoMs {
+      get { if ((_hasBits0 & 2) != 0) { return refreshDueMonoMs_; } else { return RefreshDueMonoMsDefaultValue; } }
+      set {
+        _hasBits0 |= 2;
+        refreshDueMonoMs_ = value;
+      }
+    }
+    /// <summary>Gets whether the "refresh_due_mono_ms" field is set</summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public bool HasRefreshDueMonoMs {
+      get { return (_hasBits0 & 2) != 0; }
+    }
+    /// <summary>Clears the value of the "refresh_due_mono_ms" field</summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public void ClearRefreshDueMonoMs() {
+      _hasBits0 &= ~2;
+    }
+
+    /// <summary>Field number for the "health_due_mono_ms" field.</summary>
+    public const int HealthDueMonoMsFieldNumber = 10;
+    private ulong healthDueMonoMs_;
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public ulong HealthDueMonoMs {
+      get { return healthDueMonoMs_; }
+      set {
+        healthDueMonoMs_ = value;
+      }
+    }
+
+    /// <summary>Field number for the "started_unix_ms" field.</summary>
+    public const int StartedUnixMsFieldNumber = 11;
+    private ulong startedUnixMs_;
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public ulong StartedUnixMs {
+      get { return startedUnixMs_; }
+      set {
+        startedUnixMs_ = value;
+      }
+    }
+
+    /// <summary>Field number for the "endpoint" field.</summary>
+    public const int EndpointFieldNumber = 12;
+    private string endpoint_ = "";
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public string Endpoint {
+      get { return endpoint_; }
+      set {
+        endpoint_ = pb::ProtoPreconditions.CheckNotNull(value, "value");
+      }
+    }
+
+    /// <summary>Field number for the "service" field.</summary>
+    public const int ServiceFieldNumber = 13;
+    private string service_ = "";
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public string Service {
+      get { return service_; }
+      set {
+        service_ = pb::ProtoPreconditions.CheckNotNull(value, "value");
+      }
+    }
+
+    /// <summary>Field number for the "uid" field.</summary>
+    public const int UidFieldNumber = 14;
+    private string uid_ = "";
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public string Uid {
+      get { return uid_; }
+      set {
+        uid_ = pb::ProtoPreconditions.CheckNotNull(value, "value");
+      }
+    }
+
+    /// <summary>Field number for the "hints" field.</summary>
+    public const int HintsFieldNumber = 15;
+    private global::Logfire.Fleet.Client.Sdk.AgentHints hints_;
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public global::Logfire.Fleet.Client.Sdk.AgentHints Hints {
+      get { return hints_; }
+      set {
+        hints_ = value;
+      }
+    }
+
+    /// <summary>Field number for the "ever" field.</summary>
+    public const int EverFieldNumber = 16;
+    private bool ever_;
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public bool Ever {
+      get { return ever_; }
+      set {
+        ever_ = value;
+      }
+    }
+
+    /// <summary>Field number for the "failing" field.</summary>
+    public const int FailingFieldNumber = 17;
+    private bool failing_;
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public bool Failing {
+      get { return failing_; }
+      set {
+        failing_ = value;
+      }
+    }
+
+    /// <summary>Field number for the "asked_unix_ms" field.</summary>
+    public const int AskedUnixMsFieldNumber = 18;
+    private ulong askedUnixMs_;
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public ulong AskedUnixMs {
+      get { return askedUnixMs_; }
+      set {
+        askedUnixMs_ = value;
+      }
+    }
+
+    /// <summary>Field number for the "asked_mono_ms" field.</summary>
+    public const int AskedMonoMsFieldNumber = 19;
+    private ulong askedMonoMs_;
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public ulong AskedMonoMs {
+      get { return askedMonoMs_; }
+      set {
+        askedMonoMs_ = value;
+      }
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public override bool Equals(object other) {
+      return Equals(other as AgentState);
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public bool Equals(AgentState other) {
+      if (ReferenceEquals(other, null)) {
+        return false;
+      }
+      if (ReferenceEquals(other, this)) {
+        return true;
+      }
+      if (!object.Equals(Host, other.Host)) return false;
+      if (StateDir != other.StateDir) return false;
+      if (Current != other.Current) return false;
+      if (AtStart != other.AtStart) return false;
+      if (Effective != other.Effective) return false;
+      if(!exporters_.Equals(other.exporters_)) return false;
+      if (!object.Equals(Health, other.Health)) return false;
+      if (RefreshAtUnixMs != other.RefreshAtUnixMs) return false;
+      if (RefreshDueMonoMs != other.RefreshDueMonoMs) return false;
+      if (HealthDueMonoMs != other.HealthDueMonoMs) return false;
+      if (StartedUnixMs != other.StartedUnixMs) return false;
+      if (Endpoint != other.Endpoint) return false;
+      if (Service != other.Service) return false;
+      if (Uid != other.Uid) return false;
+      if (!object.Equals(Hints, other.Hints)) return false;
+      if (Ever != other.Ever) return false;
+      if (Failing != other.Failing) return false;
+      if (AskedUnixMs != other.AskedUnixMs) return false;
+      if (AskedMonoMs != other.AskedMonoMs) return false;
+      return Equals(_unknownFields, other._unknownFields);
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public override int GetHashCode() {
+      int hash = 1;
+      if (host_ != null) hash ^= Host.GetHashCode();
+      if (StateDir != false) hash ^= StateDir.GetHashCode();
+      if (Current.Length != 0) hash ^= Current.GetHashCode();
+      if (AtStart.Length != 0) hash ^= AtStart.GetHashCode();
+      if (Effective.Length != 0) hash ^= Effective.GetHashCode();
+      hash ^= exporters_.GetHashCode();
+      if (health_ != null) hash ^= Health.GetHashCode();
+      if (HasRefreshAtUnixMs) hash ^= RefreshAtUnixMs.GetHashCode();
+      if (HasRefreshDueMonoMs) hash ^= RefreshDueMonoMs.GetHashCode();
+      if (HealthDueMonoMs != 0UL) hash ^= HealthDueMonoMs.GetHashCode();
+      if (StartedUnixMs != 0UL) hash ^= StartedUnixMs.GetHashCode();
+      if (Endpoint.Length != 0) hash ^= Endpoint.GetHashCode();
+      if (Service.Length != 0) hash ^= Service.GetHashCode();
+      if (Uid.Length != 0) hash ^= Uid.GetHashCode();
+      if (hints_ != null) hash ^= Hints.GetHashCode();
+      if (Ever != false) hash ^= Ever.GetHashCode();
+      if (Failing != false) hash ^= Failing.GetHashCode();
+      if (AskedUnixMs != 0UL) hash ^= AskedUnixMs.GetHashCode();
+      if (AskedMonoMs != 0UL) hash ^= AskedMonoMs.GetHashCode();
+      if (_unknownFields != null) {
+        hash ^= _unknownFields.GetHashCode();
+      }
+      return hash;
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public override string ToString() {
+      return pb::JsonFormatter.ToDiagnosticString(this);
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public void WriteTo(pb::CodedOutputStream output) {
+    #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
+      output.WriteRawMessage(this);
+    #else
+      if (host_ != null) {
+        output.WriteRawTag(10);
+        output.WriteMessage(Host);
+      }
+      if (StateDir != false) {
+        output.WriteRawTag(16);
+        output.WriteBool(StateDir);
+      }
+      if (Current.Length != 0) {
+        output.WriteRawTag(26);
+        output.WriteBytes(Current);
+      }
+      if (AtStart.Length != 0) {
+        output.WriteRawTag(34);
+        output.WriteBytes(AtStart);
+      }
+      if (Effective.Length != 0) {
+        output.WriteRawTag(42);
+        output.WriteString(Effective);
+      }
+      exporters_.WriteTo(output, _repeated_exporters_codec);
+      if (health_ != null) {
+        output.WriteRawTag(58);
+        output.WriteMessage(Health);
+      }
+      if (HasRefreshAtUnixMs) {
+        output.WriteRawTag(64);
+        output.WriteUInt64(RefreshAtUnixMs);
+      }
+      if (HasRefreshDueMonoMs) {
+        output.WriteRawTag(72);
+        output.WriteUInt64(RefreshDueMonoMs);
+      }
+      if (HealthDueMonoMs != 0UL) {
+        output.WriteRawTag(80);
+        output.WriteUInt64(HealthDueMonoMs);
+      }
+      if (StartedUnixMs != 0UL) {
+        output.WriteRawTag(88);
+        output.WriteUInt64(StartedUnixMs);
+      }
+      if (Endpoint.Length != 0) {
+        output.WriteRawTag(98);
+        output.WriteString(Endpoint);
+      }
+      if (Service.Length != 0) {
+        output.WriteRawTag(106);
+        output.WriteString(Service);
+      }
+      if (Uid.Length != 0) {
+        output.WriteRawTag(114);
+        output.WriteString(Uid);
+      }
+      if (hints_ != null) {
+        output.WriteRawTag(122);
+        output.WriteMessage(Hints);
+      }
+      if (Ever != false) {
+        output.WriteRawTag(128, 1);
+        output.WriteBool(Ever);
+      }
+      if (Failing != false) {
+        output.WriteRawTag(136, 1);
+        output.WriteBool(Failing);
+      }
+      if (AskedUnixMs != 0UL) {
+        output.WriteRawTag(144, 1);
+        output.WriteUInt64(AskedUnixMs);
+      }
+      if (AskedMonoMs != 0UL) {
+        output.WriteRawTag(152, 1);
+        output.WriteUInt64(AskedMonoMs);
+      }
+      if (_unknownFields != null) {
+        _unknownFields.WriteTo(output);
+      }
+    #endif
+    }
+
+    #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    void pb::IBufferMessage.InternalWriteTo(ref pb::WriteContext output) {
+      if (host_ != null) {
+        output.WriteRawTag(10);
+        output.WriteMessage(Host);
+      }
+      if (StateDir != false) {
+        output.WriteRawTag(16);
+        output.WriteBool(StateDir);
+      }
+      if (Current.Length != 0) {
+        output.WriteRawTag(26);
+        output.WriteBytes(Current);
+      }
+      if (AtStart.Length != 0) {
+        output.WriteRawTag(34);
+        output.WriteBytes(AtStart);
+      }
+      if (Effective.Length != 0) {
+        output.WriteRawTag(42);
+        output.WriteString(Effective);
+      }
+      exporters_.WriteTo(ref output, _repeated_exporters_codec);
+      if (health_ != null) {
+        output.WriteRawTag(58);
+        output.WriteMessage(Health);
+      }
+      if (HasRefreshAtUnixMs) {
+        output.WriteRawTag(64);
+        output.WriteUInt64(RefreshAtUnixMs);
+      }
+      if (HasRefreshDueMonoMs) {
+        output.WriteRawTag(72);
+        output.WriteUInt64(RefreshDueMonoMs);
+      }
+      if (HealthDueMonoMs != 0UL) {
+        output.WriteRawTag(80);
+        output.WriteUInt64(HealthDueMonoMs);
+      }
+      if (StartedUnixMs != 0UL) {
+        output.WriteRawTag(88);
+        output.WriteUInt64(StartedUnixMs);
+      }
+      if (Endpoint.Length != 0) {
+        output.WriteRawTag(98);
+        output.WriteString(Endpoint);
+      }
+      if (Service.Length != 0) {
+        output.WriteRawTag(106);
+        output.WriteString(Service);
+      }
+      if (Uid.Length != 0) {
+        output.WriteRawTag(114);
+        output.WriteString(Uid);
+      }
+      if (hints_ != null) {
+        output.WriteRawTag(122);
+        output.WriteMessage(Hints);
+      }
+      if (Ever != false) {
+        output.WriteRawTag(128, 1);
+        output.WriteBool(Ever);
+      }
+      if (Failing != false) {
+        output.WriteRawTag(136, 1);
+        output.WriteBool(Failing);
+      }
+      if (AskedUnixMs != 0UL) {
+        output.WriteRawTag(144, 1);
+        output.WriteUInt64(AskedUnixMs);
+      }
+      if (AskedMonoMs != 0UL) {
+        output.WriteRawTag(152, 1);
+        output.WriteUInt64(AskedMonoMs);
+      }
+      if (_unknownFields != null) {
+        _unknownFields.WriteTo(ref output);
+      }
+    }
+    #endif
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public int CalculateSize() {
+      int size = 0;
+      if (host_ != null) {
+        size += 1 + pb::CodedOutputStream.ComputeMessageSize(Host);
+      }
+      if (StateDir != false) {
+        size += 1 + 1;
+      }
+      if (Current.Length != 0) {
+        size += 1 + pb::CodedOutputStream.ComputeBytesSize(Current);
+      }
+      if (AtStart.Length != 0) {
+        size += 1 + pb::CodedOutputStream.ComputeBytesSize(AtStart);
+      }
+      if (Effective.Length != 0) {
+        size += 1 + pb::CodedOutputStream.ComputeStringSize(Effective);
+      }
+      size += exporters_.CalculateSize(_repeated_exporters_codec);
+      if (health_ != null) {
+        size += 1 + pb::CodedOutputStream.ComputeMessageSize(Health);
+      }
+      if (HasRefreshAtUnixMs) {
+        size += 1 + pb::CodedOutputStream.ComputeUInt64Size(RefreshAtUnixMs);
+      }
+      if (HasRefreshDueMonoMs) {
+        size += 1 + pb::CodedOutputStream.ComputeUInt64Size(RefreshDueMonoMs);
+      }
+      if (HealthDueMonoMs != 0UL) {
+        size += 1 + pb::CodedOutputStream.ComputeUInt64Size(HealthDueMonoMs);
+      }
+      if (StartedUnixMs != 0UL) {
+        size += 1 + pb::CodedOutputStream.ComputeUInt64Size(StartedUnixMs);
+      }
+      if (Endpoint.Length != 0) {
+        size += 1 + pb::CodedOutputStream.ComputeStringSize(Endpoint);
+      }
+      if (Service.Length != 0) {
+        size += 1 + pb::CodedOutputStream.ComputeStringSize(Service);
+      }
+      if (Uid.Length != 0) {
+        size += 1 + pb::CodedOutputStream.ComputeStringSize(Uid);
+      }
+      if (hints_ != null) {
+        size += 1 + pb::CodedOutputStream.ComputeMessageSize(Hints);
+      }
+      if (Ever != false) {
+        size += 2 + 1;
+      }
+      if (Failing != false) {
+        size += 2 + 1;
+      }
+      if (AskedUnixMs != 0UL) {
+        size += 2 + pb::CodedOutputStream.ComputeUInt64Size(AskedUnixMs);
+      }
+      if (AskedMonoMs != 0UL) {
+        size += 2 + pb::CodedOutputStream.ComputeUInt64Size(AskedMonoMs);
+      }
+      if (_unknownFields != null) {
+        size += _unknownFields.CalculateSize();
+      }
+      return size;
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public void MergeFrom(AgentState other) {
+      if (other == null) {
+        return;
+      }
+      if (other.host_ != null) {
+        if (host_ == null) {
+          Host = new global::Logfire.Fleet.Client.Sdk.Host();
+        }
+        Host.MergeFrom(other.Host);
+      }
+      if (other.StateDir != false) {
+        StateDir = other.StateDir;
+      }
+      if (other.Current.Length != 0) {
+        Current = other.Current;
+      }
+      if (other.AtStart.Length != 0) {
+        AtStart = other.AtStart;
+      }
+      if (other.Effective.Length != 0) {
+        Effective = other.Effective;
+      }
+      exporters_.Add(other.exporters_);
+      if (other.health_ != null) {
+        if (health_ == null) {
+          Health = new global::Logfire.Fleet.Client.Sdk.HealthReport();
+        }
+        Health.MergeFrom(other.Health);
+      }
+      if (other.HasRefreshAtUnixMs) {
+        RefreshAtUnixMs = other.RefreshAtUnixMs;
+      }
+      if (other.HasRefreshDueMonoMs) {
+        RefreshDueMonoMs = other.RefreshDueMonoMs;
+      }
+      if (other.HealthDueMonoMs != 0UL) {
+        HealthDueMonoMs = other.HealthDueMonoMs;
+      }
+      if (other.StartedUnixMs != 0UL) {
+        StartedUnixMs = other.StartedUnixMs;
+      }
+      if (other.Endpoint.Length != 0) {
+        Endpoint = other.Endpoint;
+      }
+      if (other.Service.Length != 0) {
+        Service = other.Service;
+      }
+      if (other.Uid.Length != 0) {
+        Uid = other.Uid;
+      }
+      if (other.hints_ != null) {
+        if (hints_ == null) {
+          Hints = new global::Logfire.Fleet.Client.Sdk.AgentHints();
+        }
+        Hints.MergeFrom(other.Hints);
+      }
+      if (other.Ever != false) {
+        Ever = other.Ever;
+      }
+      if (other.Failing != false) {
+        Failing = other.Failing;
+      }
+      if (other.AskedUnixMs != 0UL) {
+        AskedUnixMs = other.AskedUnixMs;
+      }
+      if (other.AskedMonoMs != 0UL) {
+        AskedMonoMs = other.AskedMonoMs;
+      }
+      _unknownFields = pb::UnknownFieldSet.MergeFrom(_unknownFields, other._unknownFields);
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public void MergeFrom(pb::CodedInputStream input) {
+    #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
+      input.ReadRawMessage(this);
+    #else
+      uint tag;
+      while ((tag = input.ReadTag()) != 0) {
+      if ((tag & 7) == 4) {
+        // Abort on any end group tag.
+        return;
+      }
+      switch(tag) {
+          default:
+            _unknownFields = pb::UnknownFieldSet.MergeFieldFrom(_unknownFields, input);
+            break;
+          case 10: {
+            if (host_ == null) {
+              Host = new global::Logfire.Fleet.Client.Sdk.Host();
+            }
+            input.ReadMessage(Host);
+            break;
+          }
+          case 16: {
+            StateDir = input.ReadBool();
+            break;
+          }
+          case 26: {
+            Current = input.ReadBytes();
+            break;
+          }
+          case 34: {
+            AtStart = input.ReadBytes();
+            break;
+          }
+          case 42: {
+            Effective = input.ReadString();
+            break;
+          }
+          case 50: {
+            exporters_.AddEntriesFrom(input, _repeated_exporters_codec);
+            break;
+          }
+          case 58: {
+            if (health_ == null) {
+              Health = new global::Logfire.Fleet.Client.Sdk.HealthReport();
+            }
+            input.ReadMessage(Health);
+            break;
+          }
+          case 64: {
+            RefreshAtUnixMs = input.ReadUInt64();
+            break;
+          }
+          case 72: {
+            RefreshDueMonoMs = input.ReadUInt64();
+            break;
+          }
+          case 80: {
+            HealthDueMonoMs = input.ReadUInt64();
+            break;
+          }
+          case 88: {
+            StartedUnixMs = input.ReadUInt64();
+            break;
+          }
+          case 98: {
+            Endpoint = input.ReadString();
+            break;
+          }
+          case 106: {
+            Service = input.ReadString();
+            break;
+          }
+          case 114: {
+            Uid = input.ReadString();
+            break;
+          }
+          case 122: {
+            if (hints_ == null) {
+              Hints = new global::Logfire.Fleet.Client.Sdk.AgentHints();
+            }
+            input.ReadMessage(Hints);
+            break;
+          }
+          case 128: {
+            Ever = input.ReadBool();
+            break;
+          }
+          case 136: {
+            Failing = input.ReadBool();
+            break;
+          }
+          case 144: {
+            AskedUnixMs = input.ReadUInt64();
+            break;
+          }
+          case 152: {
+            AskedMonoMs = input.ReadUInt64();
+            break;
+          }
+        }
+      }
+    #endif
+    }
+
+    #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    void pb::IBufferMessage.InternalMergeFrom(ref pb::ParseContext input) {
+      uint tag;
+      while ((tag = input.ReadTag()) != 0) {
+      if ((tag & 7) == 4) {
+        // Abort on any end group tag.
+        return;
+      }
+      switch(tag) {
+          default:
+            _unknownFields = pb::UnknownFieldSet.MergeFieldFrom(_unknownFields, ref input);
+            break;
+          case 10: {
+            if (host_ == null) {
+              Host = new global::Logfire.Fleet.Client.Sdk.Host();
+            }
+            input.ReadMessage(Host);
+            break;
+          }
+          case 16: {
+            StateDir = input.ReadBool();
+            break;
+          }
+          case 26: {
+            Current = input.ReadBytes();
+            break;
+          }
+          case 34: {
+            AtStart = input.ReadBytes();
+            break;
+          }
+          case 42: {
+            Effective = input.ReadString();
+            break;
+          }
+          case 50: {
             exporters_.AddEntriesFrom(ref input, _repeated_exporters_codec);
+            break;
+          }
+          case 58: {
+            if (health_ == null) {
+              Health = new global::Logfire.Fleet.Client.Sdk.HealthReport();
+            }
+            input.ReadMessage(Health);
+            break;
+          }
+          case 64: {
+            RefreshAtUnixMs = input.ReadUInt64();
+            break;
+          }
+          case 72: {
+            RefreshDueMonoMs = input.ReadUInt64();
+            break;
+          }
+          case 80: {
+            HealthDueMonoMs = input.ReadUInt64();
+            break;
+          }
+          case 88: {
+            StartedUnixMs = input.ReadUInt64();
+            break;
+          }
+          case 98: {
+            Endpoint = input.ReadString();
+            break;
+          }
+          case 106: {
+            Service = input.ReadString();
+            break;
+          }
+          case 114: {
+            Uid = input.ReadString();
+            break;
+          }
+          case 122: {
+            if (hints_ == null) {
+              Hints = new global::Logfire.Fleet.Client.Sdk.AgentHints();
+            }
+            input.ReadMessage(Hints);
+            break;
+          }
+          case 128: {
+            Ever = input.ReadBool();
+            break;
+          }
+          case 136: {
+            Failing = input.ReadBool();
+            break;
+          }
+          case 144: {
+            AskedUnixMs = input.ReadUInt64();
+            break;
+          }
+          case 152: {
+            AskedMonoMs = input.ReadUInt64();
             break;
           }
         }
@@ -5362,7 +7191,7 @@ namespace Logfire.Fleet.Client.Sdk {
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public static pbr::MessageDescriptor Descriptor {
-      get { return global::Logfire.Fleet.Client.Sdk.SettingsReflection.Descriptor.MessageTypes[14]; }
+      get { return global::Logfire.Fleet.Client.Sdk.SettingsReflection.Descriptor.MessageTypes[17]; }
     }
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
@@ -5664,7 +7493,7 @@ namespace Logfire.Fleet.Client.Sdk {
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public static pbr::MessageDescriptor Descriptor {
-      get { return global::Logfire.Fleet.Client.Sdk.SettingsReflection.Descriptor.MessageTypes[15]; }
+      get { return global::Logfire.Fleet.Client.Sdk.SettingsReflection.Descriptor.MessageTypes[18]; }
     }
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
@@ -6059,7 +7888,7 @@ namespace Logfire.Fleet.Client.Sdk {
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public static pbr::MessageDescriptor Descriptor {
-      get { return global::Logfire.Fleet.Client.Sdk.SettingsReflection.Descriptor.MessageTypes[16]; }
+      get { return global::Logfire.Fleet.Client.Sdk.SettingsReflection.Descriptor.MessageTypes[19]; }
     }
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
@@ -6357,7 +8186,7 @@ namespace Logfire.Fleet.Client.Sdk {
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public static pbr::MessageDescriptor Descriptor {
-      get { return global::Logfire.Fleet.Client.Sdk.SettingsReflection.Descriptor.MessageTypes[17]; }
+      get { return global::Logfire.Fleet.Client.Sdk.SettingsReflection.Descriptor.MessageTypes[20]; }
     }
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
@@ -6404,7 +8233,7 @@ namespace Logfire.Fleet.Client.Sdk {
     public const int HostFieldNumber = 2;
     private global::Logfire.Fleet.Client.Sdk.Host host_;
     /// <summary>
-    /// as Load's; unset, it lists no control
+    /// as AgentStart's; unset, it lists no control
     /// </summary>
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
@@ -6419,7 +8248,7 @@ namespace Logfire.Fleet.Client.Sdk {
     public const int NowUnixMsFieldNumber = 3;
     private ulong nowUnixMs_;
     /// <summary>
-    /// as Load's: debug is listed only with a clock
+    /// the wall clock: debug is listed only with one
     /// </summary>
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
@@ -6640,7 +8469,7 @@ namespace Logfire.Fleet.Client.Sdk {
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public static pbr::MessageDescriptor Descriptor {
-      get { return global::Logfire.Fleet.Client.Sdk.SettingsReflection.Descriptor.MessageTypes[18]; }
+      get { return global::Logfire.Fleet.Client.Sdk.SettingsReflection.Descriptor.MessageTypes[21]; }
     }
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
@@ -6688,7 +8517,7 @@ namespace Logfire.Fleet.Client.Sdk {
     public const int HostFieldNumber = 2;
     private global::Logfire.Fleet.Client.Sdk.Host host_;
     /// <summary>
-    /// as Load's
+    /// as AgentStart's
     /// </summary>
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
@@ -6703,7 +8532,7 @@ namespace Logfire.Fleet.Client.Sdk {
     public const int NowUnixMsFieldNumber = 3;
     private ulong nowUnixMs_;
     /// <summary>
-    /// as Load's: debug mode is carried out only with a clock
+    /// the wall clock: debug mode is carried out only with one
     /// </summary>
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
@@ -6936,7 +8765,7 @@ namespace Logfire.Fleet.Client.Sdk {
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public static pbr::MessageDescriptor Descriptor {
-      get { return global::Logfire.Fleet.Client.Sdk.SettingsReflection.Descriptor.MessageTypes[19]; }
+      get { return global::Logfire.Fleet.Client.Sdk.SettingsReflection.Descriptor.MessageTypes[22]; }
     }
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
@@ -7312,7 +9141,7 @@ namespace Logfire.Fleet.Client.Sdk {
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public static pbr::MessageDescriptor Descriptor {
-      get { return global::Logfire.Fleet.Client.Sdk.SettingsReflection.Descriptor.MessageTypes[20]; }
+      get { return global::Logfire.Fleet.Client.Sdk.SettingsReflection.Descriptor.MessageTypes[23]; }
     }
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
@@ -7553,7 +9382,7 @@ namespace Logfire.Fleet.Client.Sdk {
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public static pbr::MessageDescriptor Descriptor {
-      get { return global::Logfire.Fleet.Client.Sdk.SettingsReflection.Descriptor.MessageTypes[21]; }
+      get { return global::Logfire.Fleet.Client.Sdk.SettingsReflection.Descriptor.MessageTypes[24]; }
     }
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
@@ -7881,7 +9710,7 @@ namespace Logfire.Fleet.Client.Sdk {
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public static pbr::MessageDescriptor Descriptor {
-      get { return global::Logfire.Fleet.Client.Sdk.SettingsReflection.Descriptor.MessageTypes[22]; }
+      get { return global::Logfire.Fleet.Client.Sdk.SettingsReflection.Descriptor.MessageTypes[25]; }
     }
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
@@ -8137,7 +9966,7 @@ namespace Logfire.Fleet.Client.Sdk {
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public static pbr::MessageDescriptor Descriptor {
-      get { return global::Logfire.Fleet.Client.Sdk.SettingsReflection.Descriptor.MessageTypes[23]; }
+      get { return global::Logfire.Fleet.Client.Sdk.SettingsReflection.Descriptor.MessageTypes[26]; }
     }
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
@@ -8499,7 +10328,7 @@ namespace Logfire.Fleet.Client.Sdk {
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public static pbr::MessageDescriptor Descriptor {
-      get { return global::Logfire.Fleet.Client.Sdk.SettingsReflection.Descriptor.MessageTypes[24]; }
+      get { return global::Logfire.Fleet.Client.Sdk.SettingsReflection.Descriptor.MessageTypes[27]; }
     }
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
@@ -8734,7 +10563,7 @@ namespace Logfire.Fleet.Client.Sdk {
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public static pbr::MessageDescriptor Descriptor {
-      get { return global::Logfire.Fleet.Client.Sdk.SettingsReflection.Descriptor.MessageTypes[25]; }
+      get { return global::Logfire.Fleet.Client.Sdk.SettingsReflection.Descriptor.MessageTypes[28]; }
     }
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
@@ -9015,7 +10844,7 @@ namespace Logfire.Fleet.Client.Sdk {
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public static pbr::MessageDescriptor Descriptor {
-      get { return global::Logfire.Fleet.Client.Sdk.SettingsReflection.Descriptor.MessageTypes[26]; }
+      get { return global::Logfire.Fleet.Client.Sdk.SettingsReflection.Descriptor.MessageTypes[29]; }
     }
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
@@ -9093,7 +10922,7 @@ namespace Logfire.Fleet.Client.Sdk {
     public const int NowUnixMsFieldNumber = 7;
     private ulong nowUnixMs_;
     /// <summary>
-    /// as Load's: debug mode folded in
+    /// the wall clock: debug mode folded in
     /// </summary>
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
@@ -9546,7 +11375,7 @@ namespace Logfire.Fleet.Client.Sdk {
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public static pbr::MessageDescriptor Descriptor {
-      get { return global::Logfire.Fleet.Client.Sdk.SettingsReflection.Descriptor.MessageTypes[27]; }
+      get { return global::Logfire.Fleet.Client.Sdk.SettingsReflection.Descriptor.MessageTypes[30]; }
     }
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
@@ -9783,7 +11612,7 @@ namespace Logfire.Fleet.Client.Sdk {
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public static pbr::MessageDescriptor Descriptor {
-      get { return global::Logfire.Fleet.Client.Sdk.SettingsReflection.Descriptor.MessageTypes[28]; }
+      get { return global::Logfire.Fleet.Client.Sdk.SettingsReflection.Descriptor.MessageTypes[31]; }
     }
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
@@ -10107,7 +11936,7 @@ namespace Logfire.Fleet.Client.Sdk {
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public static pbr::MessageDescriptor Descriptor {
-      get { return global::Logfire.Fleet.Client.Sdk.SettingsReflection.Descriptor.MessageTypes[29]; }
+      get { return global::Logfire.Fleet.Client.Sdk.SettingsReflection.Descriptor.MessageTypes[32]; }
     }
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
@@ -10346,7 +12175,7 @@ namespace Logfire.Fleet.Client.Sdk {
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public static pbr::MessageDescriptor Descriptor {
-      get { return global::Logfire.Fleet.Client.Sdk.SettingsReflection.Descriptor.MessageTypes[30]; }
+      get { return global::Logfire.Fleet.Client.Sdk.SettingsReflection.Descriptor.MessageTypes[33]; }
     }
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
@@ -10590,7 +12419,7 @@ namespace Logfire.Fleet.Client.Sdk {
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public static pbr::MessageDescriptor Descriptor {
-      get { return global::Logfire.Fleet.Client.Sdk.SettingsReflection.Descriptor.MessageTypes[31]; }
+      get { return global::Logfire.Fleet.Client.Sdk.SettingsReflection.Descriptor.MessageTypes[34]; }
     }
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
@@ -10895,7 +12724,7 @@ namespace Logfire.Fleet.Client.Sdk {
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public static pbr::MessageDescriptor Descriptor {
-      get { return global::Logfire.Fleet.Client.Sdk.SettingsReflection.Descriptor.MessageTypes[32]; }
+      get { return global::Logfire.Fleet.Client.Sdk.SettingsReflection.Descriptor.MessageTypes[35]; }
     }
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
@@ -11311,7 +13140,7 @@ namespace Logfire.Fleet.Client.Sdk {
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public static pbr::MessageDescriptor Descriptor {
-      get { return global::Logfire.Fleet.Client.Sdk.SettingsReflection.Descriptor.MessageTypes[33]; }
+      get { return global::Logfire.Fleet.Client.Sdk.SettingsReflection.Descriptor.MessageTypes[36]; }
     }
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
@@ -11662,7 +13491,7 @@ namespace Logfire.Fleet.Client.Sdk {
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public static pbr::MessageDescriptor Descriptor {
-      get { return global::Logfire.Fleet.Client.Sdk.SettingsReflection.Descriptor.MessageTypes[34]; }
+      get { return global::Logfire.Fleet.Client.Sdk.SettingsReflection.Descriptor.MessageTypes[37]; }
     }
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
@@ -11683,32 +13512,23 @@ namespace Logfire.Fleet.Client.Sdk {
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public Request(Request other) : this() {
       switch (other.CallCase) {
-        case CallOneofCase.Load:
-          Load = other.Load.Clone();
-          break;
-        case CallOneofCase.Decide:
-          Decide = other.Decide.Clone();
-          break;
         case CallOneofCase.Describe:
           Describe = other.Describe.Clone();
           break;
         case CallOneofCase.Evaluate:
           Evaluate = other.Evaluate.Clone();
           break;
-        case CallOneofCase.Refresh:
-          Refresh = other.Refresh.Clone();
-          break;
-        case CallOneofCase.Health:
-          Health = other.Health.Clone();
-          break;
         case CallOneofCase.Components:
           Components = other.Components.Clone();
           break;
-        case CallOneofCase.Commit:
-          Commit = other.Commit.Clone();
-          break;
         case CallOneofCase.Exporters:
           Exporters = other.Exporters.Clone();
+          break;
+        case CallOneofCase.AgentStart:
+          AgentStart = other.AgentStart.Clone();
+          break;
+        case CallOneofCase.AgentStep:
+          AgentStep = other.AgentStep.Clone();
           break;
       }
 
@@ -11719,30 +13539,6 @@ namespace Logfire.Fleet.Client.Sdk {
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public Request Clone() {
       return new Request(this);
-    }
-
-    /// <summary>Field number for the "load" field.</summary>
-    public const int LoadFieldNumber = 1;
-    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
-    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public global::Logfire.Fleet.Client.Sdk.Load Load {
-      get { return callCase_ == CallOneofCase.Load ? (global::Logfire.Fleet.Client.Sdk.Load) call_ : null; }
-      set {
-        call_ = value;
-        callCase_ = value == null ? CallOneofCase.None : CallOneofCase.Load;
-      }
-    }
-
-    /// <summary>Field number for the "decide" field.</summary>
-    public const int DecideFieldNumber = 2;
-    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
-    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public global::Logfire.Fleet.Client.Sdk.Decide Decide {
-      get { return callCase_ == CallOneofCase.Decide ? (global::Logfire.Fleet.Client.Sdk.Decide) call_ : null; }
-      set {
-        call_ = value;
-        callCase_ = value == null ? CallOneofCase.None : CallOneofCase.Decide;
-      }
     }
 
     /// <summary>Field number for the "describe" field.</summary>
@@ -11769,30 +13565,6 @@ namespace Logfire.Fleet.Client.Sdk {
       }
     }
 
-    /// <summary>Field number for the "refresh" field.</summary>
-    public const int RefreshFieldNumber = 5;
-    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
-    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public global::Logfire.Fleet.Client.Sdk.Refresh Refresh {
-      get { return callCase_ == CallOneofCase.Refresh ? (global::Logfire.Fleet.Client.Sdk.Refresh) call_ : null; }
-      set {
-        call_ = value;
-        callCase_ = value == null ? CallOneofCase.None : CallOneofCase.Refresh;
-      }
-    }
-
-    /// <summary>Field number for the "health" field.</summary>
-    public const int HealthFieldNumber = 6;
-    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
-    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public global::Logfire.Fleet.Client.Sdk.Health Health {
-      get { return callCase_ == CallOneofCase.Health ? (global::Logfire.Fleet.Client.Sdk.Health) call_ : null; }
-      set {
-        call_ = value;
-        callCase_ = value == null ? CallOneofCase.None : CallOneofCase.Health;
-      }
-    }
-
     /// <summary>Field number for the "components" field.</summary>
     public const int ComponentsFieldNumber = 7;
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
@@ -11802,18 +13574,6 @@ namespace Logfire.Fleet.Client.Sdk {
       set {
         call_ = value;
         callCase_ = value == null ? CallOneofCase.None : CallOneofCase.Components;
-      }
-    }
-
-    /// <summary>Field number for the "commit" field.</summary>
-    public const int CommitFieldNumber = 8;
-    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
-    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public global::Logfire.Fleet.Client.Sdk.Commit Commit {
-      get { return callCase_ == CallOneofCase.Commit ? (global::Logfire.Fleet.Client.Sdk.Commit) call_ : null; }
-      set {
-        call_ = value;
-        callCase_ = value == null ? CallOneofCase.None : CallOneofCase.Commit;
       }
     }
 
@@ -11829,19 +13589,40 @@ namespace Logfire.Fleet.Client.Sdk {
       }
     }
 
+    /// <summary>Field number for the "agent_start" field.</summary>
+    public const int AgentStartFieldNumber = 10;
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public global::Logfire.Fleet.Client.Sdk.AgentStart AgentStart {
+      get { return callCase_ == CallOneofCase.AgentStart ? (global::Logfire.Fleet.Client.Sdk.AgentStart) call_ : null; }
+      set {
+        call_ = value;
+        callCase_ = value == null ? CallOneofCase.None : CallOneofCase.AgentStart;
+      }
+    }
+
+    /// <summary>Field number for the "agent_step" field.</summary>
+    public const int AgentStepFieldNumber = 11;
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public global::Logfire.Fleet.Client.Sdk.AgentStep AgentStep {
+      get { return callCase_ == CallOneofCase.AgentStep ? (global::Logfire.Fleet.Client.Sdk.AgentStep) call_ : null; }
+      set {
+        call_ = value;
+        callCase_ = value == null ? CallOneofCase.None : CallOneofCase.AgentStep;
+      }
+    }
+
     private object call_;
     /// <summary>Enum of possible cases for the "call" oneof.</summary>
     public enum CallOneofCase {
       None = 0,
-      Load = 1,
-      Decide = 2,
       Describe = 3,
       Evaluate = 4,
-      Refresh = 5,
-      Health = 6,
       Components = 7,
-      Commit = 8,
       Exporters = 9,
+      AgentStart = 10,
+      AgentStep = 11,
     }
     private CallOneofCase callCase_ = CallOneofCase.None;
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
@@ -11872,15 +13653,12 @@ namespace Logfire.Fleet.Client.Sdk {
       if (ReferenceEquals(other, this)) {
         return true;
       }
-      if (!object.Equals(Load, other.Load)) return false;
-      if (!object.Equals(Decide, other.Decide)) return false;
       if (!object.Equals(Describe, other.Describe)) return false;
       if (!object.Equals(Evaluate, other.Evaluate)) return false;
-      if (!object.Equals(Refresh, other.Refresh)) return false;
-      if (!object.Equals(Health, other.Health)) return false;
       if (!object.Equals(Components, other.Components)) return false;
-      if (!object.Equals(Commit, other.Commit)) return false;
       if (!object.Equals(Exporters, other.Exporters)) return false;
+      if (!object.Equals(AgentStart, other.AgentStart)) return false;
+      if (!object.Equals(AgentStep, other.AgentStep)) return false;
       if (CallCase != other.CallCase) return false;
       return Equals(_unknownFields, other._unknownFields);
     }
@@ -11889,15 +13667,12 @@ namespace Logfire.Fleet.Client.Sdk {
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public override int GetHashCode() {
       int hash = 1;
-      if (callCase_ == CallOneofCase.Load) hash ^= Load.GetHashCode();
-      if (callCase_ == CallOneofCase.Decide) hash ^= Decide.GetHashCode();
       if (callCase_ == CallOneofCase.Describe) hash ^= Describe.GetHashCode();
       if (callCase_ == CallOneofCase.Evaluate) hash ^= Evaluate.GetHashCode();
-      if (callCase_ == CallOneofCase.Refresh) hash ^= Refresh.GetHashCode();
-      if (callCase_ == CallOneofCase.Health) hash ^= Health.GetHashCode();
       if (callCase_ == CallOneofCase.Components) hash ^= Components.GetHashCode();
-      if (callCase_ == CallOneofCase.Commit) hash ^= Commit.GetHashCode();
       if (callCase_ == CallOneofCase.Exporters) hash ^= Exporters.GetHashCode();
+      if (callCase_ == CallOneofCase.AgentStart) hash ^= AgentStart.GetHashCode();
+      if (callCase_ == CallOneofCase.AgentStep) hash ^= AgentStep.GetHashCode();
       hash ^= (int) callCase_;
       if (_unknownFields != null) {
         hash ^= _unknownFields.GetHashCode();
@@ -11917,14 +13692,6 @@ namespace Logfire.Fleet.Client.Sdk {
     #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
       output.WriteRawMessage(this);
     #else
-      if (callCase_ == CallOneofCase.Load) {
-        output.WriteRawTag(10);
-        output.WriteMessage(Load);
-      }
-      if (callCase_ == CallOneofCase.Decide) {
-        output.WriteRawTag(18);
-        output.WriteMessage(Decide);
-      }
       if (callCase_ == CallOneofCase.Describe) {
         output.WriteRawTag(26);
         output.WriteMessage(Describe);
@@ -11933,25 +13700,21 @@ namespace Logfire.Fleet.Client.Sdk {
         output.WriteRawTag(34);
         output.WriteMessage(Evaluate);
       }
-      if (callCase_ == CallOneofCase.Refresh) {
-        output.WriteRawTag(42);
-        output.WriteMessage(Refresh);
-      }
-      if (callCase_ == CallOneofCase.Health) {
-        output.WriteRawTag(50);
-        output.WriteMessage(Health);
-      }
       if (callCase_ == CallOneofCase.Components) {
         output.WriteRawTag(58);
         output.WriteMessage(Components);
       }
-      if (callCase_ == CallOneofCase.Commit) {
-        output.WriteRawTag(66);
-        output.WriteMessage(Commit);
-      }
       if (callCase_ == CallOneofCase.Exporters) {
         output.WriteRawTag(74);
         output.WriteMessage(Exporters);
+      }
+      if (callCase_ == CallOneofCase.AgentStart) {
+        output.WriteRawTag(82);
+        output.WriteMessage(AgentStart);
+      }
+      if (callCase_ == CallOneofCase.AgentStep) {
+        output.WriteRawTag(90);
+        output.WriteMessage(AgentStep);
       }
       if (_unknownFields != null) {
         _unknownFields.WriteTo(output);
@@ -11963,14 +13726,6 @@ namespace Logfire.Fleet.Client.Sdk {
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     void pb::IBufferMessage.InternalWriteTo(ref pb::WriteContext output) {
-      if (callCase_ == CallOneofCase.Load) {
-        output.WriteRawTag(10);
-        output.WriteMessage(Load);
-      }
-      if (callCase_ == CallOneofCase.Decide) {
-        output.WriteRawTag(18);
-        output.WriteMessage(Decide);
-      }
       if (callCase_ == CallOneofCase.Describe) {
         output.WriteRawTag(26);
         output.WriteMessage(Describe);
@@ -11979,25 +13734,21 @@ namespace Logfire.Fleet.Client.Sdk {
         output.WriteRawTag(34);
         output.WriteMessage(Evaluate);
       }
-      if (callCase_ == CallOneofCase.Refresh) {
-        output.WriteRawTag(42);
-        output.WriteMessage(Refresh);
-      }
-      if (callCase_ == CallOneofCase.Health) {
-        output.WriteRawTag(50);
-        output.WriteMessage(Health);
-      }
       if (callCase_ == CallOneofCase.Components) {
         output.WriteRawTag(58);
         output.WriteMessage(Components);
       }
-      if (callCase_ == CallOneofCase.Commit) {
-        output.WriteRawTag(66);
-        output.WriteMessage(Commit);
-      }
       if (callCase_ == CallOneofCase.Exporters) {
         output.WriteRawTag(74);
         output.WriteMessage(Exporters);
+      }
+      if (callCase_ == CallOneofCase.AgentStart) {
+        output.WriteRawTag(82);
+        output.WriteMessage(AgentStart);
+      }
+      if (callCase_ == CallOneofCase.AgentStep) {
+        output.WriteRawTag(90);
+        output.WriteMessage(AgentStep);
       }
       if (_unknownFields != null) {
         _unknownFields.WriteTo(ref output);
@@ -12009,32 +13760,23 @@ namespace Logfire.Fleet.Client.Sdk {
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public int CalculateSize() {
       int size = 0;
-      if (callCase_ == CallOneofCase.Load) {
-        size += 1 + pb::CodedOutputStream.ComputeMessageSize(Load);
-      }
-      if (callCase_ == CallOneofCase.Decide) {
-        size += 1 + pb::CodedOutputStream.ComputeMessageSize(Decide);
-      }
       if (callCase_ == CallOneofCase.Describe) {
         size += 1 + pb::CodedOutputStream.ComputeMessageSize(Describe);
       }
       if (callCase_ == CallOneofCase.Evaluate) {
         size += 1 + pb::CodedOutputStream.ComputeMessageSize(Evaluate);
       }
-      if (callCase_ == CallOneofCase.Refresh) {
-        size += 1 + pb::CodedOutputStream.ComputeMessageSize(Refresh);
-      }
-      if (callCase_ == CallOneofCase.Health) {
-        size += 1 + pb::CodedOutputStream.ComputeMessageSize(Health);
-      }
       if (callCase_ == CallOneofCase.Components) {
         size += 1 + pb::CodedOutputStream.ComputeMessageSize(Components);
       }
-      if (callCase_ == CallOneofCase.Commit) {
-        size += 1 + pb::CodedOutputStream.ComputeMessageSize(Commit);
-      }
       if (callCase_ == CallOneofCase.Exporters) {
         size += 1 + pb::CodedOutputStream.ComputeMessageSize(Exporters);
+      }
+      if (callCase_ == CallOneofCase.AgentStart) {
+        size += 1 + pb::CodedOutputStream.ComputeMessageSize(AgentStart);
+      }
+      if (callCase_ == CallOneofCase.AgentStep) {
+        size += 1 + pb::CodedOutputStream.ComputeMessageSize(AgentStep);
       }
       if (_unknownFields != null) {
         size += _unknownFields.CalculateSize();
@@ -12049,18 +13791,6 @@ namespace Logfire.Fleet.Client.Sdk {
         return;
       }
       switch (other.CallCase) {
-        case CallOneofCase.Load:
-          if (Load == null) {
-            Load = new global::Logfire.Fleet.Client.Sdk.Load();
-          }
-          Load.MergeFrom(other.Load);
-          break;
-        case CallOneofCase.Decide:
-          if (Decide == null) {
-            Decide = new global::Logfire.Fleet.Client.Sdk.Decide();
-          }
-          Decide.MergeFrom(other.Decide);
-          break;
         case CallOneofCase.Describe:
           if (Describe == null) {
             Describe = new global::Logfire.Fleet.Client.Sdk.Describe();
@@ -12073,35 +13803,29 @@ namespace Logfire.Fleet.Client.Sdk {
           }
           Evaluate.MergeFrom(other.Evaluate);
           break;
-        case CallOneofCase.Refresh:
-          if (Refresh == null) {
-            Refresh = new global::Logfire.Fleet.Client.Sdk.Refresh();
-          }
-          Refresh.MergeFrom(other.Refresh);
-          break;
-        case CallOneofCase.Health:
-          if (Health == null) {
-            Health = new global::Logfire.Fleet.Client.Sdk.Health();
-          }
-          Health.MergeFrom(other.Health);
-          break;
         case CallOneofCase.Components:
           if (Components == null) {
             Components = new global::Logfire.Fleet.Client.Sdk.Components();
           }
           Components.MergeFrom(other.Components);
           break;
-        case CallOneofCase.Commit:
-          if (Commit == null) {
-            Commit = new global::Logfire.Fleet.Client.Sdk.Commit();
-          }
-          Commit.MergeFrom(other.Commit);
-          break;
         case CallOneofCase.Exporters:
           if (Exporters == null) {
             Exporters = new global::Logfire.Fleet.Client.Sdk.Exporters();
           }
           Exporters.MergeFrom(other.Exporters);
+          break;
+        case CallOneofCase.AgentStart:
+          if (AgentStart == null) {
+            AgentStart = new global::Logfire.Fleet.Client.Sdk.AgentStart();
+          }
+          AgentStart.MergeFrom(other.AgentStart);
+          break;
+        case CallOneofCase.AgentStep:
+          if (AgentStep == null) {
+            AgentStep = new global::Logfire.Fleet.Client.Sdk.AgentStep();
+          }
+          AgentStep.MergeFrom(other.AgentStep);
           break;
       }
 
@@ -12124,24 +13848,6 @@ namespace Logfire.Fleet.Client.Sdk {
           default:
             _unknownFields = pb::UnknownFieldSet.MergeFieldFrom(_unknownFields, input);
             break;
-          case 10: {
-            global::Logfire.Fleet.Client.Sdk.Load subBuilder = new global::Logfire.Fleet.Client.Sdk.Load();
-            if (callCase_ == CallOneofCase.Load) {
-              subBuilder.MergeFrom(Load);
-            }
-            input.ReadMessage(subBuilder);
-            Load = subBuilder;
-            break;
-          }
-          case 18: {
-            global::Logfire.Fleet.Client.Sdk.Decide subBuilder = new global::Logfire.Fleet.Client.Sdk.Decide();
-            if (callCase_ == CallOneofCase.Decide) {
-              subBuilder.MergeFrom(Decide);
-            }
-            input.ReadMessage(subBuilder);
-            Decide = subBuilder;
-            break;
-          }
           case 26: {
             global::Logfire.Fleet.Client.Sdk.Describe subBuilder = new global::Logfire.Fleet.Client.Sdk.Describe();
             if (callCase_ == CallOneofCase.Describe) {
@@ -12160,24 +13866,6 @@ namespace Logfire.Fleet.Client.Sdk {
             Evaluate = subBuilder;
             break;
           }
-          case 42: {
-            global::Logfire.Fleet.Client.Sdk.Refresh subBuilder = new global::Logfire.Fleet.Client.Sdk.Refresh();
-            if (callCase_ == CallOneofCase.Refresh) {
-              subBuilder.MergeFrom(Refresh);
-            }
-            input.ReadMessage(subBuilder);
-            Refresh = subBuilder;
-            break;
-          }
-          case 50: {
-            global::Logfire.Fleet.Client.Sdk.Health subBuilder = new global::Logfire.Fleet.Client.Sdk.Health();
-            if (callCase_ == CallOneofCase.Health) {
-              subBuilder.MergeFrom(Health);
-            }
-            input.ReadMessage(subBuilder);
-            Health = subBuilder;
-            break;
-          }
           case 58: {
             global::Logfire.Fleet.Client.Sdk.Components subBuilder = new global::Logfire.Fleet.Client.Sdk.Components();
             if (callCase_ == CallOneofCase.Components) {
@@ -12187,15 +13875,6 @@ namespace Logfire.Fleet.Client.Sdk {
             Components = subBuilder;
             break;
           }
-          case 66: {
-            global::Logfire.Fleet.Client.Sdk.Commit subBuilder = new global::Logfire.Fleet.Client.Sdk.Commit();
-            if (callCase_ == CallOneofCase.Commit) {
-              subBuilder.MergeFrom(Commit);
-            }
-            input.ReadMessage(subBuilder);
-            Commit = subBuilder;
-            break;
-          }
           case 74: {
             global::Logfire.Fleet.Client.Sdk.Exporters subBuilder = new global::Logfire.Fleet.Client.Sdk.Exporters();
             if (callCase_ == CallOneofCase.Exporters) {
@@ -12203,6 +13882,24 @@ namespace Logfire.Fleet.Client.Sdk {
             }
             input.ReadMessage(subBuilder);
             Exporters = subBuilder;
+            break;
+          }
+          case 82: {
+            global::Logfire.Fleet.Client.Sdk.AgentStart subBuilder = new global::Logfire.Fleet.Client.Sdk.AgentStart();
+            if (callCase_ == CallOneofCase.AgentStart) {
+              subBuilder.MergeFrom(AgentStart);
+            }
+            input.ReadMessage(subBuilder);
+            AgentStart = subBuilder;
+            break;
+          }
+          case 90: {
+            global::Logfire.Fleet.Client.Sdk.AgentStep subBuilder = new global::Logfire.Fleet.Client.Sdk.AgentStep();
+            if (callCase_ == CallOneofCase.AgentStep) {
+              subBuilder.MergeFrom(AgentStep);
+            }
+            input.ReadMessage(subBuilder);
+            AgentStep = subBuilder;
             break;
           }
         }
@@ -12224,24 +13921,6 @@ namespace Logfire.Fleet.Client.Sdk {
           default:
             _unknownFields = pb::UnknownFieldSet.MergeFieldFrom(_unknownFields, ref input);
             break;
-          case 10: {
-            global::Logfire.Fleet.Client.Sdk.Load subBuilder = new global::Logfire.Fleet.Client.Sdk.Load();
-            if (callCase_ == CallOneofCase.Load) {
-              subBuilder.MergeFrom(Load);
-            }
-            input.ReadMessage(subBuilder);
-            Load = subBuilder;
-            break;
-          }
-          case 18: {
-            global::Logfire.Fleet.Client.Sdk.Decide subBuilder = new global::Logfire.Fleet.Client.Sdk.Decide();
-            if (callCase_ == CallOneofCase.Decide) {
-              subBuilder.MergeFrom(Decide);
-            }
-            input.ReadMessage(subBuilder);
-            Decide = subBuilder;
-            break;
-          }
           case 26: {
             global::Logfire.Fleet.Client.Sdk.Describe subBuilder = new global::Logfire.Fleet.Client.Sdk.Describe();
             if (callCase_ == CallOneofCase.Describe) {
@@ -12260,24 +13939,6 @@ namespace Logfire.Fleet.Client.Sdk {
             Evaluate = subBuilder;
             break;
           }
-          case 42: {
-            global::Logfire.Fleet.Client.Sdk.Refresh subBuilder = new global::Logfire.Fleet.Client.Sdk.Refresh();
-            if (callCase_ == CallOneofCase.Refresh) {
-              subBuilder.MergeFrom(Refresh);
-            }
-            input.ReadMessage(subBuilder);
-            Refresh = subBuilder;
-            break;
-          }
-          case 50: {
-            global::Logfire.Fleet.Client.Sdk.Health subBuilder = new global::Logfire.Fleet.Client.Sdk.Health();
-            if (callCase_ == CallOneofCase.Health) {
-              subBuilder.MergeFrom(Health);
-            }
-            input.ReadMessage(subBuilder);
-            Health = subBuilder;
-            break;
-          }
           case 58: {
             global::Logfire.Fleet.Client.Sdk.Components subBuilder = new global::Logfire.Fleet.Client.Sdk.Components();
             if (callCase_ == CallOneofCase.Components) {
@@ -12287,15 +13948,6 @@ namespace Logfire.Fleet.Client.Sdk {
             Components = subBuilder;
             break;
           }
-          case 66: {
-            global::Logfire.Fleet.Client.Sdk.Commit subBuilder = new global::Logfire.Fleet.Client.Sdk.Commit();
-            if (callCase_ == CallOneofCase.Commit) {
-              subBuilder.MergeFrom(Commit);
-            }
-            input.ReadMessage(subBuilder);
-            Commit = subBuilder;
-            break;
-          }
           case 74: {
             global::Logfire.Fleet.Client.Sdk.Exporters subBuilder = new global::Logfire.Fleet.Client.Sdk.Exporters();
             if (callCase_ == CallOneofCase.Exporters) {
@@ -12303,6 +13955,24 @@ namespace Logfire.Fleet.Client.Sdk {
             }
             input.ReadMessage(subBuilder);
             Exporters = subBuilder;
+            break;
+          }
+          case 82: {
+            global::Logfire.Fleet.Client.Sdk.AgentStart subBuilder = new global::Logfire.Fleet.Client.Sdk.AgentStart();
+            if (callCase_ == CallOneofCase.AgentStart) {
+              subBuilder.MergeFrom(AgentStart);
+            }
+            input.ReadMessage(subBuilder);
+            AgentStart = subBuilder;
+            break;
+          }
+          case 90: {
+            global::Logfire.Fleet.Client.Sdk.AgentStep subBuilder = new global::Logfire.Fleet.Client.Sdk.AgentStep();
+            if (callCase_ == CallOneofCase.AgentStep) {
+              subBuilder.MergeFrom(AgentStep);
+            }
+            input.ReadMessage(subBuilder);
+            AgentStep = subBuilder;
             break;
           }
         }
@@ -12327,7 +13997,7 @@ namespace Logfire.Fleet.Client.Sdk {
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public static pbr::MessageDescriptor Descriptor {
-      get { return global::Logfire.Fleet.Client.Sdk.SettingsReflection.Descriptor.MessageTypes[35]; }
+      get { return global::Logfire.Fleet.Client.Sdk.SettingsReflection.Descriptor.MessageTypes[38]; }
     }
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
@@ -12348,12 +14018,6 @@ namespace Logfire.Fleet.Client.Sdk {
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public Reply(Reply other) : this() {
       switch (other.ResultCase) {
-        case ResultOneofCase.Loaded:
-          Loaded = other.Loaded.Clone();
-          break;
-        case ResultOneofCase.Decision:
-          Decision = other.Decision.Clone();
-          break;
         case ResultOneofCase.Description:
           Description = other.Description.Clone();
           break;
@@ -12363,20 +14027,14 @@ namespace Logfire.Fleet.Client.Sdk {
         case ResultOneofCase.Evaluated:
           Evaluated = other.Evaluated.Clone();
           break;
-        case ResultOneofCase.Refreshed:
-          Refreshed = other.Refreshed.Clone();
-          break;
-        case ResultOneofCase.HealthReport:
-          HealthReport = other.HealthReport.Clone();
-          break;
         case ResultOneofCase.AvailableComponents:
           AvailableComponents = other.AvailableComponents.Clone();
           break;
-        case ResultOneofCase.Plan:
-          Plan = other.Plan.Clone();
-          break;
         case ResultOneofCase.ExportersDecided:
           ExportersDecided = other.ExportersDecided.Clone();
+          break;
+        case ResultOneofCase.AgentOutput:
+          AgentOutput = other.AgentOutput.Clone();
           break;
       }
 
@@ -12387,30 +14045,6 @@ namespace Logfire.Fleet.Client.Sdk {
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public Reply Clone() {
       return new Reply(this);
-    }
-
-    /// <summary>Field number for the "loaded" field.</summary>
-    public const int LoadedFieldNumber = 1;
-    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
-    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public global::Logfire.Fleet.Client.Sdk.Loaded Loaded {
-      get { return resultCase_ == ResultOneofCase.Loaded ? (global::Logfire.Fleet.Client.Sdk.Loaded) result_ : null; }
-      set {
-        result_ = value;
-        resultCase_ = value == null ? ResultOneofCase.None : ResultOneofCase.Loaded;
-      }
-    }
-
-    /// <summary>Field number for the "decision" field.</summary>
-    public const int DecisionFieldNumber = 2;
-    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
-    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public global::Logfire.Fleet.Client.Sdk.Decision Decision {
-      get { return resultCase_ == ResultOneofCase.Decision ? (global::Logfire.Fleet.Client.Sdk.Decision) result_ : null; }
-      set {
-        result_ = value;
-        resultCase_ = value == null ? ResultOneofCase.None : ResultOneofCase.Decision;
-      }
     }
 
     /// <summary>Field number for the "description" field.</summary>
@@ -12466,30 +14100,6 @@ namespace Logfire.Fleet.Client.Sdk {
       }
     }
 
-    /// <summary>Field number for the "refreshed" field.</summary>
-    public const int RefreshedFieldNumber = 6;
-    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
-    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public global::Logfire.Fleet.Client.Sdk.Refreshed Refreshed {
-      get { return resultCase_ == ResultOneofCase.Refreshed ? (global::Logfire.Fleet.Client.Sdk.Refreshed) result_ : null; }
-      set {
-        result_ = value;
-        resultCase_ = value == null ? ResultOneofCase.None : ResultOneofCase.Refreshed;
-      }
-    }
-
-    /// <summary>Field number for the "health_report" field.</summary>
-    public const int HealthReportFieldNumber = 7;
-    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
-    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public global::Logfire.Fleet.Client.Sdk.HealthReport HealthReport {
-      get { return resultCase_ == ResultOneofCase.HealthReport ? (global::Logfire.Fleet.Client.Sdk.HealthReport) result_ : null; }
-      set {
-        result_ = value;
-        resultCase_ = value == null ? ResultOneofCase.None : ResultOneofCase.HealthReport;
-      }
-    }
-
     /// <summary>Field number for the "available_components" field.</summary>
     public const int AvailableComponentsFieldNumber = 8;
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
@@ -12499,18 +14109,6 @@ namespace Logfire.Fleet.Client.Sdk {
       set {
         result_ = value;
         resultCase_ = value == null ? ResultOneofCase.None : ResultOneofCase.AvailableComponents;
-      }
-    }
-
-    /// <summary>Field number for the "plan" field.</summary>
-    public const int PlanFieldNumber = 9;
-    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
-    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public global::Logfire.Fleet.Client.Sdk.Plan Plan {
-      get { return resultCase_ == ResultOneofCase.Plan ? (global::Logfire.Fleet.Client.Sdk.Plan) result_ : null; }
-      set {
-        result_ = value;
-        resultCase_ = value == null ? ResultOneofCase.None : ResultOneofCase.Plan;
       }
     }
 
@@ -12526,20 +14124,28 @@ namespace Logfire.Fleet.Client.Sdk {
       }
     }
 
+    /// <summary>Field number for the "agent_output" field.</summary>
+    public const int AgentOutputFieldNumber = 11;
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public global::Logfire.Fleet.Client.Sdk.AgentOutput AgentOutput {
+      get { return resultCase_ == ResultOneofCase.AgentOutput ? (global::Logfire.Fleet.Client.Sdk.AgentOutput) result_ : null; }
+      set {
+        result_ = value;
+        resultCase_ = value == null ? ResultOneofCase.None : ResultOneofCase.AgentOutput;
+      }
+    }
+
     private object result_;
     /// <summary>Enum of possible cases for the "result" oneof.</summary>
     public enum ResultOneofCase {
       None = 0,
-      Loaded = 1,
-      Decision = 2,
       Description = 3,
       Error = 4,
       Evaluated = 5,
-      Refreshed = 6,
-      HealthReport = 7,
       AvailableComponents = 8,
-      Plan = 9,
       ExportersDecided = 10,
+      AgentOutput = 11,
     }
     private ResultOneofCase resultCase_ = ResultOneofCase.None;
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
@@ -12570,16 +14176,12 @@ namespace Logfire.Fleet.Client.Sdk {
       if (ReferenceEquals(other, this)) {
         return true;
       }
-      if (!object.Equals(Loaded, other.Loaded)) return false;
-      if (!object.Equals(Decision, other.Decision)) return false;
       if (!object.Equals(Description, other.Description)) return false;
       if (Error != other.Error) return false;
       if (!object.Equals(Evaluated, other.Evaluated)) return false;
-      if (!object.Equals(Refreshed, other.Refreshed)) return false;
-      if (!object.Equals(HealthReport, other.HealthReport)) return false;
       if (!object.Equals(AvailableComponents, other.AvailableComponents)) return false;
-      if (!object.Equals(Plan, other.Plan)) return false;
       if (!object.Equals(ExportersDecided, other.ExportersDecided)) return false;
+      if (!object.Equals(AgentOutput, other.AgentOutput)) return false;
       if (ResultCase != other.ResultCase) return false;
       return Equals(_unknownFields, other._unknownFields);
     }
@@ -12588,16 +14190,12 @@ namespace Logfire.Fleet.Client.Sdk {
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public override int GetHashCode() {
       int hash = 1;
-      if (resultCase_ == ResultOneofCase.Loaded) hash ^= Loaded.GetHashCode();
-      if (resultCase_ == ResultOneofCase.Decision) hash ^= Decision.GetHashCode();
       if (resultCase_ == ResultOneofCase.Description) hash ^= Description.GetHashCode();
       if (HasError) hash ^= Error.GetHashCode();
       if (resultCase_ == ResultOneofCase.Evaluated) hash ^= Evaluated.GetHashCode();
-      if (resultCase_ == ResultOneofCase.Refreshed) hash ^= Refreshed.GetHashCode();
-      if (resultCase_ == ResultOneofCase.HealthReport) hash ^= HealthReport.GetHashCode();
       if (resultCase_ == ResultOneofCase.AvailableComponents) hash ^= AvailableComponents.GetHashCode();
-      if (resultCase_ == ResultOneofCase.Plan) hash ^= Plan.GetHashCode();
       if (resultCase_ == ResultOneofCase.ExportersDecided) hash ^= ExportersDecided.GetHashCode();
+      if (resultCase_ == ResultOneofCase.AgentOutput) hash ^= AgentOutput.GetHashCode();
       hash ^= (int) resultCase_;
       if (_unknownFields != null) {
         hash ^= _unknownFields.GetHashCode();
@@ -12617,14 +14215,6 @@ namespace Logfire.Fleet.Client.Sdk {
     #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
       output.WriteRawMessage(this);
     #else
-      if (resultCase_ == ResultOneofCase.Loaded) {
-        output.WriteRawTag(10);
-        output.WriteMessage(Loaded);
-      }
-      if (resultCase_ == ResultOneofCase.Decision) {
-        output.WriteRawTag(18);
-        output.WriteMessage(Decision);
-      }
       if (resultCase_ == ResultOneofCase.Description) {
         output.WriteRawTag(26);
         output.WriteMessage(Description);
@@ -12637,25 +14227,17 @@ namespace Logfire.Fleet.Client.Sdk {
         output.WriteRawTag(42);
         output.WriteMessage(Evaluated);
       }
-      if (resultCase_ == ResultOneofCase.Refreshed) {
-        output.WriteRawTag(50);
-        output.WriteMessage(Refreshed);
-      }
-      if (resultCase_ == ResultOneofCase.HealthReport) {
-        output.WriteRawTag(58);
-        output.WriteMessage(HealthReport);
-      }
       if (resultCase_ == ResultOneofCase.AvailableComponents) {
         output.WriteRawTag(66);
         output.WriteMessage(AvailableComponents);
       }
-      if (resultCase_ == ResultOneofCase.Plan) {
-        output.WriteRawTag(74);
-        output.WriteMessage(Plan);
-      }
       if (resultCase_ == ResultOneofCase.ExportersDecided) {
         output.WriteRawTag(82);
         output.WriteMessage(ExportersDecided);
+      }
+      if (resultCase_ == ResultOneofCase.AgentOutput) {
+        output.WriteRawTag(90);
+        output.WriteMessage(AgentOutput);
       }
       if (_unknownFields != null) {
         _unknownFields.WriteTo(output);
@@ -12667,14 +14249,6 @@ namespace Logfire.Fleet.Client.Sdk {
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     void pb::IBufferMessage.InternalWriteTo(ref pb::WriteContext output) {
-      if (resultCase_ == ResultOneofCase.Loaded) {
-        output.WriteRawTag(10);
-        output.WriteMessage(Loaded);
-      }
-      if (resultCase_ == ResultOneofCase.Decision) {
-        output.WriteRawTag(18);
-        output.WriteMessage(Decision);
-      }
       if (resultCase_ == ResultOneofCase.Description) {
         output.WriteRawTag(26);
         output.WriteMessage(Description);
@@ -12687,25 +14261,17 @@ namespace Logfire.Fleet.Client.Sdk {
         output.WriteRawTag(42);
         output.WriteMessage(Evaluated);
       }
-      if (resultCase_ == ResultOneofCase.Refreshed) {
-        output.WriteRawTag(50);
-        output.WriteMessage(Refreshed);
-      }
-      if (resultCase_ == ResultOneofCase.HealthReport) {
-        output.WriteRawTag(58);
-        output.WriteMessage(HealthReport);
-      }
       if (resultCase_ == ResultOneofCase.AvailableComponents) {
         output.WriteRawTag(66);
         output.WriteMessage(AvailableComponents);
       }
-      if (resultCase_ == ResultOneofCase.Plan) {
-        output.WriteRawTag(74);
-        output.WriteMessage(Plan);
-      }
       if (resultCase_ == ResultOneofCase.ExportersDecided) {
         output.WriteRawTag(82);
         output.WriteMessage(ExportersDecided);
+      }
+      if (resultCase_ == ResultOneofCase.AgentOutput) {
+        output.WriteRawTag(90);
+        output.WriteMessage(AgentOutput);
       }
       if (_unknownFields != null) {
         _unknownFields.WriteTo(ref output);
@@ -12717,12 +14283,6 @@ namespace Logfire.Fleet.Client.Sdk {
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public int CalculateSize() {
       int size = 0;
-      if (resultCase_ == ResultOneofCase.Loaded) {
-        size += 1 + pb::CodedOutputStream.ComputeMessageSize(Loaded);
-      }
-      if (resultCase_ == ResultOneofCase.Decision) {
-        size += 1 + pb::CodedOutputStream.ComputeMessageSize(Decision);
-      }
       if (resultCase_ == ResultOneofCase.Description) {
         size += 1 + pb::CodedOutputStream.ComputeMessageSize(Description);
       }
@@ -12732,20 +14292,14 @@ namespace Logfire.Fleet.Client.Sdk {
       if (resultCase_ == ResultOneofCase.Evaluated) {
         size += 1 + pb::CodedOutputStream.ComputeMessageSize(Evaluated);
       }
-      if (resultCase_ == ResultOneofCase.Refreshed) {
-        size += 1 + pb::CodedOutputStream.ComputeMessageSize(Refreshed);
-      }
-      if (resultCase_ == ResultOneofCase.HealthReport) {
-        size += 1 + pb::CodedOutputStream.ComputeMessageSize(HealthReport);
-      }
       if (resultCase_ == ResultOneofCase.AvailableComponents) {
         size += 1 + pb::CodedOutputStream.ComputeMessageSize(AvailableComponents);
       }
-      if (resultCase_ == ResultOneofCase.Plan) {
-        size += 1 + pb::CodedOutputStream.ComputeMessageSize(Plan);
-      }
       if (resultCase_ == ResultOneofCase.ExportersDecided) {
         size += 1 + pb::CodedOutputStream.ComputeMessageSize(ExportersDecided);
+      }
+      if (resultCase_ == ResultOneofCase.AgentOutput) {
+        size += 1 + pb::CodedOutputStream.ComputeMessageSize(AgentOutput);
       }
       if (_unknownFields != null) {
         size += _unknownFields.CalculateSize();
@@ -12760,18 +14314,6 @@ namespace Logfire.Fleet.Client.Sdk {
         return;
       }
       switch (other.ResultCase) {
-        case ResultOneofCase.Loaded:
-          if (Loaded == null) {
-            Loaded = new global::Logfire.Fleet.Client.Sdk.Loaded();
-          }
-          Loaded.MergeFrom(other.Loaded);
-          break;
-        case ResultOneofCase.Decision:
-          if (Decision == null) {
-            Decision = new global::Logfire.Fleet.Client.Sdk.Decision();
-          }
-          Decision.MergeFrom(other.Decision);
-          break;
         case ResultOneofCase.Description:
           if (Description == null) {
             Description = new global::OpAmp.Proto.V1.AgentDescription();
@@ -12787,35 +14329,23 @@ namespace Logfire.Fleet.Client.Sdk {
           }
           Evaluated.MergeFrom(other.Evaluated);
           break;
-        case ResultOneofCase.Refreshed:
-          if (Refreshed == null) {
-            Refreshed = new global::Logfire.Fleet.Client.Sdk.Refreshed();
-          }
-          Refreshed.MergeFrom(other.Refreshed);
-          break;
-        case ResultOneofCase.HealthReport:
-          if (HealthReport == null) {
-            HealthReport = new global::Logfire.Fleet.Client.Sdk.HealthReport();
-          }
-          HealthReport.MergeFrom(other.HealthReport);
-          break;
         case ResultOneofCase.AvailableComponents:
           if (AvailableComponents == null) {
             AvailableComponents = new global::OpAmp.Proto.V1.AvailableComponents();
           }
           AvailableComponents.MergeFrom(other.AvailableComponents);
           break;
-        case ResultOneofCase.Plan:
-          if (Plan == null) {
-            Plan = new global::Logfire.Fleet.Client.Sdk.Plan();
-          }
-          Plan.MergeFrom(other.Plan);
-          break;
         case ResultOneofCase.ExportersDecided:
           if (ExportersDecided == null) {
             ExportersDecided = new global::Logfire.Fleet.Client.Sdk.ExportersDecided();
           }
           ExportersDecided.MergeFrom(other.ExportersDecided);
+          break;
+        case ResultOneofCase.AgentOutput:
+          if (AgentOutput == null) {
+            AgentOutput = new global::Logfire.Fleet.Client.Sdk.AgentOutput();
+          }
+          AgentOutput.MergeFrom(other.AgentOutput);
           break;
       }
 
@@ -12838,24 +14368,6 @@ namespace Logfire.Fleet.Client.Sdk {
           default:
             _unknownFields = pb::UnknownFieldSet.MergeFieldFrom(_unknownFields, input);
             break;
-          case 10: {
-            global::Logfire.Fleet.Client.Sdk.Loaded subBuilder = new global::Logfire.Fleet.Client.Sdk.Loaded();
-            if (resultCase_ == ResultOneofCase.Loaded) {
-              subBuilder.MergeFrom(Loaded);
-            }
-            input.ReadMessage(subBuilder);
-            Loaded = subBuilder;
-            break;
-          }
-          case 18: {
-            global::Logfire.Fleet.Client.Sdk.Decision subBuilder = new global::Logfire.Fleet.Client.Sdk.Decision();
-            if (resultCase_ == ResultOneofCase.Decision) {
-              subBuilder.MergeFrom(Decision);
-            }
-            input.ReadMessage(subBuilder);
-            Decision = subBuilder;
-            break;
-          }
           case 26: {
             global::OpAmp.Proto.V1.AgentDescription subBuilder = new global::OpAmp.Proto.V1.AgentDescription();
             if (resultCase_ == ResultOneofCase.Description) {
@@ -12878,24 +14390,6 @@ namespace Logfire.Fleet.Client.Sdk {
             Evaluated = subBuilder;
             break;
           }
-          case 50: {
-            global::Logfire.Fleet.Client.Sdk.Refreshed subBuilder = new global::Logfire.Fleet.Client.Sdk.Refreshed();
-            if (resultCase_ == ResultOneofCase.Refreshed) {
-              subBuilder.MergeFrom(Refreshed);
-            }
-            input.ReadMessage(subBuilder);
-            Refreshed = subBuilder;
-            break;
-          }
-          case 58: {
-            global::Logfire.Fleet.Client.Sdk.HealthReport subBuilder = new global::Logfire.Fleet.Client.Sdk.HealthReport();
-            if (resultCase_ == ResultOneofCase.HealthReport) {
-              subBuilder.MergeFrom(HealthReport);
-            }
-            input.ReadMessage(subBuilder);
-            HealthReport = subBuilder;
-            break;
-          }
           case 66: {
             global::OpAmp.Proto.V1.AvailableComponents subBuilder = new global::OpAmp.Proto.V1.AvailableComponents();
             if (resultCase_ == ResultOneofCase.AvailableComponents) {
@@ -12905,15 +14399,6 @@ namespace Logfire.Fleet.Client.Sdk {
             AvailableComponents = subBuilder;
             break;
           }
-          case 74: {
-            global::Logfire.Fleet.Client.Sdk.Plan subBuilder = new global::Logfire.Fleet.Client.Sdk.Plan();
-            if (resultCase_ == ResultOneofCase.Plan) {
-              subBuilder.MergeFrom(Plan);
-            }
-            input.ReadMessage(subBuilder);
-            Plan = subBuilder;
-            break;
-          }
           case 82: {
             global::Logfire.Fleet.Client.Sdk.ExportersDecided subBuilder = new global::Logfire.Fleet.Client.Sdk.ExportersDecided();
             if (resultCase_ == ResultOneofCase.ExportersDecided) {
@@ -12921,6 +14406,15 @@ namespace Logfire.Fleet.Client.Sdk {
             }
             input.ReadMessage(subBuilder);
             ExportersDecided = subBuilder;
+            break;
+          }
+          case 90: {
+            global::Logfire.Fleet.Client.Sdk.AgentOutput subBuilder = new global::Logfire.Fleet.Client.Sdk.AgentOutput();
+            if (resultCase_ == ResultOneofCase.AgentOutput) {
+              subBuilder.MergeFrom(AgentOutput);
+            }
+            input.ReadMessage(subBuilder);
+            AgentOutput = subBuilder;
             break;
           }
         }
@@ -12942,24 +14436,6 @@ namespace Logfire.Fleet.Client.Sdk {
           default:
             _unknownFields = pb::UnknownFieldSet.MergeFieldFrom(_unknownFields, ref input);
             break;
-          case 10: {
-            global::Logfire.Fleet.Client.Sdk.Loaded subBuilder = new global::Logfire.Fleet.Client.Sdk.Loaded();
-            if (resultCase_ == ResultOneofCase.Loaded) {
-              subBuilder.MergeFrom(Loaded);
-            }
-            input.ReadMessage(subBuilder);
-            Loaded = subBuilder;
-            break;
-          }
-          case 18: {
-            global::Logfire.Fleet.Client.Sdk.Decision subBuilder = new global::Logfire.Fleet.Client.Sdk.Decision();
-            if (resultCase_ == ResultOneofCase.Decision) {
-              subBuilder.MergeFrom(Decision);
-            }
-            input.ReadMessage(subBuilder);
-            Decision = subBuilder;
-            break;
-          }
           case 26: {
             global::OpAmp.Proto.V1.AgentDescription subBuilder = new global::OpAmp.Proto.V1.AgentDescription();
             if (resultCase_ == ResultOneofCase.Description) {
@@ -12982,24 +14458,6 @@ namespace Logfire.Fleet.Client.Sdk {
             Evaluated = subBuilder;
             break;
           }
-          case 50: {
-            global::Logfire.Fleet.Client.Sdk.Refreshed subBuilder = new global::Logfire.Fleet.Client.Sdk.Refreshed();
-            if (resultCase_ == ResultOneofCase.Refreshed) {
-              subBuilder.MergeFrom(Refreshed);
-            }
-            input.ReadMessage(subBuilder);
-            Refreshed = subBuilder;
-            break;
-          }
-          case 58: {
-            global::Logfire.Fleet.Client.Sdk.HealthReport subBuilder = new global::Logfire.Fleet.Client.Sdk.HealthReport();
-            if (resultCase_ == ResultOneofCase.HealthReport) {
-              subBuilder.MergeFrom(HealthReport);
-            }
-            input.ReadMessage(subBuilder);
-            HealthReport = subBuilder;
-            break;
-          }
           case 66: {
             global::OpAmp.Proto.V1.AvailableComponents subBuilder = new global::OpAmp.Proto.V1.AvailableComponents();
             if (resultCase_ == ResultOneofCase.AvailableComponents) {
@@ -13009,15 +14467,6 @@ namespace Logfire.Fleet.Client.Sdk {
             AvailableComponents = subBuilder;
             break;
           }
-          case 74: {
-            global::Logfire.Fleet.Client.Sdk.Plan subBuilder = new global::Logfire.Fleet.Client.Sdk.Plan();
-            if (resultCase_ == ResultOneofCase.Plan) {
-              subBuilder.MergeFrom(Plan);
-            }
-            input.ReadMessage(subBuilder);
-            Plan = subBuilder;
-            break;
-          }
           case 82: {
             global::Logfire.Fleet.Client.Sdk.ExportersDecided subBuilder = new global::Logfire.Fleet.Client.Sdk.ExportersDecided();
             if (resultCase_ == ResultOneofCase.ExportersDecided) {
@@ -13025,6 +14474,15 @@ namespace Logfire.Fleet.Client.Sdk {
             }
             input.ReadMessage(subBuilder);
             ExportersDecided = subBuilder;
+            break;
+          }
+          case 90: {
+            global::Logfire.Fleet.Client.Sdk.AgentOutput subBuilder = new global::Logfire.Fleet.Client.Sdk.AgentOutput();
+            if (resultCase_ == ResultOneofCase.AgentOutput) {
+              subBuilder.MergeFrom(AgentOutput);
+            }
+            input.ReadMessage(subBuilder);
+            AgentOutput = subBuilder;
             break;
           }
         }

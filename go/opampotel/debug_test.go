@@ -6,7 +6,6 @@ package opampotel
 import (
 	"context"
 	"encoding/json"
-	"reflect"
 	"slices"
 	"strings"
 	"sync"
@@ -60,6 +59,19 @@ func (ft *fakeTime) set(ms uint64) {
 	}
 }
 
+// next is when the earliest timer armed and not stopped goes off, in Unix milliseconds (0: none).
+func (ft *fakeTime) next() uint64 {
+	ft.mu.Lock()
+	defer ft.mu.Unlock()
+	var at uint64
+	for _, t := range ft.timers {
+		if ms := uint64(t.at.UnixMilli()); !t.stopped && (at == 0 || ms < at) {
+			at = ms
+		}
+	}
+	return at
+}
+
 // pending is how many timers are armed and not stopped.
 func (ft *fakeTime) pending() int {
 	ft.mu.Lock()
@@ -79,6 +91,13 @@ type fakeReporter struct {
 	effective  []*protobufs.EffectiveConfig
 	health     []*protobufs.ComponentHealth
 	components []*protobufs.AvailableComponents
+	status     []*protobufs.RemoteConfigStatus
+}
+
+func (r *fakeReporter) SetRemoteConfigStatus(s *protobufs.RemoteConfigStatus) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.status = append(r.status, s)
 }
 
 func (r *fakeReporter) SetEffectiveConfig(e *protobufs.EffectiveConfig) {
@@ -113,18 +132,6 @@ func timedAgent(t *testing.T, stateDir string, ft *fakeTime) (*agent, *fakeRepor
 	a.reporter = r
 	a.mu.Unlock()
 	return a, r
-}
-
-func sameJSON(t testing.TB, got string, want json.RawMessage) bool {
-	t.Helper()
-	var g, w any
-	if err := json.Unmarshal([]byte(got), &g); err != nil {
-		t.Fatalf("%q: %v", got, err)
-	}
-	if err := json.Unmarshal(want, &w); err != nil {
-		t.Fatal(err)
-	}
-	return reflect.DeepEqual(g, w)
 }
 
 // Debug mode over time, and what the answer comes to with each save, through the agent
@@ -171,6 +178,10 @@ func TestTheDebugAndSavingVectors(t *testing.T) {
 		}) {
 			continue
 		}
+		// A host that gives no time is another SDK's case: this one always has a clock.
+		if slices.ContainsFunc(c.Steps, func(s step) bool { return s.Now == 0 }) {
+			continue
+		}
 		t.Run(c.Name, func(t *testing.T) {
 			dir, ft := t.TempDir(), newFakeTime(0)
 			ft.set(c.Steps[0].Now)
@@ -203,7 +214,7 @@ func TestTheDebugAndSavingVectors(t *testing.T) {
 					t.Fatalf("call %q", s.Call)
 				}
 				a.mu.Lock()
-				rate, refreshAt, effective := a.controls.Sampler.rate, a.refreshAt, effectiveBody(a)
+				rate, refreshAt, effective := a.controls.Sampler.rate, flowRefreshAt(t, a), effectiveBody(a)
 				a.mu.Unlock()
 				w := s.Want
 				if w.Status != "" {
@@ -225,8 +236,8 @@ func TestTheDebugAndSavingVectors(t *testing.T) {
 					if refreshAt != *w.RefreshAt {
 						t.Fatalf("step %d: refresh at %d, want %d", i, refreshAt, *w.RefreshAt)
 					}
-					if timers := ft.pending(); (refreshAt != 0) != (timers == 1) || timers > 1 {
-						t.Fatalf("step %d: %d timers armed for a refresh at %d", i, timers, refreshAt)
+					if timers := ft.pending(); timers != 1 || refreshAt != 0 && ft.next() > refreshAt {
+						t.Fatalf("step %d: %d timers armed, the first at %d, for a refresh at %d", i, timers, ft.next(), refreshAt)
 					}
 				}
 				if w.Effective != nil && effective != *w.Effective {
@@ -255,31 +266,17 @@ func TestAStaleTimerIsNothing(t *testing.T) {
 	stale := a.gen
 	a.mu.Unlock()
 	a.remoteConfig(context.Background(), remote(debugWindow("0.1", "2026-10-14T12:20:00Z")))
+	reported := len(rep.effective) // each config's own
 	ft.mu.Lock()
 	ft.at = time.UnixMilli(int64(vectorNow + 10*60_000)) // the first window's end, no timer run
 	ft.mu.Unlock()
 	a.fired(stale)
-	if *a.controls.Sampler.rate != 1 || len(rep.effective) != 0 {
+	if *a.controls.Sampler.rate != 1 || len(rep.effective) != reported {
 		t.Fatal("the stale timer ended the newer window")
 	}
 	ft.set(vectorNow + 20*60_000)
-	if *a.controls.Sampler.rate != 0.1 || len(rep.effective) != 1 || effectiveBody(a) != sorted(t, every("head_sampling", override(`"ratio":0.1`))) {
+	if *a.controls.Sampler.rate != 0.1 || len(rep.effective) != reported+1 || effectiveBody(a) != sorted(t, every("head_sampling", override(`"ratio":0.1`))) {
 		t.Fatalf("the newer window's end: rate %v, %d reports", *a.controls.Sampler.rate, len(rep.effective))
-	}
-}
-
-// The timer's deadline decides, not the wall clock read when it goes off: a clock moved back
-// since doesn't keep debug mode on.
-func TestTheEndIsOnTheTimersDeadline(t *testing.T) {
-	ft := newFakeTime(vectorNow)
-	a, _ := timedAgent(t, t.TempDir(), ft)
-	a.remoteConfig(context.Background(), remote(debugWindow("0.1", "2026-10-14T12:10:00Z")))
-	a.mu.Lock()
-	a.refresh(time.UnixMilli(int64(vectorNow + 60_000))) // the wall clock says nine minutes are left
-	refreshAt := a.refreshAt
-	a.mu.Unlock()
-	if *a.controls.Sampler.rate != 0.1 || refreshAt != 0 {
-		t.Fatalf("the timer went off: debug mode should be over (rate %v, refresh at %d)", *a.controls.Sampler.rate, refreshAt)
 	}
 }
 
@@ -340,9 +337,9 @@ func TestAFailedConfigAfterDebugUntilEndsDebugMode(t *testing.T) {
 		t.Fatalf("status %v", st.GetStatus())
 	}
 	a.mu.Lock()
-	rate, refreshAt, eff := *a.controls.Sampler.rate, a.refreshAt, effectiveBody(a)
+	rate, refreshAt, eff := *a.controls.Sampler.rate, flowRefreshAt(t, a), effectiveBody(a)
 	a.mu.Unlock()
-	if rate != 0.1 || refreshAt != 0 || eff != sorted(t, every("head_sampling", override(`"ratio":0.1`))) || len(rep.effective) != 1 {
+	if rate != 0.1 || refreshAt != 0 || eff != sorted(t, every("head_sampling", override(`"ratio":0.1`))) || len(rep.effective) != 2 {
 		t.Fatalf("debug mode is still in force: rate %v, refresh at %d, effective %s, %d reports", rate, refreshAt, eff,
 			len(rep.effective))
 	}

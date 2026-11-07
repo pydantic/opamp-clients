@@ -97,9 +97,9 @@ internal class StreamsNet
 /// this carries out only what needs the platform: TCP connections, TLS on them (SslStream, with the
 /// operator's CAs, certificate and versions: <see cref="OpAmpClientOptions.Tls"/>), name resolution
 /// (only for a SOCKS5 proxy with local resolution: otherwise the proxy resolves), the answer to the
-/// core's proxy question (<see cref="OpAmpClient.ProxyAnswerFor"/>), and the files of downloads. It decides nothing:
+/// core's proxy question (<see cref="OpAmpClient.ProxyAnswerFor"/>). It decides nothing:
 /// every byte it writes, the core wrote, and the core keeps every time (it closes a stream it gives
-/// up on, and cancels a download's file). As node/opamp/src/streams.ts and
+/// up on). As node/opamp/src/streams.ts and
 /// python/src/logfire_fleet_client/_streams.py do.
 /// </summary>
 /// <remarks>
@@ -111,32 +111,17 @@ internal class StreamsNet
 /// the client's queue naming its stream, and reaches the core only while its entry is there, so a
 /// close (<c>stream_close</c>, or stop) ends what it names at once: nothing about it is reported
 /// after, even what was queued before; a connection, a TLS handshake or a resolution that completes
-/// after its close is closed as it arrives. The files of downloads are keyed by the download's id,
-/// the core's own effect id: they are registered in the executor's registry (<see cref="Executor.InFlight"/>),
-/// whose <c>cancel</c> and stop end them as they end the platform's effects.
+/// after its close is closed as it arrives.
 /// </para>
 /// <para>
 /// Each stream has one task that connects it, then reads it: it hands the core what it read and
 /// waits until the core has stepped with it (and this has carried out what that step asked) before
-/// it reads again. So what the core asks in answer (TLS, a splice of the next bytes into a file, a
-/// close) applies to the next bytes read, as on a single-threaded loop; and the TLS handshake the
+/// it reads again. So what the core asks in answer (TLS, a close) applies to the next bytes read, as on a single-threaded loop; and the TLS handshake the
 /// core asks for runs on that task, once what was written before it has gone.
 /// </para>
 /// <para>
-/// Download files are written beside the loop (on the thread pool, through the client's file
-/// operations: journaled with the core tap on), made new (never one left behind), one write at a
-/// time per file, in the order the bytes came, and hashed as they are written. Each download ends
-/// here once: <c>download_done</c> is answered (synced, then <c>downloaded</c>; or
-/// <c>download_failed</c> if a write failed: what came after is dropped and the file deleted), or
-/// not at all when the core discards or cancels it first: then the file goes once the write in
-/// flight is over.
-/// </para>
-/// <para>
-/// Backpressure, both ways ("stops reading": it begins no new read; one already under way may
-/// still bring one chunk). Socket to file: once more than <see cref="HighWater"/> bytes wait for a
-/// file's writes, the stream that brought the last of them stops reading until they are down to
-/// <see cref="LowWater"/> (nothing is dropped or reordered: the kernel's window stops the server).
-/// Core to socket: while more than <see cref="WriteHigh"/> bytes written to a stream are unsent,
+/// Backpressure ("stops reading": it begins no new read; one already under way may still bring
+/// one chunk): while more than <see cref="WriteHigh"/> bytes written to a stream are unsent,
 /// the stream reads nothing more (a peer that doesn't read hears nothing more to answer), until
 /// they are down to <see cref="WriteLow"/>; and a write that finds more than
 /// <see cref="MaxUnsent"/> still unsent fails the stream (<c>stream_failed</c>: the core reconnects,
@@ -148,12 +133,6 @@ internal sealed class Streams
     /// <summary>How long a closed stream has to flush what was written (and hear the peer's end) before it is reset.</summary>
     public static readonly TimeSpan Linger = TimeSpan.FromSeconds(2);
 
-    /// <summary>Bytes waiting for a file's writes beyond which the stream they come from stops reading...</summary>
-    public const long HighWater = 4 << 20;
-
-    /// <summary>...until they are down to this.</summary>
-    public const long LowWater = 1 << 20;
-
     /// <summary>Bytes written to a stream and unsent beyond which it stops reading...</summary>
     public const long WriteHigh = 256 << 10;
 
@@ -163,12 +142,8 @@ internal sealed class Streams
     /// <summary>Bytes written to a stream and not yet taken by the peer beyond which the next write fails it.</summary>
     public const long MaxUnsent = 16 << 20;
 
-    /// <summary>The most buffers one file write pass takes.</summary>
-    private const int MaxWritev = 256;
-
     private const int ReadBuffer = 64 << 10;
 
-    private readonly Executor x;
     private readonly Action<Queued> deliver;
     private readonly StreamsNet net;
     private readonly TimeProvider time;
@@ -182,22 +157,15 @@ internal sealed class Streams
     // Closed gracefully, still flushing (Linger at most): stop resets them.
     private readonly HashSet<Conn> lingering = new();
 
-    // Download files by the download's id, until answered, discarded or cancelled.
-    private readonly Dictionary<ulong, DlFile> files = new();
-
-    // The stream whose input the core is stepping with (the download_data of that step came from it).
-    private Conn? reading;
     private bool closed;
 
-    /// <param name="x">The platform executor: its registry, file operations and download paths.</param>
     /// <param name="deliver">The client's queue.</param>
     /// <param name="tls">The operator's TLS settings (<see cref="ClientTransport.SslOptions"/>), copied for each handshake.</param>
     /// <param name="proxyFor">The answer to the core's proxy question for a URL.</param>
     /// <param name="net">The network (connects, TLS, resolution): .NET's if none.</param>
     /// <param name="time">The clock a closed stream's linger is kept with: the system's if none.</param>
-    public Streams(Executor x, Action<Queued> deliver, SslClientAuthenticationOptions tls, Func<string, ProxyAnswer> proxyFor, StreamsNet? net = null, TimeProvider? time = null)
+    public Streams(Action<Queued> deliver, SslClientAuthenticationOptions tls, Func<string, ProxyAnswer> proxyFor, StreamsNet? net = null, TimeProvider? time = null)
     {
-        this.x = x;
         this.deliver = deliver;
         this.tls = tls;
         this.proxyFor = proxyFor;
@@ -238,30 +206,6 @@ internal sealed class Streams
         }
     }
 
-    /// <summary>Bytes waiting for files' writes, all of them: for tests.</summary>
-    internal long Unwritten
-    {
-        get
-        {
-            lock (this.gate)
-            {
-                return this.files.Values.Sum(f => f.Unwritten);
-            }
-        }
-    }
-
-    /// <summary>
-    /// On the loop, around carrying out a step's effects: the input it stepped with (or null after).
-    /// A download_data in that step came from the stream that input was read from.
-    /// </summary>
-    public void Stepping(Queued? q)
-    {
-        lock (this.gate)
-        {
-            this.reading = q is { Registry: { } r, Of: { } id } && ReferenceEquals(r, this.In) && this.conns.TryGetValue(id, out var c) ? c : null;
-        }
-    }
-
     /// <summary>On the loop: carry out <paramref name="e"/> if it is one of core mode's; false if it isn't (it goes to the executor).</summary>
     public bool Run(Effect e)
     {
@@ -291,50 +235,14 @@ internal sealed class Streams
             case Effect.KindOneofCase.StreamClose:
                 this.Close(e.StreamClose.Id, e.StreamClose.Abort);
                 return true;
-            case Effect.KindOneofCase.StreamSplice:
-                this.Splice(e.StreamSplice.Id, e.StreamSplice.Download, e.StreamSplice.Bytes);
-                return true;
-            case Effect.KindOneofCase.DownloadData:
-                Conn? from;
-                lock (this.gate)
-                {
-                    from = this.reading;
-                }
-
-                this.Append(e.DownloadData.Id, e.DownloadData.Data.ToByteArray(), from);
-                return true;
-            case Effect.KindOneofCase.DownloadDone:
-                this.Done(e.DownloadDone.Id_);
-                return true;
-            case Effect.KindOneofCase.Discard:
-                // A download's file the core is done with: one still being written goes once the
-                // write in flight is over; one already answered (or never begun) is the executor's
-                // to delete, as in platform mode.
-                DlFile? f;
-                lock (this.gate)
-                {
-                    this.files.TryGetValue(e.Discard.Id_, out f);
-                }
-
-                if (f is null)
-                {
-                    return false;
-                }
-
-                this.x.InFlight.Cancel(f.Id); // its release discards it
-                this.Discard(f);
-                return true;
             default:
-                // cancel goes to the executor: a download's file is registered there, and its
-                // release discards it.
                 return false;
         }
     }
 
     /// <summary>
     /// Stop: every stream is reset, every resolution stopped, every lingering stream reset; the task
-    /// ends when their work is over, or at <paramref name="bound"/>. (The files are the executor's
-    /// registry's: its own stop discards those not complete.)
+    /// ends when their work is over, or at <paramref name="bound"/>.
     /// </summary>
     public Task ShutdownAsync(TimeSpan bound)
     {
@@ -555,7 +463,6 @@ internal sealed class Streams
         lock (c.Gate)
         {
             c.Closing = true;
-            c.Splice = null;
             c.Holds = 0;
             readable = c.Readable; // it reads on, into nothing, until the peer's end
         }
@@ -609,27 +516,6 @@ internal sealed class Streams
             if (c.Driver is { } driver)
             {
                 await driver.ConfigureAwait(false); // the peer's end
-            }
-        }
-    }
-
-    private void Splice(ulong id, ulong download, ulong bytes)
-    {
-        if (this.Find(id) is not { } c)
-        {
-            return;
-        }
-
-        lock (this.gate)
-        {
-            _ = this.File(download); // registered on the loop, before its first bytes come
-        }
-
-        lock (c.Gate)
-        {
-            if (!c.Gone && !c.Closing)
-            {
-                c.Splice = (download, bytes);
             }
         }
     }
@@ -693,8 +579,7 @@ internal sealed class Streams
 
     /// <summary>
     /// The stream's task: connect, tell the core; then, each time the core has stepped with what it
-    /// was told, start TLS if it asked, or read: the next bytes to the file of a splice, or to the
-    /// core. A failure is told once (unless it was closed first), and resets it.
+    /// was told, start TLS if it asked, or read the next bytes for the core. A failure is told once (unless it was closed first), and resets it.
     /// </summary>
     private async Task DriveAsync(Conn c, string host, int port)
     {
@@ -760,36 +645,8 @@ internal sealed class Streams
                 }
 
                 await this.Readable(c).WaitAsync(c.Token).ConfigureAwait(false);
-                (ulong Download, ulong Left)? splice;
+                var n = await c.Stream!.ReadAsync(buf, c.Token).ConfigureAwait(false);
                 bool closing;
-                lock (c.Gate)
-                {
-                    splice = c.Splice;
-                    closing = c.Closing;
-                }
-
-                var want = buf.Length;
-                if (splice is { } sp && !closing)
-                {
-                    if (sp.Left == 0)
-                    {
-                        lock (c.Gate)
-                        {
-                            c.Splice = null;
-                        }
-
-                        if (!await this.TellAsync(c, new Input { StreamSpliced = new Id { Id_ = c.Id } }).ConfigureAwait(false))
-                        {
-                            return;
-                        }
-
-                        continue;
-                    }
-
-                    want = (int)Math.Min((ulong)buf.Length, sp.Left);
-                }
-
-                var n = await c.Stream!.ReadAsync(buf.AsMemory(0, want), c.Token).ConfigureAwait(false);
                 lock (c.Gate)
                 {
                     closing = c.Closing;
@@ -809,24 +666,6 @@ internal sealed class Streams
                 if (closing)
                 {
                     continue; // read into nothing until the peer's end
-                }
-
-                if (splice is { } s)
-                {
-                    // Body bytes: straight to the file, past the core.
-                    this.Append(s.Download, buf.AsSpan(0, n).ToArray(), c);
-                    var left = s.Left - (ulong)n;
-                    lock (c.Gate)
-                    {
-                        c.Splice = left == 0 || c.Closing ? null : (s.Download, left);
-                    }
-
-                    if (left == 0 && !await this.TellAsync(c, new Input { StreamSpliced = new Id { Id_ = c.Id } }).ConfigureAwait(false))
-                    {
-                        return;
-                    }
-
-                    continue;
                 }
 
                 var data = new WsMessage { Id = c.Id, Data = ByteString.CopyFrom(buf, 0, n) };
@@ -973,7 +812,6 @@ internal sealed class Streams
             }
 
             c.Gone = true;
-            c.Splice = null;
             layers = [.. c.Layers];
             raw = c.Raw;
         }
@@ -1019,368 +857,6 @@ internal sealed class Streams
             {
                 // gone already
             }
-        }
-    }
-
-    // ---- Files.
-
-    /// <summary>Download <paramref name="id"/>'s file (under the gate): made at its first bytes, registered in the executor's registry.</summary>
-    private DlFile File(ulong id)
-    {
-        if (this.files.TryGetValue(id, out var f))
-        {
-            return f;
-        }
-
-        f = new DlFile(id, this.x.StatePath is null ? null : this.x.DownloadPath(id));
-        this.files[id] = f;
-        if (this.x.InFlight.Register(id) is null)
-        {
-            f.Gone = true; // stopped: nothing is written
-        }
-        else
-        {
-            this.x.InFlight.Adopt(id, () => this.Discard(f));
-        }
-
-        return f;
-    }
-
-    /// <summary>
-    /// Queue <paramref name="data"/> for the end of download <paramref name="id"/>'s file;
-    /// <paramref name="from"/>: the stream it came from, held while too much waits.
-    /// </summary>
-    private void Append(ulong id, byte[] data, Conn? from)
-    {
-        var hold = false;
-        lock (this.gate)
-        {
-            var f = this.File(id);
-            if (f.Error is not null || f.Gone || data.Length == 0)
-            {
-                return; // after a failure (or a discard), the bytes go nowhere
-            }
-
-            f.Queue.Enqueue(data);
-            f.Unwritten += data.Length;
-            if (from is not null && f.Unwritten > HighWater && f.Paused.Add(from))
-            {
-                hold = true;
-            }
-
-            this.Pump(f);
-        }
-
-        if (hold)
-        {
-            Hold(from!);
-        }
-    }
-
-    private void Done(ulong id)
-    {
-        lock (this.gate)
-        {
-            var f = this.File(id);
-            f.Done = true;
-            this.Pump(f);
-        }
-    }
-
-    /// <summary>The core is done with <paramref name="f"/> (a discard, a cancel, stop): it goes, unanswered.</summary>
-    private void Discard(DlFile f)
-    {
-        lock (this.gate)
-        {
-            if (f.Gone)
-            {
-                return;
-            }
-
-            f.Gone = true;
-            if (!f.Answered)
-            {
-                this.Pump(f); // deleted once the write in flight is over
-                return;
-            }
-        }
-
-        // Answered already (and the answer not yet taken): only its file is left.
-        if (f.Path is { } path)
-        {
-            this.Beside(() => FileOps.OffPool(() => this.Remove(path)));
-        }
-    }
-
-    private bool IsGone(DlFile f)
-    {
-        lock (this.gate)
-        {
-            return f.Gone;
-        }
-    }
-
-    /// <summary>Carry <paramref name="f"/> forward (under the gate), unless that is under way.</summary>
-    private void Pump(DlFile f)
-    {
-        if (f.Busy)
-        {
-            return;
-        }
-
-        f.Busy = true;
-        this.Beside(() => this.RunFileAsync(f));
-    }
-
-    /// <summary>
-    /// File work beside the loop: tracked in the executor's registry (stop waits for it), and on
-    /// the state file's files (a client started next on it waits for it).
-    /// </summary>
-    private void Beside(Func<Task> work)
-    {
-        var busy = this.x.StatePath is { } state ? StateFile.Begin(state) : null;
-        this.x.InFlight.Track(Task.Run(async () =>
-        {
-            try
-            {
-                await work().ConfigureAwait(false);
-            }
-            finally
-            {
-                busy?.Dispose();
-            }
-        }));
-    }
-
-    /// <summary>
-    /// Write what is queued, in order; then, once done, sync, close and answer; if it is gone or
-    /// failed, delete it (and answer download_failed if download_done came).
-    /// </summary>
-    private async Task RunFileAsync(DlFile f)
-    {
-        try
-        {
-            while (true)
-            {
-                byte[][] bufs = [];
-                bool make = false, finish = false;
-                lock (this.gate)
-                {
-                    if (f.Gone || f.Error is not null)
-                    {
-                        break;
-                    }
-
-                    if (f.Queue.Count > 0 || f.Done)
-                    {
-                        if (f.Handle is null)
-                        {
-                            make = true;
-                        }
-                        else if (f.Queue.Count > 0)
-                        {
-                            bufs = new byte[Math.Min(MaxWritev, f.Queue.Count)][];
-                            for (var i = 0; i < bufs.Length; i++)
-                            {
-                                bufs[i] = f.Queue.Dequeue();
-                            }
-                        }
-                        else
-                        {
-                            finish = true;
-                        }
-                    }
-                    else
-                    {
-                        f.Busy = false;
-                        return;
-                    }
-                }
-
-                if (make)
-                {
-                    if (f.Path is not { } path)
-                    {
-                        throw new IOException("no state file");
-                    }
-
-                    // Made new: never one already there (a crashed run's). Not once it is gone:
-                    // this thread can start late (a busy machine), after stop stopped waiting for it.
-                    var handle = await FileOps.OffPool(() =>
-                    {
-                        if (this.IsGone(f))
-                        {
-                            return null;
-                        }
-
-                        this.x.Files.MakeDir(System.IO.Path.GetDirectoryName(path)!);
-                        return this.x.Files.CreateNew(path, download: true);
-                    }).ConfigureAwait(false);
-                    if (handle is not null)
-                    {
-                        lock (this.gate)
-                        {
-                            f.Handle = handle;
-                            f.Made = true;
-                        }
-                    }
-
-                    continue;
-                }
-
-                if (finish)
-                {
-                    // Complete: durable before the core hears of it.
-                    var handle = f.Handle!;
-                    await FileOps.OffPool(handle.Sync).ConfigureAwait(false);
-                    lock (this.gate)
-                    {
-                        f.Handle = null;
-                    }
-
-                    handle.Dispose();
-                    var digest = f.Hash.GetHashAndReset();
-                    lock (this.gate)
-                    {
-                        if (!f.Gone)
-                        {
-                            f.Answered = true;
-                            this.files.Remove(f.Id);
-                        }
-                    }
-
-                    if (f.Answered)
-                    {
-                        this.deliver(new Queued(new Input { Downloaded = new Downloaded { Id = f.Id, Sha256 = ByteString.CopyFrom(digest) } }, f.Id, Final: true));
-                        lock (this.gate)
-                        {
-                            f.Busy = false;
-                        }
-
-                        return;
-                    }
-
-                    break; // discarded while it was synced
-                }
-
-                long wrote = 0;
-                foreach (var b in bufs)
-                {
-                    if (this.IsGone(f))
-                    {
-                        break; // nothing more is written once it is gone (as above)
-                    }
-
-                    await f.Handle!.WriteAsync(b, CancellationToken.None).ConfigureAwait(false);
-                    f.Hash.AppendData(b);
-                    wrote += b.Length;
-                }
-
-                List<Conn> resume = [];
-                lock (this.gate)
-                {
-                    f.Unwritten -= wrote;
-                    if (f.Unwritten <= LowWater)
-                    {
-                        resume.AddRange(f.Paused);
-                        f.Paused.Clear();
-                    }
-                }
-
-                foreach (var c in resume)
-                {
-                    Release(c);
-                }
-            }
-        }
-        catch (Exception e)
-        {
-            lock (this.gate)
-            {
-                f.Error = $"writing {f.Path}: {Executor.Detail(e)}";
-            }
-        }
-
-        await FileOps.OffPool(() => this.RemoveFile(f)).ConfigureAwait(false);
-    }
-
-    /// <summary>
-    /// Close and delete a file that failed or is gone (only one it made), then answer download_done
-    /// if it came; nothing more is written, and the streams it held read on.
-    /// </summary>
-    private void RemoveFile(DlFile f)
-    {
-        IWritingFile? handle;
-        List<Conn> resume;
-        bool made;
-        lock (this.gate)
-        {
-            f.Queue.Clear();
-            f.Unwritten = 0;
-            resume = [.. f.Paused];
-            f.Paused.Clear();
-            handle = f.Handle;
-            f.Handle = null;
-            made = f.Made;
-            f.Made = false;
-        }
-
-        foreach (var c in resume)
-        {
-            Release(c);
-        }
-
-        try
-        {
-            handle?.Dispose();
-        }
-        catch (Exception)
-        {
-            // it goes anyway
-        }
-
-        if (made && f.Path is { } path)
-        {
-            this.Remove(path);
-        }
-
-        Input? answer = null;
-        lock (this.gate)
-        {
-            f.Busy = false;
-            if (f.Gone)
-            {
-                if (this.files.TryGetValue(f.Id, out var mine) && mine == f)
-                {
-                    this.files.Remove(f.Id);
-                }
-            }
-            else if (f.Done)
-            {
-                this.files.Remove(f.Id);
-                answer = new Input { DownloadFailed = new Failed { Id = f.Id, Detail = f.Error ?? "failed" } };
-            }
-            else if (f.Queue.Count > 0)
-            {
-                this.Pump(f);
-            }
-        }
-
-        if (answer is not null)
-        {
-            this.deliver(new Queued(answer, f.Id, Final: true));
-        }
-    }
-
-    private void Remove(string path)
-    {
-        try
-        {
-            this.x.Files.Remove(path);
-        }
-        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
-        {
-            // it goes at the next start
         }
     }
 
@@ -1436,16 +912,13 @@ internal sealed class Streams
         /// <summary>Closed by the core, lingering: nothing more is told.</summary>
         public bool Closing { get; set; }
 
-        /// <summary>Why it is not reading: how many reasons (files it waits for, a full write buffer).</summary>
+        /// <summary>Why it is not reading: how many reasons (a full write buffer).</summary>
         public int Holds { get; set; }
 
         public bool Blocked { get; set; }
 
         /// <summary>Completed while it may read.</summary>
         public TaskCompletionSource Readable { get; set; } = Completed();
-
-        /// <summary>Its next bytes go to a download's file: which, and how many are left.</summary>
-        public (ulong Download, ulong Left)? Splice { get; set; }
 
         /// <summary>The last of its writes (after the connect).</summary>
         public Task Chain { get; set; }
@@ -1462,47 +935,5 @@ internal sealed class Streams
             t.SetResult();
             return t;
         }
-    }
-
-    /// <summary>A download's file.</summary>
-    private sealed class DlFile(ulong id, string? path)
-    {
-        public ulong Id { get; } = id;
-
-        /// <summary>Where (null: no state file, so no file).</summary>
-        public string? Path { get; } = path;
-
-        /// <summary>Open, once the first write has made it.</summary>
-        public IWritingFile? Handle { get; set; }
-
-        /// <summary>Made by this client: only then may it delete it.</summary>
-        public bool Made { get; set; }
-
-        /// <summary>Bytes waiting for the next write, in order.</summary>
-        public Queue<byte[]> Queue { get; } = new();
-
-        /// <summary>How many bytes are queued or being written.</summary>
-        public long Unwritten { get; set; }
-
-        /// <summary>Streams not reading until the bytes waiting are down to LowWater.</summary>
-        public HashSet<Conn> Paused { get; } = new();
-
-        /// <summary>Of the bytes written (touched by the write in flight only).</summary>
-        public IncrementalHash Hash { get; } = IncrementalHash.CreateHash(HashAlgorithmName.SHA256);
-
-        /// <summary>A write is running: only it touches the handle.</summary>
-        public bool Busy { get; set; }
-
-        /// <summary>download_done came: sync, close and answer once everything queued is written.</summary>
-        public bool Done { get; set; }
-
-        /// <summary>Discarded, cancelled, or stopped: delete it, say nothing.</summary>
-        public bool Gone { get; set; }
-
-        /// <summary>Answered downloaded: a discard (or cancel) deletes the file at its path.</summary>
-        public bool Answered { get; set; }
-
-        /// <summary>A write failed: the file is deleted, and download_done answered with this.</summary>
-        public string? Error { get; set; }
     }
 }

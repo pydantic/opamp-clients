@@ -16,8 +16,8 @@ import opamp.proto.v1.Opamp;
  * says), with any bytes on both sides, as python/tests/fuzz/fuzz_native.py does for the native core.
  * One input is a session: a Config (any saved state), then steps whose inputs carry any
  * server-to-agent bytes (a response, a WebSocket message, a stream's data, up to megabytes: the
- * module's memory grows under the client's buffers), and calls into the SDK settings layer (load
- * any saved document, decide on any remote config, describe). What must hold: every call returns
+ * module's memory grows under the client's buffers), and calls into the SDK settings layer (start
+ * from any saved state, step any remote config, describe). What must hold: every call returns
  * an Output or, for an input the core refuses, a CoreException with its reason; the core never traps,
  * and neither does the SDK settings layer (a refusal is an IllegalArgumentException); nothing else
  * escapes.
@@ -109,7 +109,14 @@ public final class CoreFuzz {
   private static void sdk(FuzzInput.Reader r) {
     try {
       switch (r.u8() % 3) {
-        case 0 -> LAYER.load(r.bit() ? r.blob(1024) : null);
+        case 0 -> {
+          var start = dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentStart.newBuilder()
+              .setStateDir(r.bit()).setInstanceUid(r.bytes(16)).setNowUnixMs(r.bit() ? 0 : 1_791_979_200_000L);
+          if (r.bit()) {
+            start.setCoreState(com.google.protobuf.ByteString.copyFrom(r.blob(1024)));
+          }
+          LAYER.start(start.build());
+        }
         case 1 -> {
           Opamp.AgentConfigMap.Builder m = Opamp.AgentConfigMap.newBuilder();
           for (int n = r.u8() % 3; n > 0; n--) {
@@ -117,8 +124,12 @@ public final class CoreFuzz {
             m.putConfigMap(r.bit() ? "logfire-sdk-policy.json" : r.text(16), Opamp.AgentConfigObject.newBuilder().setBody(r.bytes(1024))
                 .setContentType(r.pick(List.of("", "application/json", "text/yaml", r.text(16)))).build());
           }
-          LAYER.decide(Opamp.AgentRemoteConfig.newBuilder().setConfigHash(r.bytes(32)).setConfig(m).build(),
-              r.bytes(512), r.bytes(512), null, 0, r.bit() ? doc -> { } : null);
+          // A remote config to an agent just started, or to a state that may not be one.
+          com.google.protobuf.ByteString agent = r.bit() ? r.bytes(512) : LAYER.start(
+              dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentStart.newBuilder().setStateDir(r.bit())
+                  .setInstanceUid(com.google.protobuf.ByteString.copyFrom(new byte[16])).build()).getAgent();
+          LAYER.step(dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentStep.newBuilder().setAgent(agent)
+              .setRemoteConfig(Opamp.AgentRemoteConfig.newBuilder().setConfigHash(r.bytes(32)).setConfig(m)).build());
         }
         default -> {
           List<Anyvalue.KeyValue> resource = new java.util.ArrayList<>();

@@ -36,6 +36,7 @@ import (
 	"google.golang.org/protobuf/proto"
 
 	"github.com/pydantic/opamp-clients/go/opamp/internal/corepb"
+	"github.com/pydantic/opamp-clients/go/opamp/internal/plumb"
 )
 
 // streamRig is a core-mode executor with the test as its loop.
@@ -885,20 +886,20 @@ func coreModeDownload(t *testing.T, ws, splice bool) {
 	defer ts.Close()
 	srvURL = ts.URL
 	dir := t.TempDir()
-	cfg := Config{Endpoint: endpoint(ts, ws), Mode: ModeCore, NoSpliceDownloads: !splice, Proxy: Proxy{Direct: true},
+	cfg := Config{Endpoint: endpoint(ts, ws), Mode: ModeCore, Proxy: Proxy{Direct: true},
 		InstanceUID: [16]byte{7}, HeartbeatInterval: 50 * time.Millisecond, StateFile: filepath.Join(dir, "state"),
-		AcceptPackages: true, tapFile: filepath.Join(dir, "core.tap")}
+		plumbed: plumb.Options{AcceptPackages: true, NoSpliceDownloads: !splice}, tapFile: filepath.Join(dir, "core.tap")}
 	installed := make(chan string, 1)
-	c, err := Start(context.Background(), cfg, Status{}, func(c *Client, n Notification) {
+	c, err := startFull(context.Background(), cfg, Status{}, func(c *Client, n Notification) {
 		if n.Kind != InstallPackage {
 			return
 		}
-		got, err := os.ReadFile(n.Path)
+		got, err := os.ReadFile(n.x().Path)
 		if err != nil || !bytes.Equal(got, file) {
 			t.Errorf("the file handed over holds %d bytes (%v), the server sent %d", len(got), err, len(file))
 		}
-		c.PackageInstalled(n.PackageName, n.Package.GetHash(), nil)
-		installed <- n.Path
+		c.PackageInstalled(n.x().PackageName, n.x().Package.GetHash(), nil)
+		installed <- n.x().Path
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -965,7 +966,7 @@ func TestCoreModeRetryAfterDate(t *testing.T) {
 			defer ts.Close()
 			cfg := Config{Endpoint: endpoint(ts, ws), Mode: ModeCore, Proxy: Proxy{Direct: true},
 				InstanceUID: [16]byte{7}, HeartbeatInterval: 50 * time.Millisecond}
-			c, err := Start(context.Background(), cfg, Status{}, nil)
+			c, err := startFull(context.Background(), cfg, Status{}, nil)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -1004,12 +1005,12 @@ func TestAModeRefusesWhatItCantTake(t *testing.T) {
 		{Config{Endpoint: "http://127.0.0.1:9/", Mode: ModeCore, TLS: TLS{CAPEM: []byte("no")}}, "CAPEM"},
 		{Config{Endpoint: "http://127.0.0.1:9/", Mode: ModeCore, TLS: TLS{Config: named}}, "TLS.Config.ServerName in core mode"},
 		{Config{Endpoint: "http://127.0.0.1:9/", TLS: TLS{Config: named}}, "TLS.Config.ServerName in core mode"},
-		{Config{Endpoint: "http://127.0.0.1:9/", Mode: ModePlatform, NoSpliceDownloads: true}, "NoSpliceDownloads in platform mode"},
-		{Config{Endpoint: "http://127.0.0.1:9/", Mode: ModePlatform, HTTPClient: &http.Client{}, NoSpliceDownloads: true}, "NoSpliceDownloads in platform mode"},
+		{Config{Endpoint: "http://127.0.0.1:9/", Mode: ModePlatform, plumbed: plumb.Options{NoSpliceDownloads: true}}, "NoSpliceDownloads in platform mode"},
+		{Config{Endpoint: "http://127.0.0.1:9/", Mode: ModePlatform, HTTPClient: &http.Client{}, plumbed: plumb.Options{NoSpliceDownloads: true}}, "NoSpliceDownloads in platform mode"},
 		// Regression: an HTTPClient alone switched to platform mode silently; it needs the mode named.
 		{Config{Endpoint: "http://127.0.0.1:9/", HTTPClient: &http.Client{}}, "HTTPClient with no Mode"},
 	} {
-		if _, err := Start(context.Background(), c.cfg, Status{}, nil); err == nil || !strings.Contains(err.Error(), c.want) {
+		if _, err := startFull(context.Background(), c.cfg, Status{}, nil); err == nil || !strings.Contains(err.Error(), c.want) {
 			t.Errorf("%+v: %v, want %q", c.cfg, err, c.want)
 		}
 	}
@@ -1054,7 +1055,7 @@ func TestWithNothingSaidTheClientRunsInCoreMode(t *testing.T) {
 		asked.Add(1)
 		return "", false
 	}}
-	c, err := Start(context.Background(), cfg, Status{}, nil)
+	c, err := startFull(context.Background(), cfg, Status{}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}

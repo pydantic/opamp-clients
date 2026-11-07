@@ -1,7 +1,7 @@
 # Copyright (c) 2026 Pydantic Services Inc.
 # SPDX-License-Identifier: MIT
 """How the client reaches the server: TLS and a proxy, as the application configures them. The
-core knows nothing of either. Every request, WebSocket and package download goes through a
+core knows nothing of either. Every request and WebSocket goes through a
 connector made here from one `Transport` (an SSL context and a proxy route)."""
 
 from __future__ import annotations
@@ -26,7 +26,7 @@ from aiohttp.abc import AbstractResolver, ResolveResult
 
 @dataclass(frozen=True)
 class TLS:
-    """TLS for https:// and wss:// endpoints, https:// proxies and package downloads. The
+    """TLS for https:// and wss:// endpoints and https:// proxies. The
     defaults: the system's CAs, TLS 1.2 or later, no client certificate."""
 
     #: CAs to trust for the server's certificate, instead of the system's: a PEM file.
@@ -118,7 +118,7 @@ def _pem_file(pem: str | bytes | None) -> Iterator[str | None]:
 
 @dataclass(frozen=True, repr=False)
 class Proxy:
-    """A proxy to reach the server through, and to download packages through.
+    """A proxy to reach the server through.
 
     ``url`` is ``http://host:port`` or ``https://host:port`` (an HTTP proxy; https: TLS to the
     proxy too), or ``socks5://host:port`` or ``socks5h://host:port`` (a SOCKS5 proxy; both leave
@@ -310,7 +310,7 @@ CORE_PROXY_VARIABLES = ("REQUEST_METHOD", "HTTP_PROXY", "http_proxy", "HTTPS_PRO
 
 
 class Transport:
-    """The SSL context and the proxies every connection and download uses; the executor makes its
+    """The SSL context and the proxies every connection uses; the executor makes its
     sessions' connectors from it.
 
     With no proxy configured, the environment's apply, read once, here, as urllib reads them:
@@ -327,8 +327,8 @@ class Transport:
                  core_mode: bool = False, _environ: Mapping[str, str] | None = None) -> None:
         # _environ: tests only, the environment to read in place of the process's.
         self.ssl = tls if isinstance(tls, ssl.SSLContext) else (tls or TLS()).context()
-        #: For a package file not at the OpAMP server's own origin (Download.server_origin false):
-        #: the same, without the client certificate, which is the server's alone. An SSLContext
+        #: For a TLS handshake not with the OpAMP server's own origin (an https:// proxy in core
+        #: mode): the same, without the client certificate, which is the server's alone. An SSLContext
         #: the application made is its own, used as it is.
         self.elsewhere_ssl = self.ssl
         if not isinstance(tls, ssl.SSLContext) and tls is not None and (tls.cert_file or tls.cert_pem):

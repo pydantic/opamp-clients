@@ -21,7 +21,7 @@ namespace Logfire.Fleet.Tests;
 internal static class Kept
 {
     private const string Before =
-        "a core state saved before the core kept the config applied: the policy kept before carries over";
+        "a core state saved before the core kept the config applied: the policy with every control local";
 
     /// <summary>A client state whose config applied has <paramref name="document"/> as its only file, the policy.</summary>
     public static byte[] CoreState(string document)

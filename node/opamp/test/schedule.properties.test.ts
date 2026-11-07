@@ -10,24 +10,25 @@
 //
 // A run (fc.scheduledModelRun over fc.commands) starts one client, real core included, over HTTP or
 // WebSocket, in "platform" mode (the executor: fetch and ws) or "core" mode (streams.ts: TCP
-// sockets and download files; the fake server then speaks HTTP/1.1 and WebSocket framing itself).
-// Its commands are application calls, from outside and from inside the callback; the server's
-// offers (remote config, custom message, heartbeat interval, package); the server closing, dropping
-// or corrupting the connection; time passing; a callback that throws; stop, from outside or from
-// the callback. Between commands the scheduler resolves what it likes. The server's answers come
-// from lists the run draws (a request answered, refused or failed; a handshake accepted, refused or
-// failed; a download whole, missing, corrupt or cut; a send or a save that fails).
+// sockets; the fake server then speaks HTTP/1.1 and WebSocket framing itself). Its commands are
+// application calls, from outside and from inside the callback; the server's offers (remote
+// config, heartbeat interval, and a custom message and a package, which this client takes neither
+// of: the core hands it nothing of them); the server closing, dropping or corrupting the
+// connection; time passing; a callback that throws; stop, from outside or from the callback.
+// Between commands the scheduler resolves what it likes. The server's answers come from lists the
+// run draws (a request answered, refused or failed; a handshake accepted, refused or failed; a
+// send or a save that fails).
 //
 // The model is spec/shell-contract.md. At the core's boundary (Core.step, wrapped) every input is
 // checked against the effects issued so far: each effect answered at most once, by its kind, naming
 // an id issued; WebSocket and stream events only between open and end, nothing about a stream
-// after it was closed, nothing about a download file after its discard or cancel; a downloaded file
-// is what was written; stored means saved; a timer never early; nothing about an effect after the
+// after it was closed; stored means saved; a timer never early; nothing about an effect after the
 // core's cancel of it (RULE-SHELL-06, in both modes); nothing fed after the output that says
-// stopped, and no request, connection or download started by it. The callback is held to the
-// callback contract (callback.properties.test.ts's model). Once the scheduler is idle every effect
-// has its answer. Stop settles within a bound of (mocked) time, and when it does no socket, request,
-// download, file handle or file operation is left, and nothing is started afterwards.
+// stopped, and no request or connection started by it; no download (this client takes no
+// packages). The callback is held to the callback contract (callback.properties.test.ts's model).
+// Once the scheduler is idle every effect has its answer. Stop settles within a bound of (mocked)
+// time, and when it does no socket, request, file handle or file operation is left, and nothing is
+// started afterwards.
 //
 // OPAMP_SCHED_RUNS runs (500 by default); the seed is printed, and OPAMP_SCHED_SEED replays it. A
 // failure prints the line that replays its shrunk run alone: the seed, OPAMP_SCHED_PATH (fast-check's
@@ -48,7 +49,7 @@ import { mock } from "node:test";
 import fc from "fast-check";
 
 import { Core } from "../src/core.js";
-import { downloadPath, Executor, type ExecutorPlatform, TEST_PLATFORM, type TestPlatform } from "../src/executor.js";
+import { Executor, type ExecutorPlatform, TEST_PLATFORM, type TestPlatform } from "../src/executor.js";
 import { type FileOps, type OpenFile, TEST_FILE_OPS, tempOf } from "../src/files.js";
 import { EffectSchema, type Input, type Output } from "../src/gen/opamp/core/v1/core_pb.js";
 import {
@@ -58,8 +59,6 @@ import {
   ComponentHealthSchema,
   type Config,
   create,
-  CustomCapabilitiesSchema,
-  CustomMessageSchema,
   fromBinary,
   type Notification,
   PackageType,
@@ -74,7 +73,6 @@ import { annotatedTest } from "./annotate.js";
 
 const UID = new Uint8Array(16).fill(0x92);
 const CAPABILITY = "io.example.sched";
-const UNDECLARED = "io.example.undeclared";
 const ACCEPTS_REMOTE_CONFIG = 2n;
 const SERVER_CAPABILITIES = 1n | 2n | 8n; // AcceptsStatus, OffersRemoteConfig, OffersPackages
 const HEARTBEAT_MS = 1000;
@@ -92,7 +90,6 @@ const DOWNLOAD_HOST = "dl.test";
 
 type Post = "ok" | "500" | "fail";
 type Upgrade = "accept" | "refuse" | "fail";
-type Fetched = "ok" | "404" | "corrupt" | "cut";
 type Sent = "ok" | "fail";
 type Saved = "ok" | "fail";
 type Connected = "ok" | "refused";
@@ -104,7 +101,6 @@ interface Setup {
   /** The server's answers, each list taken in turn (and round again). */
   posts: Post[];
   upgrades: Upgrade[];
-  downloads: Fetched[];
   sends: Sent[];
   saves: Saved[];
   connects: Connected[];
@@ -134,7 +130,6 @@ const setupArb: fc.Arbitrary<Setup> = fc.record({
   ws: fc.boolean(),
   posts: lists<Post>("ok", "ok", "ok", "500", "fail"),
   upgrades: lists<Upgrade>("accept", "accept", "accept", "refuse", "fail"),
-  downloads: lists<Fetched>("ok", "ok", "404", "corrupt", "cut"),
   sends: lists<Sent>("ok", "ok", "ok", "ok", "fail"),
   saves: lists<Saved>("ok", "ok", "ok", "fail"),
   connects: lists<Connected>("ok", "ok", "ok", "refused"),
@@ -151,7 +146,6 @@ const HEAL = 40;
 const HEALTHY: { [K in Lists]: Setup[K][number] } = {
   posts: "ok",
   upgrades: "accept",
-  downloads: "ok",
   sends: "ok",
   saves: "ok",
   connects: "ok",
@@ -280,10 +274,9 @@ class FakeHandle implements OpenFile {
   }
 }
 
-/** The file system, as the client's FileOps (files.ts): saves and download files. */
+/** The file system, as the client's FileOps (files.ts): saves. */
 class MemFs implements FileOps {
   readonly paths = new Map<string, Inode>();
-  readonly dirs = new Set<string>();
   /** Operations called and not yet complete, but for saves'. */
   inFlight = 0;
   /** Saves' operations called and not yet complete: a save under way at stop goes on, and ends
@@ -319,14 +312,6 @@ class MemFs implements FileOps {
 
   #isSave(path: string): boolean {
     return path === tempOf(this.w.stateFile) || path === this.w.stateFile;
-  }
-
-  mkdir(dir: string): Promise<boolean> {
-    return this.op(`mkdir ${dir}`, () => {
-      const made = !this.dirs.has(dir);
-      this.dirs.add(dir);
-      return made;
-    });
   }
 
   create(path: string): Promise<OpenFile> {
@@ -370,18 +355,13 @@ class MemFs implements FileOps {
     return this.op(`remove ${path}`, () => this.paths.delete(path), false, this.#isSave(path));
   }
 
-  clear(dir: string): void {
-    this.w.use(`clear ${dir}`);
-    for (const p of [...this.paths.keys()]) if (p.startsWith(`${dir}/`)) this.paths.delete(p);
-  }
-
   read(path: string): Uint8Array | undefined {
     return this.paths.get(path)?.data;
   }
 }
 
 // ---------------------------------------------------------------------------------------------
-// The server: OpAMP over whatever carries it, and the package files.
+// The server: OpAMP over whatever carries it.
 
 /** A connection the server can push on (a WebSocket, either mode's). */
 interface Peer {
@@ -397,7 +377,6 @@ interface Peer {
 type OfferKind = "config" | "custom" | "heartbeat" | "package";
 
 const sha256 = (b: Uint8Array): Uint8Array => new Uint8Array(createHash("sha256").update(b).digest());
-const packageFile = (n: number): Uint8Array => new Uint8Array(Buffer.from(`package ${n} `.repeat(40 + n * 13)));
 
 class Server {
   readonly got: AgentToServer[] = [];
@@ -441,7 +420,7 @@ class Server {
               type: PackageType.PackageType_TopLevel,
               version: String(n),
               hash: new Uint8Array([n]),
-              file: { downloadUrl: `http://${DOWNLOAD_HOST}/pkg/${n}`, contentHash: sha256(packageFile(n)) },
+              file: { downloadUrl: `http://${DOWNLOAD_HOST}/pkg/${n}`, contentHash: sha256(new Uint8Array([n])) },
             },
           },
         },
@@ -459,12 +438,6 @@ class Server {
     }
   }
 
-  /** A package file, as served (`corrupt`: other bytes than the offer's hash). */
-  file(n: number, corrupt: boolean): Uint8Array {
-    const f = packageFile(n);
-    if (corrupt) f[0] = (f[0] ?? 0) ^ 0xff;
-    return f;
-  }
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -639,8 +612,8 @@ class FakeWs extends EventEmitter implements Peer {
   }
 }
 
-/** undici's fetch: a POST to the OpAMP endpoint, or a GET of a package file (its body streamed,
- * a part at a time, failing once the request's signal has aborted). */
+/** undici's fetch: a POST to the OpAMP endpoint (anything else is a problem: this client takes
+ * no packages, so the core asks for no download). */
 function fakeFetch(w: World): ExecutorPlatform["fetch"] {
   type Init = { method?: string; body?: Uint8Array; signal?: AbortSignal };
   type Held = { settled: boolean };
@@ -650,7 +623,7 @@ function fakeFetch(w: World): ExecutorPlatform["fetch"] {
   const requests = new Map<string, { url: string; init: Init; r: Held }>();
   let count = 0;
   const respond = w.s.scheduleFunction(async (what: string) => {
-    const { url, init, r } = requests.get(what)!;
+    const { url, init } = requests.get(what)!;
     requests.delete(what);
     if ((init.method ?? "GET") === "POST") {
       const outcome = w.pick("posts");
@@ -661,35 +634,8 @@ function fakeFetch(w: World): ExecutorPlatform["fetch"] {
         headers: { "content-type": "application/x-protobuf" },
       });
     }
-    const n = Number(new URL(url).pathname.split("/").at(-1));
-    const outcome = w.pick("downloads");
-    if (outcome === "404") return new Response(null, { status: 404 });
-    const file = w.server.file(n, outcome === "corrupt");
-    const parts = [file.subarray(0, file.length >> 1), file.subarray(file.length >> 1)];
-    let at = 0;
-    const body = new ReadableStream<Uint8Array>({
-      // As undici: the request's signal aborting fails its body at once.
-      start: (c) => {
-        init.signal?.addEventListener("abort", () => {
-          if (r.settled) return;
-          r.settled = true;
-          c.error(aborted());
-        });
-      },
-      pull: async (c) => {
-        await w.s.schedule(Promise.resolve(), `download ${n}: body`);
-        w.trace.push(`  download ${n}: body part ${at + 1}${init.signal?.aborted ? " (aborted)" : ""}`);
-        if (r.settled) return;
-        const part = parts[at++];
-        if (init.signal?.aborted || (outcome === "cut" && at === 2) || !part) r.settled = true;
-        if (init.signal?.aborted) c.error(aborted());
-        else if (outcome === "cut" && at === 2) c.error(new TypeError("terminated"));
-        else if (part) c.enqueue(part);
-        else c.close();
-      },
-      cancel: () => void (r.settled = true),
-    });
-    return new Response(body, { status: 200 });
+    w.problems.push(`fetch ${init.method ?? "GET"} ${url}: not the OpAMP endpoint's POST (RULE-SHELL-04)`);
+    return new Response(null, { status: 404 });
   });
   return ((url: string, init: Init) => {
     const what = `fetch ${init.method ?? "GET"} ${url}`;
@@ -722,8 +668,7 @@ function fakeFetch(w: World): ExecutorPlatform["fetch"] {
           r.settled = true;
           throw aborted();
         }
-        // A file's body is still to come: released once read, failed or cancelled.
-        if (!res.body || (init.method ?? "GET") === "POST") r.settled = true;
+        r.settled = true;
         return res;
       },
       (e: unknown) => {
@@ -888,8 +833,8 @@ function wsFrame(op: number, payload: Uint8Array): Buffer {
   return Buffer.concat([head, payload]);
 }
 
-/** The server's end of a fake socket: HTTP/1.1 requests (the OpAMP endpoint, upgrades, package
- * files), then WebSocket frames after an upgrade. */
+/** The server's end of a fake socket: HTTP/1.1 requests (the OpAMP endpoint, upgrades), then
+ * WebSocket frames after an upgrade. */
 class RawConn implements Peer {
   buf = Buffer.alloc(0);
   mode: "http" | "ws" | "gone" = "http";
@@ -954,20 +899,8 @@ class RawConn implements Peer {
       else this.#respond(200, this.w.server.answer(new Uint8Array(body)), "Content-Type: application/x-protobuf\r\n");
       return true;
     }
-    const n = Number((target ?? "").split("/").at(-1));
-    const outcome = this.w.pick("downloads");
-    if (outcome === "404") {
-      this.#respond(404, new Uint8Array());
-      return true;
-    }
-    const file = this.w.server.file(n, outcome === "corrupt");
-    if (outcome === "cut") {
-      const head = `HTTP/1.1 200 OK\r\nContent-Length: ${file.length}\r\n\r\n`;
-      this.sock.deliver(Buffer.concat([Buffer.from(head, "latin1"), file.subarray(0, file.length >> 1)]));
-      this.#reset();
-      return false;
-    }
-    this.#respond(200, file);
+    this.w.problems.push(`${method} ${target}: not the OpAMP endpoint (RULE-SHELL-04)`);
+    this.#respond(404, new Uint8Array());
     return true;
   }
 
@@ -1078,12 +1011,10 @@ interface Pending {
   phase: "waiting" | "open" | "closed" | "draining" | "crossed" | "ended";
   /** The core said ws_close. */
   closing?: boolean;
-  /** Discarded (a download's file) or cancelled: nothing more may name it. */
+  /** Cancelled: nothing more may name it. */
   gone?: boolean;
   /** Cancelled. */
   cancelled?: boolean;
-  /** A stream's splices issued and not yet answered. */
-  splices?: number;
   tls?: boolean;
   data?: Uint8Array;
 }
@@ -1143,27 +1074,14 @@ class Book {
         return;
       case "httpResponse":
       case "httpFailed":
-      case "downloaded":
-      case "downloadResponse":
-      case "downloadFailed":
       case "stored":
       case "storeFailed": {
         const id = idOf(k.value);
-        const coreMode = this.w.setup.mode === "core";
-        const kinds =
-          k.case.startsWith("http") ? ["httpRequest"] : k.case.startsWith("download") ? [coreMode ? "downloadDone" : "download"] : ["store"];
-        const e = this.#answer(k.case.startsWith("download") ? "dl" : "fx", id, what, kinds);
+        const e = this.#answer("fx", id, what, [k.case.startsWith("http") ? "httpRequest" : "store"]);
         if (!e) return;
         if (e.phase !== "waiting") this.#bad(`${what}: answered already`, "RULE-SHELL-04");
-        if (e.gone) this.#bad(`${what} after its discard or cancel`, "RULE-SHELL-06");
+        if (e.gone) this.#bad(`${what} after its cancel`, "RULE-SHELL-06");
         e.phase = "ended";
-        if (k.case === "downloaded" || k.case === "downloadResponse") {
-          const file = this.w.fs.read(downloadPath(this.w.stateFile, id));
-          if (!file) this.#bad(`${what}: no file`, "RULE-SHELL-04");
-          else if (Buffer.compare(sha256(file), (k.value as { sha256: Uint8Array }).sha256) !== 0) {
-            this.#bad(`${what}: the hash is not the file's`, "RULE-SHELL-04");
-          }
-        }
         if (k.case === "stored") {
           const saved = this.w.fs.read(this.w.stateFile);
           const mine = this.stores.findIndex((s) => s.id === id);
@@ -1210,7 +1128,6 @@ class Book {
       case "streamTlsReady":
       case "streamData":
       case "streamEof":
-      case "streamSpliced":
       case "streamFailed": {
         const e = this.#answer("st", idOf(k.value), what, ["streamOpen"]);
         if (!e) return;
@@ -1225,9 +1142,6 @@ class Book {
         } else if (k.case === "streamTlsReady") {
           if (!e.tls) this.#bad(`${what} without streamStartTls`, "RULE-SHELL-04");
           e.tls = false;
-        } else if (k.case === "streamSpliced") {
-          if (!e.splices) this.#bad(`${what} without a splice`, "RULE-SHELL-04");
-          else e.splices--;
         }
         return;
       }
@@ -1250,9 +1164,8 @@ class Book {
       switch (k.case) {
         case "httpRequest":
         case "wsOpen":
-        case "download":
         case "store":
-          this.effects.set(`${k.case === "download" ? "dl" : "fx"}:${k.value.id}`, { kind: k.case, phase: "waiting" });
+          this.effects.set(`fx:${k.value.id}`, { kind: k.case, phase: "waiting" });
           if (k.case === "store") this.stores.push({ id: k.value.id, data: k.value.data.slice() });
           break;
         case "proxyQuery":
@@ -1260,16 +1173,11 @@ class Book {
           this.effects.set(`st:${k.value.id}`, { kind: k.case, phase: "waiting" });
           break;
         case "streamOpen":
-          this.effects.set(`st:${k.value.id}`, { kind: k.case, phase: "waiting", splices: 0 });
+          this.effects.set(`st:${k.value.id}`, { kind: k.case, phase: "waiting" });
           break;
         case "streamStartTls": {
           const s = this.#get("st", k.value.id);
           if (s) s.tls = true;
-          break;
-        }
-        case "streamSplice": {
-          const s = this.#get("st", k.value.id);
-          if (s) s.splices = (s.splices ?? 0) + 1;
           break;
         }
         case "streamClose": {
@@ -1277,8 +1185,11 @@ class Book {
           if (s) s.phase = "ended";
           break;
         }
+        case "download":
         case "downloadDone":
-          this.effects.set(`dl:${k.value.id}`, { kind: k.case, phase: "waiting" });
+        case "streamSplice":
+        case "discard":
+          this.#bad(`${k.case}(${k.value.id}) for a client that takes no packages`, "RULE-SHELL-04");
           break;
         case "wsClose": {
           const c = this.#get("fx", k.value.id);
@@ -1290,17 +1201,8 @@ class Book {
         }
         case "cancel": {
           // Nothing more about it (RULE-SHELL-06), whatever it is.
-          for (const ns of ["fx", "dl"]) {
-            const e = this.#get(ns, k.value.id);
-            if (e) e.gone = e.cancelled = true;
-          }
-          this.w.forgotten.add(downloadPath(this.w.stateFile, k.value.id));
-          break;
-        }
-        case "discard": {
-          const d = this.#get("dl", k.value.id);
-          if (d) d.gone = true;
-          this.w.forgotten.add(downloadPath(this.w.stateFile, k.value.id));
+          const e = this.#get("fx", k.value.id);
+          if (e) e.gone = e.cancelled = true;
           break;
         }
         default:
@@ -1315,17 +1217,10 @@ class Book {
   }
 
   /** Once the scheduler is idle, with the client running: every effect has its answer
-   * (RULE-SHELL-05), and a download file discarded or cancelled is gone (RULE-SHELL-06). */
+   * (RULE-SHELL-05). */
   idle(): void {
     for (const [key, e] of this.effects) {
       if (e.phase === "waiting" && !e.gone) this.#bad(`${e.kind} ${key} never answered`, "RULE-SHELL-05");
-    }
-    this.files();
-  }
-
-  files(): void {
-    for (const p of this.w.forgotten) {
-      if (this.w.fs.read(p) !== undefined) this.#bad(`${p} left after its discard or cancel`, "RULE-SHELL-06");
     }
   }
 }
@@ -1361,10 +1256,6 @@ class Life {
       if (client === undefined) throw new Error("the callback has no client handle");
       if (n.kind === "remoteConfig") {
         client.setRemoteConfigStatus(create(RemoteConfigStatusSchema, { lastRemoteConfigHash: n.remoteConfig.configHash, status: 1 }));
-      } else if (n.kind === "installPackage") {
-        client.packageInstalled(n.packageName, n.package.hash);
-      } else if (n.kind === "removePackage") {
-        client.packageRemoved(n.packageName);
       }
       for (const a of this.inside.splice(0)) {
         if (a === "call") this.w.call();
@@ -1406,11 +1297,6 @@ class Life {
     const increasing = (xs: number[], what: string) =>
       xs.forEach((x, i) => i === 0 || assert.ok(x > xs[i - 1]!, `${what} in order: ${log()}`));
     increasing(this.notes.flatMap((n) => (n.kind === "remoteConfig" ? [n.remoteConfig.configHash[0]!] : [])), "remote configs");
-    increasing(this.notes.flatMap((n) => (n.kind === "customMessage" ? [n.customMessage.data[0]!] : [])), "custom messages");
-    increasing(
-      this.notes.flatMap((n) => (n.kind === "customMessageNotSent" ? [Number(new TextDecoder().decode(n.customMessage.data))] : [])),
-      "refused custom messages",
-    );
   }
 }
 
@@ -1452,8 +1338,6 @@ class World {
   readonly trace: string[] = [];
   /** Everything the client was handed that must be let go of by the time stop returns. */
   readonly resources: { what: string; released: () => boolean }[] = [];
-  /** Download files discarded or cancelled. */
-  readonly forgotten = new Set<string>();
   /** The notifications the core emitted, in the order the application is to hear them. */
   readonly emitted: string[] = [];
   readonly life = new Life(this);
@@ -1507,8 +1391,8 @@ class World {
     }
   }
 
-  /** A platform call: none once stop has returned, and nothing opened (a connection, a
-   * download) once the core has said stopped (RULE-SHELL-07). */
+  /** A platform call: none once stop has returned, and nothing opened (a connection) once the
+   * core has said stopped (RULE-SHELL-07). */
   use(what: string, opens = false, save = false): void {
     // What was let go of at the bound may end after: its file closed, and deleted. A save under
     // way at stop ends whole, unreported (stop doesn't wait for it; a client started next on the
@@ -1527,7 +1411,6 @@ class World {
       requestTimeoutMs: REQUEST_TIMEOUT_MS,
       maxReceiveBytes: MAX_RECEIVE,
       stateFile: this.stateFile,
-      acceptPackages: true,
       proxy: false,
       mode: this.setup.mode,
       [TEST_PLATFORM]: this.platform(),
@@ -1556,23 +1439,17 @@ class World {
     rmSync(this.stateFile, { force: true });
     const client = Client.start(
       this.config(),
-      {
-        health: create(ComponentHealthSchema, { healthy: true, status: "h0" }),
-        customCapabilities: create(CustomCapabilitiesSchema, { capabilities: [CAPABILITY] }),
-      },
+      { health: create(ComponentHealthSchema, { healthy: true, status: "h0" }) },
       this.life.notify,
     );
     this.life.client = client;
     this.life.returned = true;
   }
 
-  /** An application call (as the callback test's): a health, or a custom message the core refuses
-   * at once (a callback in the call's own step). */
+  /** An application call (as the callback test's): a health. */
   call(): void {
-    const client = this.life.client!;
     const n = ++this.healths;
-    if (n % 2 === 1) client.setHealth(create(ComponentHealthSchema, { healthy: true, status: `h${n}` }));
-    else client.sendCustomMessage(create(CustomMessageSchema, { capability: UNDECLARED, type: "x", data: new TextEncoder().encode(String(n)) }));
+    this.life.client!.setHealth(create(ComponentHealthSchema, { healthy: true, status: `h${n}` }));
   }
 
   failure(): unknown {
@@ -1634,7 +1511,6 @@ class World {
     mock.timers.tick(5000);
     await this.s.waitIdle();
     assert.equal(this.life.notes.length, told, "no callback after stop");
-    this.book.files();
     // A save let go at stop has ended by now, whole: its file closed (a stalled disk's writes
     // take longer than this run lasts).
     if (!this.setup.stall) {
@@ -1780,8 +1656,7 @@ class Stop extends Step {
 }
 
 // Weighted so that about half the runs end with stop or a throw of their own (the other half
-// are stopped at the end), and packages, which need an offer, time (over HTTP, a poll) and many
-// steps, are often downloaded.
+// are stopped at the end).
 const commands = [
   fc.oneof(
     { weight: 4, arbitrary: fc.constantFrom("now", "later").map((h) => new Call(h as "now" | "later")) },
@@ -1789,7 +1664,7 @@ const commands = [
     { weight: 1, arbitrary: fc.integer({ min: 1, max: 4 }).map((k) => new ThrowOn(k)) },
     {
       weight: 8,
-      arbitrary: fc.constantFrom<OfferKind>("config", "custom", "heartbeat", "package", "package").map((k) => new Offer(k)),
+      arbitrary: fc.constantFrom<OfferKind>("config", "config", "custom", "heartbeat", "package").map((k) => new Offer(k)),
     },
     {
       weight: 3,
@@ -1876,8 +1751,7 @@ test("a WebSocket whose write fails ends once (seed 1)", async () => {
     ws: true,
     posts: ["ok"],
     upgrades: ["accept"],
-    downloads: ["ok"],
-    sends: ["ok", "fail"],
+      sends: ["ok", "fail"],
     saves: ["ok"],
     connects: ["ok"],
     writes: ["ok"],
@@ -1914,82 +1788,22 @@ test("a WebSocket whose write fails ends once (seed 1)", async () => {
   );
 });
 
-// Found by the test above (seed 1, once the double end was fixed): a download that shutdown
-// aborted went on after stop had returned: its write in flight, its file's close and the removal
-// of what it had written all came later (so a client restarted on the same state file
-// could have its own download of the same id deleted). The replay pins that run; the property
-// under it shuts the executor down at every point of a download.
-// covers: RULE-SHELL-07
-test("nothing of a download is left once shutdown is over (seed 1)", async () => {
-  await fc.assert(property("MMFAJ:V"), { seed: 1, path: "81:0:0:0:0:0:0:0:0:0:0:0:2:2:10" });
-  const setup: Setup = {
-    mode: "platform",
-    ws: false,
-    posts: ["ok"],
-    upgrades: ["accept"],
-    downloads: ["ok", "cut", "corrupt"],
-    sends: ["ok"],
-    saves: ["ok"],
-    connects: ["ok"],
-    writes: ["ok"],
-    chunk: 64,
-    fileWrite: 100,
-    deaf: false,
-  };
-  await fc.assert(
-    fc.asyncProperty(schedulerArb, fc.nat(12), async (seed, steps) => {
-      const s = scheduler(seed);
-      mock.timers.enable({ apis: ["setTimeout", "Date"], now: T0 });
-      const w = new World(s, setup);
-      try {
-        const got: Input[] = [];
-        const x = new Executor((i) => got.push(i), w.stateFile, new Transport({ proxy: false }), w.fs, w.platform().executor);
-        w.server.offer("package");
-        const effect = { id: 2n, url: `http://${DOWNLOAD_HOST}/pkg/1`, maxBytes: 1n << 20n, timeoutMs: 600_000n };
-        x.do(create(EffectSchema, { kind: { case: "download", value: effect } }));
-        for (let i = 0; i < steps && s.count() > 0; i++) await s.waitNext(1);
-        await s.waitFor(Promise.resolve(x.shutdown()));
-        w.stopSettled = true;
-        const held = w.resources.filter((r) => !r.released()).map((r) => r.what);
-        assert.deepEqual(held, [], "nothing held once shutdown is over");
-        assert.equal(w.fs.inFlight, 0, "no file operation in flight once shutdown is over");
-        await s.waitIdle();
-        assert.deepEqual(w.problems, [], "nothing done after shutdown");
-        assert.ok(got.every((i) => i.kind.case === "downloadResponse"), `nothing said of a download given up on: ${got.map((i) => i.kind.case)}`);
-      } finally {
-        mock.timers.reset();
-      }
-    }),
-    { numRuns: 200, seed: 92 },
-  );
-});
-
-// Found by the test above (seed 1 then; seed 4 pinned here, once the two above were fixed): stop
-// asked for over HTTP while
-// a poll was in flight; its answer offered a package, and the core's last output was the goodbye,
-// stopped, and a download: the client started the download (a GET to the server after it said
-// stopped), only to abort it at shutdown.
-// covers: RULE-SHELL-07
-test("an output that says stopped starts no download (seed 4)", async () => {
-  await fc.assert(property("IHL:F"), { seed: 4, path: "78:4:2:2:2:2:2:2:2:2:2:2:2:8:14" });
-});
-
 // Found by the test above (seed 2), once it compared what the core emitted with what the
 // application heard: an output carried stopped and then a notification (here the remote config
 // that came back with the goodbye's answer; Go and Python saw install_package in the step that
 // answers a save after stop). A core bug, fixed elsewhere; but the shell dropped the
 // notification, since nothing is told after stopped. Within each output, stopped is now told
-// last.
+// last. (Its pinned path stopped replaying once the setup lost its downloads list: the runs of
+// seed 2 stand in for it.)
 // covers: RULE-SHELL-01
 test("stopped is told last within an output (seed 2)", async () => {
-  await fc.assert(property("d:B"), { seed: 2, path: "62:1:1:1:1:1:1:1:2:2:2:5:1:2:2:2:2" });
+  await fc.assert(property(), { seed: 2, numRuns: 100 });
 });
 
 // Asked of every shell (Go and Python fixed it): all of stop takes one stop_timeout, measured from
-// stop(). Node's stop doesn't wait for a save (one under way ends whole, after); but once the core had
-// stopped, the client waited for every download file's write in flight without any bound (core
-// mode's Streams.shutdown, and platform mode's aborted downloads): a disk that stops answering held
-// stop for as long. A run here stalls every file write, and stops while a package downloads.
+// stop(). Node's stop doesn't wait for a save (one under way ends whole, after), so a disk that
+// stops answering never holds it. A run here stalls every file write, and stops while remote
+// configs are being saved.
 // covers: RULE-SHELL-07
 test("stop is bounded though a file write hangs", async () => {
   await fc.assert(
@@ -2000,8 +1814,7 @@ test("stop is bounded though a file write hangs", async () => {
         ws,
         posts: ["ok"],
         upgrades: ["accept"],
-        downloads: ["ok"],
-        sends: ["ok"],
+              sends: ["ok"],
         saves: ["ok"],
         connects: ["ok"],
         writes: ["ok"],
@@ -2019,7 +1832,7 @@ test("stop is bounded though a file write hangs", async () => {
         dbg("started");
         await s.waitIdle();
         dbg("idle");
-        w.server.offer("package");
+        w.server.offer("config");
         mock.timers.tick(HEARTBEAT_MS);
         dbg("ticked");
         for (let i = 0; i < steps && s.count() > 0; i++) {
@@ -2035,8 +1848,7 @@ test("stop is bounded though a file write hangs", async () => {
           mock.timers.tick(250);
           waited += 250;
         }
-        // The core's stop_timeout (5 s) and the shell's grace once the core has stopped (1 s,
-        // STOP_GRACE_MS in src/index.ts), whatever the disk does.
+        // The core's stop_timeout (5 s) and a margin, whatever the disk does.
         if (process.env.OPAMP_SCHED_DEBUG) console.error(`stall run: ${mode} ${ws} steps=${steps} waited=${waited} settled=${w.stopSettled}`);
         assert.ok(w.stopSettled && waited <= 6_000, `stop returned within 6 s of stop() (waited ${waited} ms, a write in flight: ${writing})`);
       } finally {

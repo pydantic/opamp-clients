@@ -61,7 +61,7 @@ def test_a_stalled_save_is_told_as_the_core_says():
 
     def told(stalled: bool, waited_ms: int) -> Notification | None:
         n = corepb.Notification(save_stalled=corepb.SaveStalled(stalled=stalled, waited_ms=waited_ms))
-        return _notification(n, lambda _: "")
+        return _notification(n)
 
     assert told(True, 30_000) == Notification("save_stalled", stalled=True, waited_ms=30_000)
     assert told(False, 2**64 - 1) == Notification("save_stalled", stalled=False, waited_ms=2**64 - 1)

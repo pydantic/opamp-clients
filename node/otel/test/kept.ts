@@ -13,7 +13,7 @@ import { AgentRemoteConfigSchema, create, toBinary } from "@pydantic/logfire-fle
 
 import { FILE } from "./policy.js";
 
-const BEFORE = "a core state saved before the core kept the config applied: the policy kept before carries over";
+const BEFORE = "a core state saved before the core kept the config applied: the policy with every control local";
 
 function varint(n: number): number[] {
   const out: number[] = [];

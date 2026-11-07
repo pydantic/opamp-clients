@@ -24,6 +24,7 @@ import (
 
 	"github.com/pydantic/opamp-clients/go/opamp/internal/core"
 	"github.com/pydantic/opamp-clients/go/opamp/internal/corepb"
+	"github.com/pydantic/opamp-clients/go/opamp/internal/plumb"
 )
 
 // mustCross fails unless in can be handed to the core (proto.Marshal checks every string is UTF-8).
@@ -44,7 +45,7 @@ func TestAResponseHeaderThatIsntUTF8DoesntStopTheClient(t *testing.T) {
 	}))
 	defer ts.Close()
 	stoppedWith := make(chan error, 1)
-	c, err := Start(context.Background(), Config{Mode: ModePlatform, Endpoint: ts.URL, HeartbeatInterval: time.Hour},
+	c, err := startFull(context.Background(), Config{Mode: ModePlatform, Endpoint: ts.URL, HeartbeatInterval: time.Hour},
 		Status{}, func(_ *Client, n Notification) {
 			if n.Kind == Stopped {
 				stoppedWith <- n.Err
@@ -149,10 +150,10 @@ func TestANegativeDurationIsRefused(t *testing.T) {
 		{Config{ConnectTimeout: -time.Hour}, "connect_timeout_ms is -3600000: negative"},
 		{Config{StopTimeout: -time.Minute}, "stop_timeout_ms is -60000: negative"},
 		{Config{VerifyTimeout: -time.Second}, "verify_timeout_ms is -1000: negative"},
-		{Config{DownloadTimeout: math.MinInt64}, "download_timeout_ms is -9223372036854: negative"},
+		{Config{plumbed: plumb.Options{DownloadTimeout: math.MinInt64}}, "download_timeout_ms is -9223372036854: negative"},
 	} {
 		c.cfg.Endpoint = "http://127.0.0.1:1/v1/opamp"
-		cl, err := Start(context.Background(), c.cfg, Status{}, nil)
+		cl, err := startFull(context.Background(), c.cfg, Status{}, nil)
 		if err == nil {
 			_ = cl.Stop(context.Background())
 			t.Fatalf("%s: started", c.field)

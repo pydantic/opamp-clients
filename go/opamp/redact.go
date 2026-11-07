@@ -26,7 +26,6 @@ func (c Config) String() string {
 	return fields(c, map[string]any{
 		"Endpoint":    redactedURL(c.Endpoint),
 		"Header":      redactedHeader(c.Header),
-		"AuthHeader":  typeOnly(c.AuthHeader),
 		"HTTPClient":  typeOnly(c.HTTPClient),
 		"StateSealer": typeOnly(c.StateSealer),
 	})

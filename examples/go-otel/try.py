@@ -146,10 +146,12 @@ def judge_settings(seven: list[dict]) -> list[tuple[str, bool]]:
     ticks = len(pings(seven, t2 + MARGIN, t3 - MARGIN))
     per = logs(seven, t2 + MARGIN, t3 - MARGIN) / ticks if ticks else 0
     out.append((f"log_levels scopes noisy off: one log record a tick ({per:.1f})", ticks > 5 and 0.5 <= per <= 1.5))
-    three = arrived(seven, t3 + MARGIN, t4)
+    # Each window ends a second before the next policy's APPLIED: the agent puts a policy in force
+    # before it reports it, so an export in that moment may already go out under the next one.
+    three = arrived(seven, t3 + MARGIN, t4 - DRIFT)
     out.append((f"attribute_redaction drop url.full: spans, none named by a URL ({sorted(set(three))[:3]})",
                 bool(three) and not any(n.startswith("http") for n in three)))
-    four = arrived(seven, t4 + MARGIN, t5)
+    four = arrived(seven, t4 + MARGIN, t5 - DRIFT)
     out.append((f"attribute_redaction mask URL.FULL: every span [REDACTED] ({sorted(set(four))[:3]})",
                 bool(four) and all(n == "[REDACTED]" for n in four)))
     lasted = end - (t5 + MARGIN)

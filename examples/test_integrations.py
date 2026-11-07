@@ -1437,6 +1437,49 @@ class Slots(unittest.TestCase):
                          ["each restart starts on the policy its slot kept (the drop, as its effective config, with no offer)"])
 
 
+def named_dir(base: Path, folders: tuple[str, ...] = ("2",), empty: tuple[str, ...] = ()) -> None:
+    """A named state directory as check_slots leaves it: its own lock and state, and `folders`,
+    each holding its lock and, but for those in `empty` ("" is the directory itself), its state."""
+    for f in ("", *folders):
+        (base / f).mkdir(parents=True, exist_ok=True)
+        (base / f / "lock").touch()
+        if f not in empty:
+            (base / f / "instance-uid").write_text("x")
+
+
+class NamedSlots(unittest.TestCase):
+    def judged(self, heard: list[str | None] = [U1, U2, U2, U1], log: Log | None = None, **kw) -> list[str]:
+        with tempfile.TemporaryDirectory() as d:
+            named_dir(Path(d), **kw)
+            return failed(integrations.judge_named_slots((log or four_starts()).events, integrations.files_under(Path(d)),
+                                                         [0, 10, 20, 30], heard))
+
+    def test_a_good_run_passes(self):
+        self.assertEqual(self.judged(), [])
+
+    def test_one_uid_for_both_processes_fails(self):
+        # As before the directory was locked: both processes read and wrote it, as one instance.
+        judged = self.judged(heard=[U1, U1, U1, U1], folders=())
+        self.assertIn(f"two processes sharing a named state directory, each its own instance: two UIDs ({U1}, {U1})", judged)
+        self.assertIn("the first keeps the directory itself (['instance-uid']), the second takes its folder 2 ([])", judged)
+
+    def test_a_third_folder_fails(self):
+        self.assertEqual(self.judged(folders=("2", "3")),
+                         ["the first keeps the directory itself (['instance-uid']), the second takes its folder 2 (['2', '3'])"])
+
+    def test_a_directory_without_its_own_state_fails(self):
+        self.assertEqual(self.judged(empty=("",)),
+                         ["the first keeps the directory itself ([]), the second takes its folder 2 (['2'])"])
+
+    def test_the_last_start_in_the_folder_fails(self):
+        self.assertIn(f"with both gone, the next start takes the directory itself: the first's UID ({U2})",
+                      self.judged(heard=[U1, U2, U2, U2]))
+
+    def test_a_restart_offered_the_policy_again_fails(self):
+        self.assertEqual(self.judged(log=four_starts(offered=True)),
+                         ["each restart starts on the policy its directory kept (the drop, as its effective config, with no offer)"])
+
+
 def seventh(early: bool = False, on: bool = True, failed_off: bool = False, stays_on: bool = False,
             again: bool = True, changes: int = 3, error: str = "app_settings: values must be an object of keys to strings, "
             "numbers or booleans") -> Log:

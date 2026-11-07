@@ -49,7 +49,7 @@ def same_host(got: str | None, want: str) -> bool:
 
 def test_platform_mode_reads_every_url_alike() -> None:
     """Platform mode hands each URL to aiohttp as a yarl.URL taken as it is written (encoded=True,
-    the executor's _url): requests, WebSocket upgrades and downloads alike."""
+    the executor's _url): requests and WebSocket upgrades alike."""
     wrong = []
     for u in URLS:
         url = yarl.URL(u["url"], encoded=True)
@@ -96,7 +96,7 @@ async def _raw_server(seen: list[str], status: bytes) -> tuple[asyncio.Server, i
     return server, server.sockets[0].getsockname()[1]
 
 
-@pytest.mark.parametrize("how", ["http_request", "download", "ws_open"])
+@pytest.mark.parametrize("how", ["http_request", "ws_open"])
 def test_platform_mode_sends_every_urls_request_target_exactly(how: str, tmp_path) -> None:
     async def run() -> None:
         seen: list[str] = []
@@ -114,8 +114,6 @@ def test_platform_mode_sends_every_urls_request_target_exactly(how: str, tmp_pat
                 if how == "http_request":
                     x.do(corepb.Effect(http_request=corepb.HttpRequest(
                         id=n, url=url, body=b"x", timeout_ms=5000, max_response_bytes=1024)))
-                elif how == "download":
-                    x.do(corepb.Effect(download=corepb.Download(id=n, url=url, max_bytes=1024, timeout_ms=5000)))
                 else:
                     x.do(corepb.Effect(ws_open=corepb.WsOpen(id=n, url=url, max_message_bytes=1024)))
                 for _ in range(500):
@@ -123,10 +121,8 @@ def test_platform_mode_sends_every_urls_request_target_exactly(how: str, tmp_pat
                         break
                     await asyncio.sleep(0.01)
                 kind = got[0].WhichOneof("kind") if got else None
-                if kind not in ("http_response", "download_response", "ws_failed") or seen != [sent_as(u["target"])]:
+                if kind not in ("http_response", "ws_failed") or seen != [sent_as(u["target"])]:
                     wrong.append((u["url"], u["target"], list(seen), kind))
-                if how == "download":
-                    x.do(corepb.Effect(discard=corepb.Id(id=n)))
         finally:
             await x.close(5)
             server.close()

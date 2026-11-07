@@ -13,20 +13,20 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
 
+import { diag, DiagLogLevel } from "@opentelemetry/api";
+
 import { type AgentRemoteConfig, AgentRemoteConfigSchema, create, type RemoteConfigStatus, RemoteConfigStatuses } from "@pydantic/logfire-fleet-client";
 import { type HostInit, SdkSettings } from "@pydantic/logfire-fleet-client/sdk";
 
 import * as standalone from "../src/app-settings.js";
 import { keepApplied } from "./kept.js";
-import { config as policyConfig, FILE, overridden, type Overrides, policy, reported } from "./policy.js";
+import { config as policyConfig, decide, FILE, overridden, type Overrides, policy, reported } from "./policy.js";
 import {
-  Agent, AppSettings, type AppSettingsMap, appSettings, Controls, hostFromEnv, preparing, settingsKeptOnFailure,
+  Agent, AppSettings, type AppSettingsMap, appSettings, Controls, hostFromEnv, preparing, release, say, settingsKeptOnFailure,
 } from "../src/index.js";
 
 const LAYER = new SdkSettings();
 const text = (s: string) => new TextEncoder().encode(s);
-/** The policy with every control local: what the SDK starts with when nothing was kept. */
-const EMPTY = text(policy());
 const APPLIED = RemoteConfigStatuses.RemoteConfigStatuses_APPLIED;
 const FAILED = RemoteConfigStatuses.RemoteConfigStatuses_FAILED;
 /** 2026-10-14T12:00:00Z. */
@@ -92,8 +92,12 @@ class TestAgent extends Agent {
       clear: (t) => void ((t as { cleared: boolean }).cleared = true),
     };
     if (prepare) this.prepare(TestAgent.env(dir, env));
+    // Each agent is a start of its own process: its state directory's lock is let go at once, as
+    // that process ending would, so the next one is the restart that takes it back.
+    if (this.setup?.stateLock) release(this.setup.stateLock);
     this.client = {
       setEffectiveConfig: (e: never) => this.reported.push(overridden(e)),
+      setRemoteConfigStatus: () => {},
       setHealth: () => {},
       stop: () => Promise.resolve(),
     } as never;
@@ -140,7 +144,7 @@ test("vectors: custom.json's cases through the layer, with each case's host", ()
   for (const c of VECTORS.cases) {
     // Without a host, the host this package declares, which carries out every control.
     const host: HostInit = c.host ?? hostFromEnv();
-    const d = LAYER.decide(config(c.document), EMPTY, EMPTY, host, 0n);
+    const d = decide(LAYER, config(c.document), host, 0n);
     if (c.refused !== undefined) {
       assert.equal(d.status?.status, FAILED, c.name);
       assert.equal(d.status?.errorMessage, c.refused, c.name);
@@ -446,8 +450,10 @@ test("the timer's Refresh (debug mode's end) puts the same map in force again: n
   assert.equal(app.get("example.feature", "off"), "on");
   assert.equal(told.length, 1);
   assert.deepEqual(agent.reported.at(-1), { app_settings: { values: { "example.feature": "on" } }, head_sampling: { ratio: 0.1 } });
-  // A Refresh called again (no debug mode at all): still nothing.
-  agent.refresh();
+  // The timer again (export health's; no debug mode at all): still nothing.
+  agent.wall += 30_000;
+  agent.mono += 30_000;
+  agent.timer!.fn();
   assert.equal(told.length, 1);
 });
 
@@ -620,10 +626,21 @@ test("a saved policy with a bad app_settings map: the SDK's own settings, the de
   new TestAgent(dir).remoteConfig(config(doc({ a: "1" })));
   // Written by hand, not by the client: a map the layer refuses.
   keepApplied(dir, doc({ "a b": "1" }));
-  const agent = new TestAgent(dir);
+  const warned: string[] = [];
+  diag.setLogger({ error: () => {}, warn: (m) => void warned.push(m), info: () => {}, debug: () => {}, verbose: () => {} },
+    DiagLogLevel.WARN);
+  const before = say.console;
+  say.console = false;
+  let agent: TestAgent;
+  try {
+    agent = new TestAgent(dir);
+  } finally {
+    say.console = before;
+    diag.disable();
+  }
   assert.equal(agent.app.get("a b", "def"), "def");
   assert.equal(agent.app.get("a", "def"), "def");
-  assert.ok(agent.loaded?.warning, "the load warns");
+  assert.equal(warned.filter((m) => m.includes('"a b"')).length, 1, JSON.stringify(warned));
 });
 
 // --- what the package declares --------------------------------------------------------------------
@@ -644,7 +661,7 @@ test("Controls without an AppSettings of their own keep a private one: tests and
   const b = new Controls();
   assert.notEqual(a.app, b.app);
   assert.notEqual(a.app, appSettings);
-  a.apply(LAYER.decide(config(doc({ k: "v" })), EMPTY, EMPTY, { live: ["custom"] }, 0n).apply);
+  a.apply(decide(LAYER, config(doc({ k: "v" })), { live: ["custom"] }, 0n).apply);
   assert.equal(a.app.get("k"), "v");
   assert.equal(b.app.get("k"), undefined);
   assert.equal(appSettings.get("k"), undefined);
@@ -687,7 +704,6 @@ test("a register that fails after Load: no timer left to put the saved settings 
   assert.equal(agent.on, false);
   // Even a timer that fires anyway (already on its way) puts nothing back.
   for (const t of agent.armed) t.fn();
-  agent.refresh();
   assert.equal(app.get("example.feature", "off"), "off");
   assert.equal(agent.armed.filter((t) => !t.cleared).length, 0, "nothing armed again");
   assert.equal(told.length, 2);

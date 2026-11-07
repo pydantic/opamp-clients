@@ -14,7 +14,7 @@ import (
 	"github.com/open-telemetry/opamp-go/protobufs"
 	"github.com/stretchr/testify/require"
 
-	"github.com/pydantic/opamp-clients/go/opamp"
+	"github.com/pydantic/opamp-clients/go/opamp/collector"
 	"github.com/pydantic/opamp-clients/go/opampsupervisor/supervisor/verifier"
 )
 
@@ -105,7 +105,7 @@ func TestARollbackThatFailsRunsTheConfiguredCollector(t *testing.T) {
 	err := s.revertAgentUpdate(installed, true, s.telemetrySettings.Logger)
 	require.Error(t, err)
 	require.False(t, unanswered(err))
-	require.True(t, opamp.IsFailedLeavingUnknown(err), "%v", err)
+	require.True(t, collector.IsFailedLeavingUnknown(err), "%v", err)
 	require.Equal(t, s.packagedAgent, s.commander.Executable())
 	require.FileExists(t, s.unprovenAgentPath(), "the next start tries again")
 }
@@ -170,7 +170,7 @@ func TestAnInstallSigstoreCannotCheckForNowIsTriedAgain(t *testing.T) {
 			})
 			require.ErrorIs(t, err, c.err)
 			require.False(t, unanswered(err))
-			require.Equal(t, c.forNow, opamp.IsFailedForNow(err), "%v", err)
+			require.Equal(t, c.forNow, collector.IsFailedForNow(err), "%v", err)
 			require.Equal(t, s.packagedAgent, s.commander.Executable(), "the running collector wasn't touched")
 		})
 	}

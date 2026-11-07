@@ -5,7 +5,7 @@
 // (fast-check's fc.commands with asyncModelRun), against the real core and a local server: start,
 // with a saved remote config or none; application calls from outside, from another task and from
 // inside the callback; a callback that throws on its k-th call; stop from outside, or requested
-// from inside the callback; the server offering a remote config, a custom message or a heartbeat
+// from inside the callback; the server offering a remote config or a heartbeat
 // interval. After each step the notifications seen so far are checked against the contract: one
 // callback at a time, none before start returned, none after stopped, stopped exactly once (with
 // the error when a callback threw), stop bounded and giving that error, and the order the model
@@ -37,8 +37,6 @@ import {
   Client,
   ComponentHealthSchema,
   create,
-  CustomCapabilitiesSchema,
-  CustomMessageSchema,
   fromBinary,
   type Notification,
   RemoteConfigStatusSchema,
@@ -49,8 +47,6 @@ import {
 import { annotatedTest } from "./annotate.js";
 
 const UID = new Uint8Array(16).fill(0x87);
-const CAPABILITY = "io.example.model";
-const UNDECLARED = "io.example.undeclared";
 const ACCEPTS_REMOTE_CONFIG = 2n;
 const SERVER_CAPABILITIES = 1n | 2n; // AcceptsStatus, OffersRemoteConfig
 const REQUEST_TIMEOUT_MS = 2000;
@@ -71,7 +67,7 @@ async function body(req: IncomingMessage): Promise<Uint8Array> {
   return new Uint8Array(Buffer.concat(chunks));
 }
 
-type OfferKind = "config" | "custom" | "heartbeat";
+type OfferKind = "config" | "heartbeat";
 
 /** The local server, over HTTP and WebSocket (properties.test.ts's): it answers every message,
  * and carries the offers the steps queue, one per answer (pushed at once on an open connection). */
@@ -84,7 +80,6 @@ class OpampServer {
   /** Offers not yet sent. */
   readonly pending: ServerToAgent[] = [];
   configs = 0;
-  customs = 0;
   heartbeats = 0;
   port = 0;
 
@@ -135,9 +130,6 @@ class OpampServer {
       m = create(ServerToAgentSchema, {
         remoteConfig: { config: { configMap: { "": { body: new Uint8Array([n]) } } }, configHash: new Uint8Array([n]) },
       });
-    } else if (kind === "custom") {
-      n = ++this.customs;
-      m = create(ServerToAgentSchema, { customMessage: { capability: CAPABILITY, type: "m", data: new Uint8Array([n]) } });
     } else {
       // 1 s and 0 in turn: each is a change (over HTTP, 0 is the configured poll interval).
       n = this.heartbeats++ % 2 === 0 ? 1 : 0;
@@ -275,16 +267,6 @@ class Life {
       this.notes.flatMap((n) => (n.kind === "remoteConfig" ? [n.remoteConfig.configHash[0]!] : [])),
       "remote configs",
     );
-    increasing(
-      this.notes.flatMap((n) => (n.kind === "customMessage" ? [n.customMessage.data[0]!] : [])),
-      "custom messages",
-    );
-    increasing(
-      this.notes.flatMap((n) =>
-        n.kind === "customMessageNotSent" ? [Number(new TextDecoder().decode(n.customMessage.data))] : [],
-      ),
-      "refused custom messages",
-    );
     const beats = this.notes.flatMap((n) => (n.kind === "heartbeatInterval" ? [n.heartbeatIntervalMs] : []));
     beats.forEach((b, i) => {
       assert.ok([0, 1000, HEARTBEAT_MS].includes(b), `a heartbeat interval offered: ${log()}`);
@@ -302,10 +284,6 @@ function describe(n: Notification): string {
   switch (n.kind) {
     case "remoteConfig":
       return `remoteConfig(${n.remoteConfig.configHash[0]})`;
-    case "customMessage":
-      return `customMessage(${n.customMessage.data[0]})`;
-    case "customMessageNotSent":
-      return `customMessageNotSent(${new TextDecoder().decode(n.customMessage.data)})`;
     case "heartbeatInterval":
       return `heartbeatInterval(${n.heartbeatIntervalMs})`;
     case "stopped":
@@ -350,18 +328,13 @@ class World {
   status() {
     return {
       health: create(ComponentHealthSchema, { healthy: true, status: "h0" }),
-      customCapabilities: create(CustomCapabilitiesSchema, { capabilities: [CAPABILITY] }),
     };
   }
 
-  /** An application call, numbered: a health (the server sees them go up), or a custom message
-   * for a capability not declared, which the core refuses at once with customMessageNotSent: a
-   * notification in the step of the call, so a call made from the callback that reached the core
-   * before the callback returned would call back inside it. */
+  /** An application call, numbered: a health (the server sees them go up). */
   call(client: Client): void {
     const n = ++this.healths;
-    if (n % 2 === 1) client.setHealth(create(ComponentHealthSchema, { healthy: true, status: `h${n}` }));
-    else client.sendCustomMessage(create(CustomMessageSchema, { capability: UNDECLARED, type: "x", data: new TextEncoder().encode(String(n)) }));
+    client.setHealth(create(ComponentHealthSchema, { healthy: true, status: `h${n}` }));
   }
 
   /** What a callback throws: an Error, or not one (JavaScript throws anything). */
@@ -501,8 +474,8 @@ class Inside implements Cmd {
   check = (m: Readonly<Model>) => m.running;
   async run(_m: Model, w: World) {
     w.life!.inside.push(this.what);
-    // A callback to do it in: the server's next custom message (if nothing comes first).
-    await offer(w, "custom");
+    // A callback to do it in: the server's next remote config (if nothing comes first).
+    await offer(w, "config");
   }
   toString = () => `inside(${this.what})`;
 }
@@ -567,7 +540,7 @@ const commands = [
   fc.constantFrom("now", "macrotask", "microtask").map((h) => new CallOutside(h)),
   fc.constantFrom("call", "stop").map((w) => new Inside(w)),
   fc.integer({ min: 1, max: 3 }).map((k) => new ThrowOn(k)),
-  fc.constantFrom<OfferKind>("config", "custom", "heartbeat").map((k) => new Offer(k)),
+  fc.constantFrom<OfferKind>("config", "heartbeat").map((k) => new Offer(k)),
   fc.constant(new StopOutside()),
   fc.integer({ min: 5, max: 80 }).map((ms) => new Wait(ms)),
 ];

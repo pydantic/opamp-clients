@@ -13,8 +13,8 @@ fetch` puts in place with the core.
 ## The callback
 
 The application gives the client one callback when it starts it. The client calls it with each
-notification: a remote config offered, connection settings, a custom message, a package to
-install, the instance UID changed, `stopped`, and the rest.
+notification: a remote config offered, connection settings, the instance UID changed, `stopped`,
+and the rest (and, in Go's `go/opamp/collector` only, a custom message or a package to install).
 
 - **One at a time.** Two calls of the callback never overlap, on any thread. A callback may
   keep state of its own without a lock, as long as only the callback touches it.

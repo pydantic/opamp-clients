@@ -25,7 +25,7 @@ import opamp.proto.v1.Opamp;
  */
 final class Kept {
   private static final String BEFORE =
-      "a core state saved before the core kept the config applied: the policy kept before carries over";
+      "a core state saved before the core kept the config applied: the policy with every control local";
 
   private Kept() {}
 

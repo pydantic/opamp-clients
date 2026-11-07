@@ -4,7 +4,6 @@
 // Runs our Node.js client (node/opamp: the shared core in Node's WebAssembly engine) under the
 // conformance driver contract (conformance/DRIVERS.md).
 
-import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 
 import {
@@ -12,8 +11,6 @@ import {
   AgentDescriptionSchema,
   AvailableComponentsSchema,
   Client,
-  CustomCapabilitiesSchema,
-  CustomMessageSchema,
   ComponentHealthSchema,
   ConnectionSettingsStatusSchema,
   ConnectionSettingsStatuses,
@@ -31,9 +28,6 @@ function components() {
     components: { receivers: group("otlp", { metadata: [version] }), exporters: group("debug", {}) },
   });
 }
-
-/** The custom capability DRIVERS.md names: ping is answered with pong. */
-const ECHO = "io.opentelemetry.echo";
 
 function emit(event, fields = {}) {
   process.stdout.write(`${JSON.stringify({ ...fields, event, wall: Date.now() / 1000 })}\n`);
@@ -128,38 +122,6 @@ const onNote = (n) => {
         ),
       );
       break;
-    case "customMessage": {
-      const m = n.customMessage;
-      emit("custom_message", { capability: m.capability, type: m.type, data: hex(m.data) });
-      if (m.type === "ping") {
-        setImmediate(() =>
-          client.sendCustomMessage(create(CustomMessageSchema, { capability: ECHO, type: "pong", data: m.data })),
-        );
-      }
-      break;
-    }
-    case "customMessageNotSent":
-      emit("custom_message_not_sent", { reason: n.detail });
-      break;
-    case "installPackage": {
-      let sha = null;
-      let error;
-      try {
-        sha = createHash("sha256").update(readFileSync(n.path)).digest("hex");
-      } catch (e) {
-        error = String(e);
-      }
-      emit("install_package", { name: n.packageName, version: n.package.version, sha256: sha, error: error ?? null });
-      setImmediate(() => client.packageInstalled(n.packageName, n.package.hash, error));
-      break;
-    }
-    case "removePackage":
-      emit("remove_package", { name: n.packageName });
-      setImmediate(() => client.packageRemoved(n.packageName));
-      break;
-    case "serverCustomCapabilities":
-      emit("server_custom_capabilities", { capabilities: n.customCapabilities });
-      break;
     case "connectionSettings": {
       const s = n.connectionSettings;
       emit("telemetry_settings", { hash: hex(s.hash), metrics_endpoint: s.ownMetrics?.destinationEndpoint ?? null });
@@ -214,7 +176,6 @@ try {
       headers: process.env.DRIVER_TOKEN ? { Authorization: `Bearer ${process.env.DRIVER_TOKEN}` } : {},
       stateFile: process.env.DRIVER_STATE_FILE || undefined,
       acceptConnectionSettings: process.env.DRIVER_ACCEPT_CONNECTION_SETTINGS === "1",
-      acceptPackages: process.env.DRIVER_PACKAGES === "1",
       requestInstanceUid: process.env.DRIVER_REQUEST_UID === "1",
       tls: tls(),
       proxy: process.env.DRIVER_PROXY ? { url: process.env.DRIVER_PROXY } : undefined,
@@ -228,8 +189,6 @@ try {
       health: create(ComponentHealthSchema, { healthy: true, startTimeUnixNano: BigInt(Date.now()) * 1_000_000n }),
       effectiveConfig: create(EffectiveConfigSchema, { configMap: {} }),
       availableComponents: process.env.DRIVER_COMPONENTS === "1" ? components() : undefined,
-      customCapabilities:
-        process.env.DRIVER_CUSTOM === "1" ? create(CustomCapabilitiesSchema, { capabilities: [ECHO] }) : undefined,
     },
     onNote,
   );

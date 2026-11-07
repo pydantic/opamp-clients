@@ -82,7 +82,7 @@ against:
 
 ```xml
 <PackageReference Include="Elastic.OpenTelemetry.AutoInstrumentation" Version="1.6.1" />
-<PackageReference Include="Logfire.Fleet.AutoInstrumentation" Version="0.2.0" />
+<PackageReference Include="Logfire.Fleet.AutoInstrumentation" Version="0.2.1" />
 ```
 
 List both plugins, EDOT's first, and start the application with `_instrument.sh`:

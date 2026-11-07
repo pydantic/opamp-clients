@@ -2,21 +2,19 @@
 // SPDX-License-Identifier: MIT
 
 // The client's file operations (src/files.ts), in both modes: journaled into the core tap as the
-// tap checker expects (its file records), off the event loop, and never on a file left by another
-// client or a crashed run (a download's file made new).
+// tap checker expects (its file records), and off the event loop.
 
 import assert from "node:assert/strict";
-import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
 
 import { TEST_CORE_TAP } from "../src/core.js";
-import { Executor, downloadPath, downloadsDir } from "../src/executor.js";
+import { Executor } from "../src/executor.js";
 import { REAL, TEST_FILE_OPS } from "../src/files.js";
 import { EffectSchema, type Input } from "../src/gen/opamp/core/v1/core_pb.js";
 import { AgentCapabilities, Client, type Config, create, type Notification } from "../src/index.js";
-import { Streams } from "../src/streams.js";
 import { Transport } from "../src/transport.js";
 import {
   checkTap,
@@ -24,7 +22,6 @@ import {
   fileOps,
   opampServer,
   readTap,
-  sha256,
   sleep,
   storeAnswers,
   stores,
@@ -45,9 +42,8 @@ function checked(t: { diagnostic(m: string): void }, tap: string): void {
 
 for (const mode of MODES) {
   // covers: RULE-SHELL-09
-  test(`${mode} mode: saves and a download's file are journaled in the tap, stored after the directory sync`, async (t) => {
-    const file = Buffer.from("the package ".repeat(5000));
-    const server = await opampServer({ configs: 2, pkg: file });
+  test(`${mode} mode: saves are journaled in the tap, stored after the directory sync`, async (t) => {
+    const server = await opampServer({ configs: 2 });
     const d = dir("journal");
     const state = join(d, "state.bin");
     const tap = join(d, "core.tap");
@@ -57,7 +53,6 @@ for (const mode of MODES) {
       {
         endpoint: server.url,
         stateFile: state,
-        acceptPackages: true,
         capabilities: BigInt(AgentCapabilities.AgentCapabilities_AcceptsRemoteConfig),
         heartbeatIntervalMs: 50,
         mode,
@@ -65,16 +60,14 @@ for (const mode of MODES) {
         [TEST_CORE_TAP]: tap,
       } as Config,
       {},
-      (n) => {
-        notes.push(n);
-        if (n.kind === "installPackage") client?.packageInstalled(n.packageName, n.package.hash);
-      },
+      (n) => notes.push(n),
     );
     try {
-      await until("the package installed and its file discarded, and the configs saved", () => {
+      // The core takes in what comes while a save is under way at once, so the configs (coming
+      // one a message, fast) may make as few as two saves.
+      await until("the configs saved", () => {
         const recs = readTap(tap);
-        const discarded = fileOps(recs).some((o) => o.op === "remove" && o.path?.startsWith("state.bin.downloads/"));
-        return discarded && stores(recs).length >= 3 && storeAnswers(recs).length === stores(recs).length;
+        return stores(recs).length >= 2 && storeAnswers(recs).length === stores(recs).length;
       });
     } finally {
       await client.stop();
@@ -84,7 +77,6 @@ for (const mode of MODES) {
     const ops = fileOps(recs);
     assert.deepEqual(ops[0], { at: ops[0]!.at, op: "state", path: "state.bin" }, "the state file is named first");
     assert.deepEqual(recs.slice(0, ops[0]!.at).map((r) => r.kind), [1, 2], "right after init");
-    assert.deepEqual(ops[1] && { op: ops[1].op, path: ops[1].path }, { op: "clear", path: "state.bin.downloads" });
 
     // Each save: [remove], create, write (its data), sync, rename, syncdir; and stored after it.
     const saves = ops.filter((o) => o.path === "state.bin.tmp" || o.op === "rename" || o.op === "syncdir");
@@ -107,167 +99,7 @@ for (const mode of MODES) {
       i += 5;
     }
 
-    // The download's file: its directory made, the file made new, written, synced, then deleted.
-    const dl = ops.filter((o) => o.path?.startsWith("state.bin.downloads"));
-    const name = dl.find((o) => o.op === "create")?.path;
-    assert.ok(name, JSON.stringify(dl));
-    const of = dl.filter((o) => o.path === name || o.op === "mkdir");
-    assert.deepEqual(of[0], { at: of[0]!.at, op: "mkdir", path: "state.bin.downloads" });
-    assert.equal(of[1]!.op, "create");
-    const writes = of.filter((o) => o.op === "write");
-    assert.equal(writes.reduce((n, o) => n + (o.len ?? 0), 0), file.length, "every byte written");
-    assert.deepEqual(of.slice(-2).map((o) => o.op), ["sync", "remove"]);
     checked(t, tap);
-  });
-
-  // A download given up on at stop never touches the file of the download of the same id a client
-  // started next on the state file makes.
-  // covers: RULE-SHELL-07
-  test(`${mode} mode: a download held at stop doesn't touch the next client's file of the same id`, async () => {
-    const file = Buffer.from("the package, version 1");
-    const server = await opampServer({ pkg: file, hold: (n) => n === 0 });
-    const state = join(dir("s3"), "state.bin");
-    const config = { endpoint: server.url, stateFile: state, acceptPackages: true, heartbeatIntervalMs: 60_000, mode, proxy: false } as Config;
-    try {
-      const a = Client.start(config, {});
-      await until("the first download", () => server.gets >= 1);
-      await a.stop();
-      const paths: string[] = [];
-      const b = Client.start(config, {}, (n) => {
-        if (n.kind === "installPackage") paths.push(n.path);
-      });
-      try {
-        await until("installPackage", () => paths.length > 0);
-        server.release(); // the first client's download, if it is still there, goes on now
-        await sleep(300);
-        assert.equal(sha256(readFileSync(paths[0]!)), sha256(file), "the file handed over is the package");
-      } finally {
-        await b.stop();
-      }
-    } finally {
-      server.close();
-    }
-  });
-
-  // A file left at a download's path (by a crashed run) is cleared at start: the download is
-  // written to a file made new, and the tap says so.
-  test(`${mode} mode: a file left in the downloads is never written over or handed over`, async (t) => {
-    const file = Buffer.from("the package, fresh");
-    const server = await opampServer({ pkg: file });
-    const d = dir("left");
-    const state = join(d, "state.bin");
-    const tap = join(d, "core.tap");
-    mkdirSync(downloadsDir(state), { recursive: true });
-    for (let id = 0n; id < 4n; id++) writeFileSync(downloadPath(state, id), "PARTIAL");
-    const paths: string[] = [];
-    const client = Client.start(
-      { endpoint: server.url, stateFile: state, acceptPackages: true, heartbeatIntervalMs: 60_000, mode, proxy: false, [TEST_CORE_TAP]: tap } as Config,
-      {},
-      (n) => {
-        if (n.kind === "installPackage") paths.push(n.path);
-      },
-    );
-    try {
-      await until("installPackage", () => paths.length > 0);
-      assert.equal(sha256(readFileSync(paths[0]!)), sha256(file));
-    } finally {
-      await client.stop();
-      server.close();
-    }
-    assert.ok(!fileOps(readTap(tap)).some((o) => o.op === "open"), "no file written in place");
-    checked(t, tap);
-  });
-}
-
-// A download's file is made new: one already at its path (another client's, or a crashed run's)
-// fails the download, untouched.
-test("a download never writes over a file already at its path (platform mode)", async () => {
-  const file = Buffer.from("the package");
-  const server = await opampServer({ pkg: file });
-  const state = join(dir("exec"), "state.bin");
-  mkdirSync(downloadsDir(state), { recursive: true });
-  writeFileSync(downloadPath(state, 1n), "SOMEONE ELSE'S");
-  const got: Input[] = [];
-  const x = new Executor((i) => got.push(i), state, new Transport({ proxy: false }));
-  try {
-    const url = server.url.replace("/v1/opamp", "/file");
-    x.do(create(EffectSchema, { kind: { case: "download", value: { id: 1n, url, maxBytes: 1n << 20n, timeoutMs: 5000n } } }));
-    await until("an answer", () => got.length > 0);
-    assert.equal(got[0]!.kind.case, "downloadFailed", JSON.stringify(got[0]!.kind.value, (_, v) => (typeof v === "bigint" ? `${v}` : v)));
-    assert.equal(readFileSync(downloadPath(state, 1n), "utf8"), "SOMEONE ELSE'S");
-  } finally {
-    x.shutdown();
-    server.close();
-  }
-});
-
-test("a download never writes over a file already at its path (core mode)", async () => {
-  const state = join(dir("streams"), "state.bin");
-  mkdirSync(downloadsDir(state), { recursive: true });
-  writeFileSync(downloadPath(state, 2n), "SOMEONE ELSE'S");
-  const got: Input[] = [];
-  const s = new Streams((i) => got.push(i), new Transport({ proxy: false }), state);
-  s.do(create(EffectSchema, { kind: { case: "downloadData", value: { id: 2n, data: Buffer.from("new") } } }));
-  s.do(create(EffectSchema, { kind: { case: "downloadDone", value: { id: 2n } } }));
-  await until("an answer", () => got.length > 0);
-  await s.shutdown();
-  assert.equal(got[0]!.kind.case, "downloadFailed");
-  assert.equal(readFileSync(downloadPath(state, 2n), "utf8"), "SOMEONE ELSE'S");
-});
-
-// RULE-SHELL-07: a download whose file is still being flushed when the core says stopped is the
-// shell's to delete (the core gave up on it), once the flush is over; and by the time stop returns,
-// however much of the stop timeout the core took (STOP_GRACE_MS at least, after it).
-// covers: RULE-SHELL-07
-for (const mode of MODES) {
-  test(`${mode} mode: a download's file being flushed as the core stops is gone when stop returns`, async () => {
-    const pkg = Buffer.from("the package ".repeat(10_000));
-    const server = await opampServer({ pkg });
-    const state = join(dir("flushed"), "state.bin");
-    const downloads = downloadsDir(state);
-    const flushMs = 600; // longer than the stop timeout, well within the grace after it
-    let flushing = false;
-    let flushed = false;
-    const ops = {
-      ...REAL,
-      async create(path: string) {
-        const f = await REAL.create(path);
-        if (!path.startsWith(downloads)) return f;
-        return {
-          path: f.path,
-          write: (bufs: Uint8Array[]) => f.write(bufs),
-          async sync() {
-            flushing = true;
-            await sleep(flushMs);
-            await f.sync();
-            flushed = true;
-          },
-          close: () => f.close(),
-        };
-      },
-    };
-    const listing = () => (existsSync(downloads) ? readdirSync(downloads).sort() : []);
-    const installed: string[] = [];
-    const config = { endpoint: server.url, stateFile: state, acceptPackages: true, heartbeatIntervalMs: 60_000,
-      stopTimeoutMs: 100, mode, proxy: false, [TEST_FILE_OPS]: ops } as Config;
-    try {
-      const c = Client.start(config, {}, (n) => {
-        if (n.kind === "installPackage") installed.push(n.path);
-      });
-      await until("the download's file being flushed", () => flushing);
-      const t0 = performance.now();
-      await c.stop();
-      const took = performance.now() - t0;
-      const atReturn = listing();
-      await sleep(flushMs + 500);
-      assert.ok(flushed, "the flush ended");
-      assert.deepEqual(atReturn, [], `stop returned with ${atReturn} still there (deleted later: ${listing().length === 0})`);
-      assert.deepEqual(listing(), []);
-      assert.ok(took < 100 + 1000 + 500, `stop took ${took} ms`);
-      assert.deepEqual(installed, []);
-    } finally {
-      server.close();
-    }
   });
 }
 

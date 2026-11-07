@@ -161,28 +161,6 @@ public class CancelTests
     }
 
     [Fact]
-    public async Task ACancelledDownloadIsAbortedAndItsPartialFileDeleted()
-    {
-        using var server = new RawServer(async c =>
-        {
-            await c.ReadHeadAsync();
-            await Http1.WriteAsync(c.Stream, "HTTP/1.1 200 OK\r\nContent-Length: 1000000\r\n\r\n", new byte[400_000]);
-            await Task.Delay(Timeout.Infinite);
-        });
-        var loop = TestLoop.New();
-        var file = loop.X.DownloadPath(7);
-        loop.Run(new Effect { Download = new Download { Id = 7, Url = server.Url("http", "/file"), MaxBytes = 1 << 20 } });
-        Assert.True(await Wait.ForAsync(() => File.Exists(file) && new FileInfo(file).Length > 0), "nothing was written");
-
-        loop.Run(Cancel(7));
-
-        Assert.True(await Wait.ForAsync(() => !File.Exists(file), 5), "the partial file is still there");
-        Assert.True(await server.Conns.First().EndsWithinAsync(TimeSpan.FromSeconds(5)), "the download was not aborted");
-        await Task.Delay(Quiet);
-        Assert.Empty(loop.Drain());
-    }
-
-    [Fact]
     public async Task ACancelledSaveFinishesWholeAndIsNeverReported()
     {
         var loop = TestLoop.New();

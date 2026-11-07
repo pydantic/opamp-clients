@@ -102,16 +102,15 @@ class AppSettingsExtensionTest {
         var host = dev.pydantic.logfire.fleet.sdk.SettingsProto.Host.newBuilder();
         c.get("host").path("live").forEach(n -> host.addLive(n.asText()));
         c.get("host").path("next_start").forEach(n -> host.addNextStart(n.asText()));
-        var d = Vectors.LAYER.decide(config(c.get("document").asText()), com.google.protobuf.ByteString.EMPTY,
-            com.google.protobuf.ByteString.EMPTY, host.build(), Vectors.NOW, null);
+        var d = Vectors.decide(c.get("document").asText(), host.build(), Vectors.NOW);
         if (c.has("refused")) {
-          assertEquals(FAILED, d.getStatus().getStatus());
-          assertEquals(c.get("refused").asText(), d.getStatus().getErrorMessage());
-          assertFalse(d.hasApply());
+          assertEquals(FAILED, d.status().getStatus());
+          assertEquals(c.get("refused").asText(), d.status().getErrorMessage());
+          assertNull(d.apply());
           return;
         }
-        assertEquals(APPLIED, d.getStatus().getStatus());
-        e.controls.apply(d.getApply());
+        assertEquals(APPLIED, d.status().getStatus());
+        e.controls.apply(d.apply());
         assertEquals(map(c.get("custom")), app.bridge.current());
         return;
       }
@@ -246,11 +245,12 @@ class AppSettingsExtensionTest {
   void theEndOfDebugModeTellsNothingWhenTheMapStaysTheSame(@TempDir Path dir) throws Exception {
     App app = new App();
     Extension e = extension(dir, app);
-    e.clockForTest(() -> Vectors.NOW);
+    long[] now = {Vectors.NOW};
+    e.clockForTest(() -> now[0]);
     assertEquals(APPLIED, e.remoteConfig(config(every("head_sampling", override("\"ratio\":0.1"), "debug", override("\"until\":\"2026-10-14T12:30:00Z\""), "app_settings", override("\"values\":{\"example.feature\":\"on\"}")))).getStatus());
     assertEquals(1, app.told.size());
-    long[] armed = e.armedForTest();
-    e.fire(armed[0], armed[1]);
+    now[0] = Vectors.NOW + 30 * 60_000;
+    e.fireDueForTest();
     assertEquals(0.1, e.inForce().getSamplingRate());
     assertEquals(Map.of("example.feature", "on"), app.bridge.current());
     assertEquals(1, app.told.size());
@@ -265,6 +265,7 @@ class AppSettingsExtensionTest {
     assertEquals(APPLIED, e.remoteConfig(config(every("app_settings", override("\"values\":{\"example.feature\":\"on\"}")))).getStatus());
     Kept.keepApplied(dir, every("app_settings", override("\"values\":{\"example.feature\":\"on\"}"))); // as the client does, before APPLIED goes out
 
+    ExtensionTest.ended(e);
     // The next start: in force at Load, before any config arrives, and told to whoever listened.
     App second = new App();
     Extension next = Extension.forTest(null, second.sink);
@@ -281,15 +282,13 @@ class AppSettingsExtensionTest {
 
   @Test
   void savedValuesTheServerLaterLeavesOutGoBackToTheDefaults(@TempDir Path dir) throws Exception {
-    Files.writeString(dir.resolve("sdk-settings.json"), every("app_settings", override("\"values\":{\"a\":\"1\"}")));
+    Kept.keepApplied(dir, every("app_settings", override("\"values\":{\"a\":\"1\"}")));
     App app = new App();
     Extension e = Extension.forTest(null, app.sink);
     e.properties(DefaultConfigProperties.createFromMap(props(dir)));
     assertEquals(Map.of("a", "1"), app.bridge.current());
     e.remoteConfig(config(v1()));
     assertEquals(Map.of(), app.bridge.current());
-    // The file kept before is left as it was: the client keeps the config applied now.
-    assertEquals(every("app_settings", override("\"values\":{\"a\":\"1\"}")), Files.readString(dir.resolve("sdk-settings.json"), StandardCharsets.UTF_8));
   }
 
   @Test
@@ -309,7 +308,7 @@ class AppSettingsExtensionTest {
 
   @Test
   void aFailedSetupPutsBackWhatWasInForceBefore(@TempDir Path dir) throws Exception {
-    Files.writeString(dir.resolve("sdk-settings.json"), every("app_settings", override("\"values\":{\"a\":\"saved\"}")));
+    Kept.keepApplied(dir, every("app_settings", override("\"values\":{\"a\":\"saved\"}")));
     App app = new App();
     app.bridge.put(Map.of("a", "before"));
     app.told.clear();
@@ -407,9 +406,8 @@ class AppSettingsExtensionTest {
 
   /** The settings a policy puts in force, custom declared, as Decide hands them over. */
   static dev.pydantic.logfire.fleet.sdk.SettingsProto.Settings settings(String document) {
-    var d = Vectors.LAYER.decide(config(document), com.google.protobuf.ByteString.EMPTY,
-        com.google.protobuf.ByteString.EMPTY, Extension.HOST_WITH_APP, Vectors.NOW, null);
-    assertEquals(APPLIED, d.getStatus().getStatus(), d.getStatus().getErrorMessage());
-    return d.getApply();
+    var d = Vectors.decide(document, Extension.HOST_WITH_APP, Vectors.NOW);
+    assertEquals(APPLIED, d.status().getStatus(), d.status().getErrorMessage());
+    return d.apply();
   }
 }

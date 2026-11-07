@@ -41,7 +41,7 @@ OTEL_OPAMP_STATE_DIR=/var/lib/checkout/opamp \
 | `OTEL_SDK_DISABLED` | OpenTelemetry's own: `true` turns OpAMP off too, read as `OTEL_OPAMP_DISABLED` is (here `1` is taken as `true` as well). What the SDK does with it is upstream's. |
 | `OTEL_OPAMP_ENDPOINT` | The OpAMP server: `http(s)://.../v1/opamp` polls, `ws(s)://...` keeps a connection open. Without it the plugin does nothing. |
 | `OTEL_OPAMP_HEADERS` | Headers for every request, as `OTEL_EXPORTER_OTLP_HEADERS`: `name=value,...`, values percent-encoded. The key the server gave you goes here. |
-| `OTEL_OPAMP_STATE_DIR` | Where to keep state across restarts: the instance UID, the settings for the next start, the client's own state (readable by the application's user only). Without it, the plugin keeps one of the user's own, one per process of the program running at once ([default-state-dir.md](default-state-dir.md); the program is the entry assembly's name), unless `OTEL_RESOURCE_ATTRIBUTES` has a `service.instance.id`; `none` turns that off, and then each start is a new instance and settings that take effect at the next start are refused. One process per directory named here (below). |
+| `OTEL_OPAMP_STATE_DIR` | Where to keep state across restarts: the instance UID, the settings for the next start, the client's own state (readable by the application's user only). Without it, the plugin keeps one of the user's own, one per process of the program running at once ([default-state-dir.md](default-state-dir.md); the program is the entry assembly's name), unless `OTEL_RESOURCE_ATTRIBUTES` has a `service.instance.id`; `none` turns that off, and then each start is a new instance and settings that take effect at the next start are refused. Processes given the same directory each keep their own identity (below). |
 | `OTEL_OPAMP_HEARTBEAT_INTERVAL` | How often to check in until the server offers an interval (default 30 s): milliseconds, or `500ms`, `30s`, `2m`. A value it can't read is the default, with a warning (`OpAMP: OTEL_OPAMP_HEARTBEAT_INTERVAL "soon" is not a duration (as 1500, 500ms, 30s or 2m): using the default`); longer than a day is a day. |
 
 The core reads these, by the same rules in every language: whether OpAMP is off, the endpoint (one without a scheme is refused, with a warning, and the plugin is off), the headers (one whose escape can't be decoded, or that HTTP can't carry, is left out, with a warning), the interval, which state directory, and the instance UID kept there. The plugin keeps only the I/O: reading the variables, making and locking the state directory's slot, reading and writing its `instance-uid` file, and logging the warnings.
@@ -88,7 +88,7 @@ not conflict with the ones automatic instrumentation ships.
   | `instrumentations` `all_disabled` | at the next start, every instrumentation's variable set to false (one set to true would otherwise win). |
 
   The newer controls (rules, per-scope levels, redaction, scrubbing, rate caps, debug mode) and export
-  health are [below](#the-newer-settings). No control changes the SDK's own log level.
+  health are [below](#the-settings-that-match-telemetry). No control changes the SDK's own log level.
 - **Doesn't trace itself.** The OpAMP client runs inside a `SuppressInstrumentationScope`, as the
   SDK's own exporters do, so its requests (and its goodbye) never show up as the application's
   spans.
@@ -162,14 +162,12 @@ A child process the application starts inherits its environment: `OTEL_OPAMP_STA
 instrumentation variables the plugin set at start. Two processes on one state directory would be
 one instance to the server (one UID) while each ran and saved its own settings. So the plugin
 locks the directory (a `lock` file in it, locked by the operating system while the process runs,
-never inherited, gone when the process ends). A process that finds the lock taken, a child say,
-runs **unmanaged**: the plugin says so on standard error and leaves the SDK alone. It doesn't
-join the fleet under a new UID either, which would add an instance to the fleet for every child
-started. The switches the parent set still hold in the child. To manage such processes too, give
-each its own `OTEL_OPAMP_STATE_DIR`. A state directory that can't be locked (not writable) is
-treated the same way. The default state directory (no `OTEL_OPAMP_STATE_DIR`) has a slot per
-process instead, each locked the same way: a child takes the next free slot, and an identity of
-its own.
+never inherited, gone when the process ends), as it locks the default one's slots. A process that
+finds the lock taken, a child say, takes the first free numbered folder in it (`2` to `16`), and an
+identity of its own, which it takes back at its next start
+([default-state-dir.md](default-state-dir.md#a-directory-named)). The switches the parent set still
+hold in the child. A state directory that can't be made or locked (not writable) is said as a
+warning, and each start is then a new instance.
 
 ### Is it working?
 
@@ -192,7 +190,7 @@ without a scheme gets a warning at start (one that isn't a URL at all stops the 
 says so). `WithOpAmp()` (below) says the same on the application's logger, at Information,
 Warning and Debug, naming `OpAmp:Endpoint` and `OpAmp:Headers` instead.
 
-## The newer settings
+## The settings that match telemetry
 
 Each is a control of the policy. Each is carried out at once, in the plugin and in
 `WithOpAmp()` alike (the same code), and declared to the layer
@@ -302,12 +300,12 @@ keeps its bucket. Both stay in force in debug mode. Declared with the sampler an
  "debug": {"mode": "override", "until": "2026-10-14T17:30:00Z", "sampling_ratio": 1, "log_level": "debug"}}
 ```
 
-The layer decides with the instance's clock and folds the window into the settings it hands
-over; the agent runs one timer (`System.Threading.Timer`) for the end the layer gives
-(`refresh_at_unix_ms`), as a deadline on the monotonic clock: the wall clock jumping while the
-process runs doesn't move it. When it goes off the agent calls `Refresh`, puts the result in
-force and reports the effective config: debug mode ends without the server. A later remote config
-re-arms it (a generation counter makes the old timer's call do nothing). Declared always. A policy
+The layer's agent flow decides with the instance's clock and folds the window into the settings
+it hands over; the agent runs one timer (`System.Threading.Timer`) for the wake the flow asks for,
+on the monotonic clock: the wall clock jumping while the process runs doesn't move it. When it
+goes off the agent steps the flow, which puts the settings without debug in force and reports the
+effective config: debug mode ends without the server. Each step re-arms it (a generation counter
+makes an old timer's call do nothing). Declared always. A policy
 that overrides the debug `sampling_ratio` is refused where `sampling_rate` is not declared.
 
 ### Export health
@@ -499,9 +497,9 @@ told of.
     check, with export health sent at once;
   - the application's own settings (`AppSettingsTests`): reads before any policy and once
     `app_settings` is local; the typed reads against `custom.json`'s `typed` vectors and their edges; every
-    `custom.json` case through the .NET wrapper's `Decide` and `Controls`, and through the plugin's
-    agent; a handler told once per change and never for the same map (sent again, another way, by a
-    Refresh at the end of debug mode), in order, one at a time; an exception caught and logged;
+    `custom.json` case through the .NET wrapper's agent flow and `Controls`, and through the plugin's
+    agent; a handler told once per change and never for the same map (sent again, another way, at the
+    end of debug mode), in order, one at a time; an exception caught and logged;
     unsubscribing, also from inside a handler; readers and subscribers on other threads, and each
     policy's SDK settings and application values in force together; bad values FAILED with nothing
     changed; restarts with and without a state directory; a plugin that fails as it starts putting

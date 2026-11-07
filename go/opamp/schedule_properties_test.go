@@ -78,6 +78,7 @@ import (
 	"pgregory.net/rapid"
 
 	"github.com/pydantic/opamp-clients/go/opamp/internal/corepb"
+	"github.com/pydantic/opamp-clients/go/opamp/internal/plumb"
 )
 
 const (
@@ -574,21 +575,21 @@ func (sc *schedCase) onNotify(n Notification) {
 	c := sc.m.client.Load()
 	switch n.Kind {
 	case InstallPackage:
-		want := sc.srv.fileFor(n.Package)
-		if got, err := os.ReadFile(n.Path); err != nil || string(got) != string(want) {
+		want := sc.srv.fileFor(n.x().Package)
+		if got, err := os.ReadFile(n.x().Path); err != nil || string(got) != string(want) {
 			sc.mu.Lock()
-			sc.problems = append(sc.problems, fmt.Sprintf("the file handed over (%s) holds %q (%v), the server sent %q", n.Path, got, err, want))
+			sc.problems = append(sc.problems, fmt.Sprintf("the file handed over (%s) holds %q (%v), the server sent %q", n.x().Path, got, err, want))
 			sc.mu.Unlock()
 		}
 		if c != nil {
-			c.PackageInstalled(n.PackageName, n.Package.GetHash(), nil)
+			c.PackageInstalled(n.x().PackageName, n.x().Package.GetHash(), nil)
 		}
 	case RemovePackage:
 		if c != nil {
-			c.PackageRemoved(n.PackageName, nil)
+			c.PackageRemoved(n.x().PackageName, nil)
 		}
 	case CustomMessageNotSent:
-		if k, err := strconv.Atoi(string(n.CustomMessage.GetData())); err == nil {
+		if k, err := strconv.Atoi(string(n.x().CustomMessage.GetData())); err == nil {
 			sc.mu.Lock()
 			sc.notSent[k] = true
 			sc.mu.Unlock()
@@ -696,7 +697,7 @@ func (sc *schedCase) fail(rt *rapid.T, format string, args ...any) {
 	sc.mu.Unlock()
 	rt.Fatalf("%s\n(case: %s mode, %s, manual server %v, timeouts request %v connect %v stop %v download %v, heartbeat %v; did: %s)\nthe core's last steps:\n%s",
 		fmt.Sprintf(format, args...), modeName(sc.cfg.Mode), map[bool]string{true: "websocket", false: "http"}[sc.ws], sc.manual,
-		sc.cfg.RequestTimeout, sc.cfg.ConnectTimeout, sc.cfg.StopTimeout, sc.cfg.DownloadTimeout, sc.cfg.HeartbeatInterval, log,
+		sc.cfg.RequestTimeout, sc.cfg.ConnectTimeout, sc.cfg.StopTimeout, sc.cfg.plumbed.DownloadTimeout, sc.cfg.HeartbeatInterval, log,
 		tapTail(sc.dir, 12))
 }
 
@@ -1083,9 +1084,8 @@ func runSchedCase(rt *rapid.T, base string, mode Mode) {
 		RequestTimeout:    pick("request timeout", 30*time.Second, 2*time.Second),
 		ConnectTimeout:    pick("connect timeout", 30*time.Second, 2*time.Second),
 		StopTimeout:       pick("stop timeout", 5*time.Second, time.Second),
-		DownloadTimeout:   pick("download timeout", 10*time.Minute, 5*time.Second),
 		StateFile:         filepath.Join(dir, "state"),
-		AcceptPackages:    true,
+		plumbed:           plumb.Options{AcceptPackages: true, DownloadTimeout: pick("download timeout", 10*time.Minute, 5*time.Second)},
 	}
 	sc.tr = onPipes(&sc.cfg, mode, sc.net)
 	sc.m = &mClient{armed: map[string]func(*Client){}, stopInside: make(chan error, 1)}
@@ -1096,9 +1096,8 @@ func runSchedCase(rt *rapid.T, base string, mode Mode) {
 			f()
 		}
 	}()
-	c, err := Start(context.Background(), sc.cfg, Status{Description: propDescription(0),
-		CustomCapabilities: &protobufs.CustomCapabilities{Capabilities: []string{propCapability}}},
-		func(_ *Client, n Notification) { sc.m.notify(n) })
+	c, err := startFull(context.Background(), sc.cfg, Status{Description: propDescription(0)},
+		func(_ *Client, n Notification) { sc.m.notify(n) }, &protobufs.CustomCapabilities{Capabilities: []string{propCapability}})
 	if err != nil {
 		rt.Fatalf("start: %v", err)
 	}
@@ -1203,7 +1202,7 @@ func (sc *schedCase) deadline(kind exKind) time.Duration {
 	case exUpgrade:
 		return sc.cfg.ConnectTimeout
 	case exDownload:
-		return sc.cfg.DownloadTimeout
+		return sc.cfg.plumbed.DownloadTimeout
 	}
 	return sc.cfg.RequestTimeout
 }
@@ -2014,7 +2013,7 @@ func TestScheduleVirtualTime(t *testing.T) {
 			})}
 			go func() { _ = hs.Serve(n) }()
 			tr := n.transport()
-			c, err := Start(context.Background(), Config{Mode: ModePlatform, Endpoint: "http://opamp.test/v1/opamp", InstanceUID: modelUID,
+			c, err := startFull(context.Background(), Config{Mode: ModePlatform, Endpoint: "http://opamp.test/v1/opamp", InstanceUID: modelUID,
 				HeartbeatInterval: 30 * time.Second, HTTPClient: &http.Client{Transport: tr}}, Status{}, nil)
 			if err != nil {
 				t.Fatal(err)
@@ -2076,7 +2075,7 @@ func stoppedIsTheLastNotification(t *testing.T, mode Mode) {
 		tr := onPipes(&cfg, mode, n)
 		var mu sync.Mutex
 		var heard []NotificationKind
-		c, err := Start(context.Background(), cfg, Status{}, func(_ *Client, n Notification) {
+		c, err := startFull(context.Background(), cfg, Status{}, func(_ *Client, n Notification) {
 			mu.Lock()
 			defer mu.Unlock()
 			heard = append(heard, n.Kind)
@@ -2156,7 +2155,7 @@ func theCallbacksAnswerComesFirst(t *testing.T, mode Mode, wait func()) {
 			var answers []cbCall
 			told := 0
 			answered := make(chan struct{}, 16)
-			c, err := Start(context.Background(), cfg, Status{}, func(c *Client, n Notification) {
+			c, err := startFull(context.Background(), cfg, Status{}, func(c *Client, n Notification) {
 				mu.Lock()
 				told++
 				k := told
@@ -2264,7 +2263,7 @@ func stopBoundWithASlowSave(t *testing.T, mode Mode) {
 		tr := onPipes(&cfg, mode, n)
 		saveDelays.Store(cfg.StateFile, 10*time.Second)
 		defer saveDelays.Delete(cfg.StateFile)
-		c, err := Start(context.Background(), cfg, Status{}, nil)
+		c, err := startFull(context.Background(), cfg, Status{}, nil)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -2325,7 +2324,7 @@ func panicClosesEveryConnection(t *testing.T, mode Mode) {
 		defer saveDelays.Delete(cfg.StateFile)
 		var connected atomic.Int32
 		stopped := make(chan stopResult, 1)
-		_, err := Start(context.Background(), cfg, Status{}, func(c *Client, nt Notification) {
+		_, err := startFull(context.Background(), cfg, Status{}, func(c *Client, nt Notification) {
 			if nt.Kind != Connected || connected.Add(1) != 2 {
 				return
 			}

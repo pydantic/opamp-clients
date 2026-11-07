@@ -1,19 +1,16 @@
 // Copyright (c) 2026 Pydantic Services Inc.
 // SPDX-License-Identifier: MIT
 
-// TLS, client certificates and proxies, over plain HTTP, WebSocket and package downloads. The
+// TLS, client certificates and proxies, over plain HTTP and WebSocket. The
 // certificates are test/fixtures (make.sh); the proxies are small ones written here, an HTTP
 // proxy (CONNECT) and a SOCKS5 one, both asking for a username and password.
 
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
-import { createHash } from "node:crypto";
-import { mkdtempSync, readFileSync } from "node:fs";
+import { readFileSync } from "node:fs";
 import http, { type IncomingMessage, type ServerResponse } from "node:http";
 import https from "node:https";
 import net, { type AddressInfo } from "node:net";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
 import { test } from "node:test";
 import tls, { type TLSSocket } from "node:tls";
 
@@ -21,7 +18,6 @@ import fc from "fast-check";
 import { WebSocketServer } from "ws";
 
 import { EffectSchema, type Input } from "../src/gen/opamp/core/v1/core_pb.js";
-import { Executor } from "../src/executor.js";
 import { Streams } from "../src/streams.js";
 import {
   AgentCapabilities,
@@ -79,15 +75,10 @@ interface ServerTls {
 
 /** An OpAMP server over HTTP and WebSocket both, with TLS if `tls`. It records every message,
  * and for each TLS connection its version and the client certificate's CN. */
-async function opampServer(tls?: ServerTls, files: Record<string, Buffer> = {}) {
+async function opampServer(tls?: ServerTls) {
   const got: AgentToServer[] = [];
   const handshakes: { version: string | null; peer: string | undefined }[] = [];
   const handle = async (req: IncomingMessage, res: ServerResponse) => {
-    const file = files[req.url ?? ""];
-    if (file) {
-      res.end(file);
-      return;
-    }
     const msg = fromBinary(AgentToServerSchema, await body(req));
     got.push(msg);
     res.setHeader("Content-Type", "application/x-protobuf");
@@ -530,57 +521,6 @@ for (const transport of ["http", "ws", "http+core", "ws+core"] as const) {
   }
 }
 
-// The client certificate goes only to a file at the server's own origin, as the core says
-// (Download.serverOrigin): a file anywhere else is fetched without it, still checked against the CA.
-// covers: RULE-TLS-01, RULE-TLS-02, RULE-PROXY-01
-test("downloads go the same way: the CA, the client certificate (at the server's origin only), the proxy", async () => {
-  const file = Buffer.from("package".repeat(1000));
-  const server = await opampServer({ ...SERVER, clientAuth: true }, { "/file": file });
-  const other = await opampServer(OTHER_SERVER, { "/file": file });
-  const httpProxy = await connectProxy("agent", "pw");
-  const socks = await socksProxy("agent", "pw");
-  const state = join(mkdtempSync(join(tmpdir(), "opamp-tls-")), "state");
-  try {
-    let id = 0n;
-    for (const proxy of [
-      undefined,
-      { url: `http://agent:pw@127.0.0.1:${httpProxy.port}` },
-      { url: `socks5://agent:pw@127.0.0.1:${socks.port}` },
-    ]) {
-      let deliver: (i: Input) => void = () => {};
-      const x = new Executor((i) => deliver(i), state, new Transport({ tls: { ca: CA, ...CLIENT }, proxy }));
-      const get = (url: string, serverOrigin = true) =>
-        new Promise<Input>((resolve) => {
-          deliver = resolve;
-          id++;
-          const value = { id, url, maxBytes: 1n << 20n, timeoutMs: 5000n, serverOrigin };
-          x.do(create(EffectSchema, { kind: { case: "download", value } }));
-        });
-      const ok = await get(`https://localhost:${server.port}/file`);
-      assert.equal(ok.kind.case, "downloadResponse", (ok.kind.value as { detail?: string }).detail);
-      assert.equal((ok.kind.value as { status: number }).status, 200);
-      const sha = createHash("sha256").update(file).digest();
-      assert.deepEqual([...(ok.kind.value as { sha256: Uint8Array }).sha256], [...sha]);
-      const bad = await get(`https://localhost:${other.port}/file`);
-      assert.equal(bad.kind.case, "downloadFailed");
-      assert.match((bad.kind.value as { detail: string }).detail, /certificate/i);
-      // Not the server's origin: no client certificate, so the server (which requires one) refuses.
-      const without = await get(`https://localhost:${server.port}/file`, false);
-      assert.equal(without.kind.case, "downloadFailed", "a client certificate went to a file elsewhere");
-      // Elsewhere, the CA still applies.
-      const elsewhere = await get(`https://localhost:${other.port}/file`, false);
-      assert.equal(elsewhere.kind.case, "downloadFailed");
-      assert.match((elsewhere.kind.value as { detail: string }).detail, /certificate/i);
-      x.shutdown();
-    }
-    assert.ok(httpProxy.tunnels.length >= 2);
-    assert.ok(socks.tunnels.length >= 2);
-    for (const h of server.handshakes) assert.equal(h.peer, "test-agent");
-  } finally {
-    for (const s of [server, other, httpProxy, socks]) s.close();
-  }
-});
-
 // Core mode: the client certificate goes only to a TLS handshake the core says is with the
 // server's own origin (stream_start_tls's serverOrigin); any other presents none, and the CA still
 // applies.
@@ -593,8 +533,7 @@ test("core mode: the client certificate only on a stream to the server's origin"
   });
   const port = await listen(server);
   const got: Input[] = [];
-  const state = join(mkdtempSync(join(tmpdir(), "opamp-tls-")), "state");
-  const s = new Streams((i) => got.push(i), new Transport({ tls: { ca: CA, ...CLIENT }, proxy: false }), state);
+  const s = new Streams((i) => got.push(i), new Transport({ tls: { ca: CA, ...CLIENT }, proxy: false }));
   const kind = (id: bigint) => got.find((i) => (i.kind.value as { id?: bigint }).id === id)?.kind.case;
   try {
     for (const [id, serverOrigin] of [
@@ -613,7 +552,7 @@ test("core mode: the client certificate only on a stream to the server's origin"
       got.length = 0;
     }
   } finally {
-    await s.shutdown();
+    s.shutdown();
     server.close();
   }
 });
@@ -701,9 +640,6 @@ test("with no mode named the client runs in core mode; \"platform\" is platform 
   const start = (config: Partial<Config>) =>
     void Client.start({ endpoint: "http://localhost:1/v1/opamp", instanceUid: UID, proxy: false, ...config }, {}).stop();
   assert.throws(() => start({ mode: "python" as never }), /mode is "core" or "platform", not "python"/);
-  assert.throws(() => start({ mode: "platform", spliceDownloads: false }), /spliceDownloads in platform mode/);
-  assert.doesNotThrow(() => start({ mode: "platform", spliceDownloads: true }));
-  assert.doesNotThrow(() => start({ spliceDownloads: false }));
 });
 
 // covers: RULE-PROXY-01
@@ -844,22 +780,10 @@ test("NO_PROXY is decided as Node decides it", { skip: !hasFlag }, () => {
 // covers: RULE-PROXY-01
 test("without a proxy: the environment's when Node is told to use it, else direct", { skip: !envProxySupported }, async () => {
   const plain = await opampServer();
-  const secure = await opampServer(SERVER, { "/file": Buffer.from("package") });
+  const secure = await opampServer(SERVER);
   const proxy = await connectProxy("agent", "pw");
   const url = `http://agent:pw@127.0.0.1:${proxy.port}`;
-  const state = join(mkdtempSync(join(tmpdir(), "opamp-env-")), "state");
-  let id = 0n;
-  const download = (config: { proxy?: false }) =>
-    new Promise<Input>((resolve) => {
-      const x = new Executor((i) => {
-        x.shutdown();
-        resolve(i);
-      }, state, new Transport({ tls: { ca: CA }, ...config }));
-      id++;
-      const value = { id, url: `https://localhost:${secure.port}/file`, maxBytes: 1n << 20n, timeoutMs: 5000n };
-      x.do(create(EffectSchema, { kind: { case: "download", value } }));
-    });
-  /** How many tunnels each scheme and a download open, and that each works. */
+  /** How many tunnels each scheme opens, and that each works. */
   const tunnels = async (config: { proxy?: false } = {}): Promise<number[]> => {
     const counts: number[] = [];
     for (const [transport, tls] of [["http", false], ["ws", false], ["http", true], ["ws", true]] as const) {
@@ -867,27 +791,24 @@ test("without a proxy: the environment's when Node is told to use it, else direc
       await run(tls ? secure : plain, transport, tls, { tls: { ca: CA }, ...config });
       counts.push(proxy.tunnels.length - before);
     }
-    const before = proxy.tunnels.length;
-    assert.equal((await download(config)).kind.case, "downloadResponse");
-    counts.push(proxy.tunnels.length - before);
     return counts;
   };
   try {
     const on = { NODE_USE_ENV_PROXY: "1", HTTP_PROXY: url, HTTPS_PROXY: url };
     await withEnv(on, async () => {
-      assert.ok((await tunnels()).every((n) => n > 0), "every scheme and the download go through the proxy");
+      assert.ok((await tunnels()).every((n) => n > 0), "every scheme goes through the proxy");
       for (const t of proxy.tunnels) assert.equal(t.target.split(":")[0], "localhost");
-      assert.deepEqual(await tunnels({ proxy: false }), [0, 0, 0, 0, 0], "proxy: false goes direct");
+      assert.deepEqual(await tunnels({ proxy: false }), [0, 0, 0, 0], "proxy: false goes direct");
     });
     await withEnv({ ...on, NO_PROXY: "example.com, localhost" }, async () => {
-      assert.deepEqual(await tunnels(), [0, 0, 0, 0, 0], "NO_PROXY goes direct");
+      assert.deepEqual(await tunnels(), [0, 0, 0, 0], "NO_PROXY goes direct");
     });
     // Lower case wins, as in Node: a proxy that isn't there fails.
     await withEnv({ ...on, http_proxy: "http://127.0.0.1:1" }, async () => {
       await run(plain, "http", false, {}, { fail: true });
     });
     await withEnv({ HTTP_PROXY: url, HTTPS_PROXY: url }, async () => {
-      assert.deepEqual(await tunnels(), [0, 0, 0, 0, 0], "Node not told to: direct");
+      assert.deepEqual(await tunnels(), [0, 0, 0, 0], "Node not told to: direct");
     });
   } finally {
     for (const s of [plain, secure, proxy]) s.close();

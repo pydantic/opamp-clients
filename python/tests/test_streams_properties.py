@@ -3,13 +3,13 @@
 """Core mode's byte-stream glue (src/logfire_fleet_client/_streams.py) over random plans (Hypothesis),
 on fake transports so every cut is the plan's: the peer's bytes arrive in pieces cut anywhere
 (some before the core has heard the stream is open, or its TLS up), the core's writes are split
-anywhere, part of the body may be spliced to a file, and the core closes the stream at any point:
+anywhere, and the core closes the stream at any point:
 before the connect completes, racing it (closed in the same step that completes it, with a
 connect that honours its cancel or one that swallows it), mid-handshake, or between any two
 pieces. Whatever the plan:
 
 - the core hears stream_opened (and stream_tls_ready) first, then exactly the bytes that arrived
-  while it wanted them, in order, less those spliced, and stream_spliced once all of those came;
+  while it wanted them, in order;
 - the peer gets exactly the bytes the core wrote while the stream was ready, in order;
 - after the close, the core hears nothing more of the stream; a transport that arrives after it
   is aborted at once; and once shut down, every transport is aborted and nothing is in flight.
@@ -18,7 +18,6 @@ pieces. Whatever the plan:
 from __future__ import annotations
 
 import asyncio
-import hashlib
 import os
 
 from hypothesis import given, settings
@@ -98,19 +97,17 @@ def plans(draw):
     return {
         "payload": payload, "cuts": cuts, "writes": writes, "tls": tls, "early": early, "order": order,
         "close": close, "abort": draw(st.booleans()), "swallows": draw(st.booleans()),
-        "splice": draw(st.one_of(st.none(), st.integers(1, max(1, len(payload))))),
     }
 
 
 # covers: RULE-CLIENT-14, RULE-CLIENT-15
 @settings(max_examples=int(os.environ.get("HYPOTHESIS_EXAMPLES", "300")), deadline=None)
 @given(plan=plans())
-def test_bytes_reach_the_core_and_the_peer_as_sent_whatever_the_cuts_and_the_close(plan, tmp_path_factory) -> None:
-    tmp = tmp_path_factory.mktemp("streams")
-    asyncio.run(_run(plan, str(tmp / "state")))
+def test_bytes_reach_the_core_and_the_peer_as_sent_whatever_the_cuts_and_the_close(plan) -> None:
+    asyncio.run(_run(plan))
 
 
-async def _run(plan: dict, state: str) -> None:
+async def _run(plan: dict) -> None:
     payload, cuts, close = plan["payload"], plan["cuts"], plan["close"]
     chunks = []
     at = 0
@@ -163,7 +160,7 @@ async def _run(plan: dict, state: str) -> None:
         return t
 
     got: list[corepb.Input] = []
-    s = Streams(got.append, Transport(proxy=Proxy.DIRECT), state, connect=connect, start_tls=start_tls)
+    s = Streams(got.append, Transport(proxy=Proxy.DIRECT), connect=connect, start_tls=start_tls)
     closed_at: int | None = None  # how many inputs the core had when it closed the stream
     wanted = bytearray()  # the bytes that arrived while the core wanted them
     written = bytearray()  # the bytes the core wrote while the stream was ready
@@ -184,9 +181,6 @@ async def _run(plan: dict, state: str) -> None:
             await asyncio.sleep(0)
 
     s.do(corepb.Effect(stream_open=corepb.StreamOpen(id=1, host="server", port=1)))
-    # The body's first bytes go to the file (the core asks before they can come).
-    if plan["splice"] is not None:
-        s.do(corepb.Effect(stream_splice=corepb.StreamSplice(id=1, download=7, bytes=plan["splice"])))
     await asyncio.sleep(0)
     if close == BEFORE:
         close_now()
@@ -242,13 +236,9 @@ async def _run(plan: dict, state: str) -> None:
         if plan["tls"] and "stream_tls_ready" in k:
             expect_head.append("stream_tls_ready")
     assert k[:len(expect_head)] == expect_head, k
-    assert set(k[len(expect_head):]) <= {"stream_data", "stream_spliced"}, k
+    assert set(k[len(expect_head):]) <= {"stream_data"}, k
     data = b"".join(i.stream_data.data for i in mine if i.WhichOneof("kind") == "stream_data")
-    spliced_n = 0 if plan["splice"] is None else min(plan["splice"], len(wanted))
-    assert data == bytes(wanted[spliced_n:]), "the bytes, in order, less those spliced"
-    assert k.count("stream_spliced") == (1 if plan["splice"] is not None and len(wanted) >= plan["splice"] else 0)
-    if "stream_spliced" in k and "stream_data" in k:
-        assert k.index("stream_spliced") < k.index("stream_data"), "spliced bytes come first"
+    assert data == bytes(wanted), "the bytes, in order"
 
     # The peer got the bytes written while the stream was ready.
     last = made[-1] if made else None
@@ -259,16 +249,6 @@ async def _run(plan: dict, state: str) -> None:
             assert t.closing, "closed"
             if plan["abort"] or not ready():
                 assert t.aborted, "aborted, at once"
-
-    # A complete splice is the file's.
-    if plan["splice"] is not None and "stream_spliced" in k and closed_at is None:
-        s.do(corepb.Effect(download_done=corepb.Id(id=7)))
-        for _ in range(500):
-            if any(i.WhichOneof("kind") == "downloaded" for i in got):
-                break
-            await asyncio.sleep(0.002)
-        d = [i for i in got if i.WhichOneof("kind") == "downloaded"]
-        assert d and d[0].downloaded.sha256 == hashlib.sha256(bytes(wanted[:plan["splice"]])).digest()
 
     await s.shutdown()
     assert all(t.aborted for t in made), "shutdown aborts every transport"

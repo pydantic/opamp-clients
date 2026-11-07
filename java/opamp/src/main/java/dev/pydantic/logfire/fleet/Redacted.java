@@ -67,19 +67,6 @@ final class Redacted {
     return b.build();
   }
 
-  /** The package, with its download's headers' values and URL's password hidden. */
-  static Opamp.PackageAvailable pkg(Opamp.PackageAvailable pkg) {
-    if (!pkg.hasFile()) {
-      return pkg;
-    }
-    var f = pkg.getFile();
-    var c = f.toBuilder().setDownloadUrl(url(f.getDownloadUrl()));
-    if (f.hasHeaders()) {
-      c.setHeaders(headers(f.getHeaders()));
-    }
-    return pkg.toBuilder().setFile(c).build();
-  }
-
   private static Opamp.TelemetryConnectionSettings telemetry(Opamp.TelemetryConnectionSettings s) {
     var c = s.toBuilder().setDestinationEndpoint(url(s.getDestinationEndpoint()));
     if (s.hasHeaders()) {

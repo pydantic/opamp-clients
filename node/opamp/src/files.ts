@@ -2,21 +2,18 @@
 // SPDX-License-Identifier: MIT
 
 // The file operations the client carries out for its core: a save's (a new temporary file,
-// written, synced, renamed over the state file, its directory synced) and a download's file's
-// (its directory made, the file made new, written, synced; deleted on failure or discard).
+// written, synced, renamed over the state file, its directory synced).
 //
 // They go through FileOps, whose default is the real file system: with the core tap on, it is
 // wrapped by the journal, which records each operation in the tap once it has succeeded
 // (the tap checker's file records: kind 5, a JSON object each); tests replace it to
-// inject faults (TEST_FILE_OPS). Everything here is off the event loop (fs/promises), but for
-// clearing the downloads at start.
+// inject faults (TEST_FILE_OPS). Everything here is off the event loop (fs/promises).
 //
-// A state file's work (saves, downloads' files) is counted for the whole process: a client
-// started on a state file waits for whatever a client before it left under way there (a save
-// still writing, a cancelled download deleting its file) before it reads the file.
+// A state file's saves are counted for the whole process: a client started on a state file
+// waits for whatever a client before it left under way there (a save still writing) before it
+// reads the file.
 
-import { rmSync } from "node:fs";
-import { type FileHandle, mkdir, open, rename, unlink } from "node:fs/promises";
+import { type FileHandle, open, rename, unlink } from "node:fs/promises";
 import { dirname, relative, resolve, sep } from "node:path";
 
 /** Tests only: a client Config carrying this key carries out its file operations with these
@@ -34,7 +31,7 @@ export interface OpenFile {
   close(): Promise<void>;
 }
 
-/** The file system, as saves and downloads use it. */
+/** The file system, as saves use it. */
 export interface FileOps {
   /** A new file, made exclusively (never one already there), the agent's user's only. */
   create(path: string): Promise<OpenFile>;
@@ -45,10 +42,6 @@ export interface FileOps {
   syncDir(dir: string): Promise<boolean>;
   /** Delete a file: whether there was one. */
   remove(path: string): Promise<boolean>;
-  /** Make a directory and its parents, the agent's user's only: whether it made one. */
-  mkdir(dir: string): Promise<boolean>;
-  /** Delete a directory and everything under it (at start: synchronously). */
-  clear(dir: string): void;
 }
 
 class RealFile implements OpenFile {
@@ -103,12 +96,6 @@ export const REAL: FileOps = {
       throw err;
     }
   },
-  async mkdir(dir) {
-    return (await mkdir(dir, { recursive: true, mode: 0o700 })) !== undefined;
-  },
-  clear(dir) {
-    rmSync(dir, { recursive: true, force: true });
-  },
 };
 
 /** Write all of `data` at the end of `file` (a short write is followed by the rest). */
@@ -154,14 +141,14 @@ export async function save(ops: FileOps, path: string, data: Uint8Array): Promis
 
 /** One file record (the tap checker's file records). */
 export type FileRecord =
-  | { op: "state" | "create" | "open" | "sync" | "syncdir" | "remove" | "mkdir" | "clear"; path: string }
+  | { op: "state" | "create" | "open" | "sync" | "syncdir" | "remove"; path: string }
   | { op: "write"; path: string; data: string }
   | { op: "write"; path: string; len: number }
   | { op: "rename"; from: string; to: string };
 
 /** `ops`, each operation recorded once it succeeded by `record`, its paths relative to the state
  * file's directory (parts joined with `/`, the directory itself `.`). What is written to the
- * state file's temporary file is recorded whole (hex); to a download's file, only how much. */
+ * state file's temporary file is recorded whole (hex); to another file, only how much. */
 export function journal(ops: FileOps, stateFile: string, record: (r: FileRecord) => void): FileOps {
   const base = dirname(resolve(stateFile));
   const tmp = resolve(tempOf(stateFile));
@@ -210,15 +197,6 @@ export function journal(ops: FileOps, stateFile: string, record: (r: FileRecord)
       const was = await ops.remove(path);
       if (was) record({ op: "remove", path: rel(path) });
       return was;
-    },
-    async mkdir(dir) {
-      const made = await ops.mkdir(dir);
-      if (made) record({ op: "mkdir", path: rel(dir) });
-      return made;
-    },
-    clear(dir) {
-      ops.clear(dir);
-      record({ op: "clear", path: rel(dir) });
     },
   };
 }

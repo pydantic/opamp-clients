@@ -72,7 +72,7 @@ names the control:
 
 | The reason | Means | Do |
 |---|---|---|
-| `<control>: this SDK cannot apply the requested override` | this integration doesn't carry the control out here, often because something sends telemetry past its gates: a console exporter, an exporter or processor the application added itself, another extension | Remove what bypasses the gates, or leave that control `local` in the policy. Each integration's page says what counts. |
+| `<control>: this SDK cannot apply the requested override` | this integration doesn't carry the control out here. Most often the sampler isn't the integration's (an SDK put under the server with `manage()`, another configurator or a declarative config file), so the sampling controls and debug mode are refused; or the application names its instrumentations in code, so `instrumentations` is. An exporter the gates can't reach doesn't cause this: it is reported ungoverned and the policy still applies | Leave that control `local` in the policy, or set the SDK up with the integration. Each integration's page says which controls it carries out. |
 | `instrumentations: takes effect at the next start, which needs somewhere to keep state` | no state directory | Give `OTEL_OPAMP_STATE_DIR` (or drop `none`). |
 | a value's problem, such as `head_sampling: ratio must be a number from 0 to 1` | the policy is malformed | Fix the policy. [sdk-settings.md](sdk-settings.md) has every control and its limits. |
 | from the Supervisor: `receiver "filelog" reads "/etc/shadow", which ... allowed_log_paths doesn't allow` | the collector config breaks the host's policy | Change the config, or widen the policy on the host ([what the server can do](../go/opampsupervisor/packaging/README.md#what-the-server-can-do-to-this-host)). The server can't widen it. |
@@ -90,9 +90,10 @@ Each instance is one process, named by its instance UID, which the state directo
 - **A new instance at every restart:** the state directory doesn't survive restarts (a
   container's own filesystem, an `emptyDir`), or is `none`. Mount a volume for it. Until then,
   disconnected instances pile up; delete them on the server.
-- **Two processes as one instance:** they share a state directory. Give each process its own.
-  Without `OTEL_OPAMP_STATE_DIR`, each integration already gives each running copy of a program
-  its own slot ([default-state-dir.md](default-state-dir.md)).
+- **Two processes as one instance:** they share a state directory. The Python, Node.js, .NET,
+  Java and Go integrations give each running copy of a program its own slot, in the default state
+  directory or in one named by `OTEL_OPAMP_STATE_DIR` ([default-state-dir.md](default-state-dir.md));
+  an older release of them shares a named one. Upgrade, or give each process its own.
 - **Hosts cloned from one image:** the image holds a Supervisor's state directory. Keep it out of
   images and enroll each host on first boot.
 

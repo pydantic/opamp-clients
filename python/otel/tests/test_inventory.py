@@ -29,7 +29,7 @@ from opentelemetry.util._importlib_metadata import entry_points
 
 import logfire_fleet_otel
 from _globals import sdk_globals
-from _policy import config_map, policy
+from _policy import config_map, layer_decide, policy
 from logfire_fleet_otel import Agent, Controls
 
 LAYER = SdkSettings()
@@ -90,8 +90,8 @@ def test_the_instrumentations_are_the_names_opentelemetry_instrument_matches_at_
     assert got["aiohttp-client"] == version("opentelemetry-instrumentation-aiohttp-client")
     # Each is a name the switch takes: it lands in the variable opentelemetry-instrument reads.
     local = policy().encode()
-    s = LAYER.decide(_config(policy(instrumentations={"disabled": ["aiohttp-client"]})), local, local,
-                     logfire_fleet_otel.sdk_host(), save=lambda doc: None).apply
+    s = layer_decide(LAYER, _config(policy(instrumentations={"disabled": ["aiohttp-client"]})),
+               logfire_fleet_otel.sdk_host()).apply
     assert logfire_fleet_otel.disabled_instrumentations(s, "") == "aiohttp-client"
 
 
@@ -176,12 +176,12 @@ def test_every_exporter_on_the_sdks_providers_is_gated_and_what_cant_be_is_repor
         assert listed(again.exporters) == listed(got.exporters)
         assert type(memory) is InMemorySpanExporter and traces._active_span_processor._span_processors[3].span_exporter._to is memory
         # The gate is in force on what was added past the package: send_traces stops it.
-        c.apply(SdkSettings().decide(_config(policy(signal_exports={"traces": {"enabled": False}})),
-                                     b"{}", b"{}", logfire_fleet_otel.sdk_host(), save=lambda doc: None).apply)
+        c.apply(layer_decide(LAYER, _config(policy(signal_exports={"traces": {"enabled": False}})),
+                       logfire_fleet_otel.sdk_host()).apply)
         traces._active_span_processor._span_processors[3].on_end(_span())
         assert memory.get_finished_spans() == ()
-        c.apply(SdkSettings().decide(_config(policy(signal_exports={"logs": {"enabled": False}})),
-                                     b"{}", b"{}", logfire_fleet_otel.sdk_host(), save=lambda doc: None).apply)
+        c.apply(layer_decide(LAYER, _config(policy(signal_exports={"logs": {"enabled": False}})),
+                       logfire_fleet_otel.sdk_host()).apply)
         logs.get_logger("t").emit(body="dropped")
         assert shown.getvalue() == ""
     finally:

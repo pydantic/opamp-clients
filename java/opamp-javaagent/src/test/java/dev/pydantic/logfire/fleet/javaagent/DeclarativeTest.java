@@ -163,10 +163,11 @@ class DeclarativeTest {
   }
 
   @Test
-  void theUidGoesIntoTheResourceAndIsKeptAcrossStarts(@TempDir Path dir) {
+  void theUidGoesIntoTheResourceAndIsKeptAcrossStarts(@TempDir Path dir) throws Exception {
     Extension first = Extension.forTest(null);
     String uid = attribute(Declarative.setUp(first, config(dir), model(FILE)), "service.instance.id");
     assertEquals(7, UUID.fromString(uid).version());
+    ExtensionTest.ended(first);
     Extension second = Extension.forTest(null);
     OpenTelemetryConfigurationModel m = Declarative.setUp(second, config(dir), model(FILE));
     assertEquals(uid, attribute(m, "service.instance.id"));
@@ -193,8 +194,7 @@ class DeclarativeTest {
 
   @Test
   void savedSettingsAreInForceFromTheStartTheNextStartOnesWhereTheAgentReadsThem(@TempDir Path dir) throws Exception {
-    Files.writeString(dir.resolve("sdk-settings.json"),
-        every("signal_exports", exports("", "", "off"), "instrumentations", override("\"disabled\":[\"java-http-client\",\"jdbc\"],\"all_disabled\":true")));
+    Kept.keepApplied(dir, every("signal_exports", exports("", "", "off"), "instrumentations", override("\"disabled\":[\"java-http-client\",\"jdbc\"],\"all_disabled\":true")));
     Extension e = Extension.forTest(null);
     OpenTelemetryConfigurationModel m = Declarative.setUp(e, config(dir), model(FILE + """
         distribution:
@@ -262,7 +262,7 @@ class DeclarativeTest {
     // the gates: it is reported ungoverned, and a policy that switches the traces off is applied to
     // every exporter the agent gates.
     String saved = v1("signal_exports", exports("", "off", ""));
-    Files.writeString(dir.resolve("sdk-settings.json"), saved);
+    Kept.keepApplied(dir, saved);
     System.setProperty("otel.opamp.endpoint", "http://server/v1/opamp");
     System.setProperty("otel.opamp.state.dir", dir.toString());
     Extension e = Extension.INSTANCE;
@@ -302,7 +302,7 @@ class DeclarativeTest {
   @Test
   void theSdkRunsTheExtensionsHooksFromAConfigurationFile(@TempDir Path dir) throws Exception {
     // Through the SPI, as in the agent: the customizers find the endpoint in system properties.
-    Files.writeString(dir.resolve("sdk-settings.json"), v1("signal_exports", exports("", "off", "")));
+    Kept.keepApplied(dir, v1("signal_exports", exports("", "off", "")));
     System.setProperty("otel.opamp.endpoint", "http://server/v1/opamp");
     System.setProperty("otel.opamp.state.dir", dir.toString());
     Extension e = Extension.INSTANCE;

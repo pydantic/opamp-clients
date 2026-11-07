@@ -3,7 +3,7 @@
 
 // How the client reaches the server: the TLS it trusts and presents, and the proxy it goes
 // through. One Transport is built from one set of options, and gives an undici dispatcher (for
-// the plain HTTP requests and package downloads) and options for the ws package (for WebSocket),
+// the plain HTTP requests) and options for the ws package (for WebSocket),
 // so all three go the same way.
 //
 // Without a proxy in the options, the environment's apply. In core mode (the client's default)
@@ -32,7 +32,7 @@ import { Agent, buildConnector, type Dispatcher } from "undici";
 /** A TLS version the client may use. Nothing older than 1.2. */
 export type TlsVersion = "TLSv1.2" | "TLSv1.3";
 
-/** TLS for https:// and wss:// endpoints, and for package downloads. */
+/** TLS for https:// and wss:// endpoints. */
 export interface TlsOptions {
   /** The CA certificates (PEM) to verify the server's certificate against. They replace the CAs
    * Node trusts by default unless `includeSystemCas` is set. Omitted: Node's defaults. */
@@ -290,17 +290,13 @@ export class Transport {
    * https:// proxy's alike. */
   readonly #context: tls.SecureContext;
   /** The same without the client certificate, which is the server's alone: for a TLS handshake
-   * that isn't with the server's own origin (a file elsewhere, an https:// proxy in core mode). */
+   * that isn't with the server's own origin (an https:// proxy in core mode). */
   readonly #elsewhereContext: tls.SecureContext;
   /** The proxy the options name; else those of the environment, when Node is told to use them. */
   readonly #proxy: Proxy | undefined;
   readonly #env: EnvProxies | undefined;
-  /** For fetch: the plain HTTP requests and downloads from the server's own origin. */
+  /** For fetch: the plain HTTP requests to the server. */
   readonly dispatcher: Dispatcher;
-  /** For fetch: downloads of files not at the server's own origin (Download.serverOrigin false),
-   * without the client certificate, which is the server's alone. The same as `dispatcher` when
-   * there is none. */
-  readonly elsewhere: Dispatcher;
 
   /** Core mode: the variables core mode's proxy rule reads, as set at the start, when no proxy
    * is named (and not `false`); undefined otherwise. */
@@ -338,7 +334,6 @@ export class Transport {
     const t = options.tls ?? {};
     this.#elsewhereContext =
       t.cert === undefined ? this.#context : secureContext({ ...t, cert: undefined, key: undefined });
-    this.elsewhere = t.cert === undefined ? this.dispatcher : this.#agent(this.#elsewhereContext);
   }
 
   /** A dispatcher whose TLS to the server (inside a tunnel too) is `context`'s. */
@@ -522,6 +517,5 @@ export class Transport {
   /** Drop every connection. */
   close(): void {
     void this.dispatcher.destroy().catch(() => {});
-    if (this.elsewhere !== this.dispatcher) void this.elsewhere.destroy().catch(() => {});
   }
 }

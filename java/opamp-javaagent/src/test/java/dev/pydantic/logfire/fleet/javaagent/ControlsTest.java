@@ -22,10 +22,7 @@ import org.junit.jupiter.api.Test;
 class ControlsTest {
   /** A policy's settings, read by the shared layer, every setting declared. */
   static dev.pydantic.logfire.fleet.sdk.SettingsProto.Settings settings(String json) {
-    dev.pydantic.logfire.fleet.sdk.SettingsProto.Loaded l =
-        Vectors.LAYER.load(json.getBytes(java.nio.charset.StandardCharsets.UTF_8), Vectors.ALL, Vectors.NOW);
-    assertEquals("", l.getWarning());
-    return l.getSettings();
+    return Vectors.started(json, Vectors.ALL, Vectors.NOW);
   }
 
   @Test

@@ -110,7 +110,7 @@ public class EdgeTests
         var data = new TheoryData<OpAmpMode, string>();
         foreach (var mode in new[] { OpAmpMode.Platform, OpAmpMode.Core })
         {
-            foreach (var name in new[] { "HeartbeatInterval", "RequestTimeout", "ConnectTimeout", "StopTimeout", "VerifyTimeout", "DownloadTimeout", "MaxSendBytes", "MaxReceiveBytes" })
+            foreach (var name in new[] { "HeartbeatInterval", "RequestTimeout", "ConnectTimeout", "StopTimeout", "VerifyTimeout", "MaxSendBytes", "MaxReceiveBytes" })
             {
                 data.Add(mode, name);
             }
@@ -132,7 +132,6 @@ public class EdgeTests
             "ConnectTimeout" => o with { ConnectTimeout = TimeSpan.FromMilliseconds(-1) },
             "StopTimeout" => o with { StopTimeout = Timeout.InfiniteTimeSpan },
             "VerifyTimeout" => o with { VerifyTimeout = TimeSpan.FromSeconds(-5) },
-            "DownloadTimeout" => o with { DownloadTimeout = TimeSpan.MinValue },
             "MaxSendBytes" => o with { MaxSendBytes = -1 },
             _ => o with { MaxReceiveBytes = long.MinValue },
         };
@@ -144,7 +143,6 @@ public class EdgeTests
             "ConnectTimeout" => ("connect_timeout_ms", "-1"),
             "StopTimeout" => ("stop_timeout_ms", "-1"),
             "VerifyTimeout" => ("verify_timeout_ms", "-5000"),
-            "DownloadTimeout" => ("download_timeout_ms", "-922337203685477"),
             "MaxSendBytes" => ("max_send_bytes", "-1"),
             _ => ("max_receive_bytes", "-9223372036854775808"),
         };
@@ -164,7 +162,7 @@ public class EdgeTests
             {
                 Endpoint = new Uri(server.Endpoint("http")), Mode = mode, DirectConnection = true,
                 RequestTimeout = TimeSpan.MaxValue, ConnectTimeout = TimeSpan.MaxValue, VerifyTimeout = TimeSpan.MaxValue,
-                DownloadTimeout = TimeSpan.MaxValue, MaxSendBytes = long.MaxValue, MaxReceiveBytes = long.MaxValue,
+                MaxSendBytes = long.MaxValue, MaxReceiveBytes = long.MaxValue,
                 StopTimeout = TimeSpan.Zero, HeartbeatInterval = TimeSpan.Zero,
             },
             new OpAmpStatus());

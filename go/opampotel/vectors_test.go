@@ -15,6 +15,8 @@ import (
 	"go.opentelemetry.io/otel/log"
 	sdklog "go.opentelemetry.io/otel/sdk/log"
 
+	"github.com/open-telemetry/opamp-go/protobufs"
+
 	"github.com/pydantic/opamp-clients/go/opamp/sdksettings"
 	"github.com/pydantic/opamp-clients/go/opamp/sdksettings/settingspb"
 )
@@ -52,14 +54,70 @@ func settingsOf(t testing.TB, doc []byte, now uint64) *settingspb.Settings {
 	if now == 0 {
 		now = vectorNow
 	}
-	loaded, err := testLayer(t).LoadAt(context.Background(), doc, goHost(), now)
+	loaded := startWith(t, goHost(), doc, now)
+	if loaded.warning != "" {
+		t.Fatalf("the layer refused %s: %s", doc, loaded.warning)
+	}
+	return loaded.settings
+}
+
+// started is what the layer's agent flow starts with, from a policy the client kept applied.
+type started struct {
+	settings  *settingspb.Settings
+	effective *protobufs.EffectiveConfig
+	warning   string
+}
+
+// startWith starts the layer's agent flow for host at now, with doc kept applied (nil: none).
+func startWith(t testing.TB, host *settingspb.Host, doc []byte, now uint64) started {
+	t.Helper()
+	var state []byte
+	if doc != nil {
+		state = coreState(t, string(doc))
+	}
+	out, err := testLayer(t).Start(context.Background(), &settingspb.AgentStart{Host: host, StateDir: true, CoreState: state,
+		Endpoint: "http://127.0.0.1:1", InstanceUid: make([]byte, 16), NowUnixMs: now, NowMonoMs: now})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if loaded.GetWarning() != "" {
-		t.Fatalf("the layer refused %s: %s", doc, loaded.GetWarning())
+	r := started{effective: out.GetEffective()}
+	for _, e := range out.GetEffects() {
+		if e.GetApply() != nil {
+			r.settings = e.GetApply()
+		}
+		if l := e.GetLog(); l.GetLevel() >= settingspb.AgentLog_WARN {
+			r.warning = l.GetText()
+		}
 	}
-	return loaded.GetSettings()
+	return r
+}
+
+// decideAt is the layer's answer to doc sent as a remote config to host at now, with no policy
+// kept: its status, the settings it hands over (nil: none), and the effective config after.
+func decideAt(t testing.TB, host *settingspb.Host, doc string, now uint64) (*protobufs.RemoteConfigStatus,
+	*settingspb.Settings, *protobufs.EffectiveConfig) {
+	t.Helper()
+	ctx := context.Background()
+	out, err := testLayer(t).Start(ctx, &settingspb.AgentStart{Host: host, StateDir: true,
+		Endpoint: "http://127.0.0.1:1", InstanceUid: make([]byte, 16), NowUnixMs: now, NowMonoMs: now})
+	if err == nil {
+		out, err = testLayer(t).Step(ctx, &settingspb.AgentStep{Agent: out.GetAgent(), NowUnixMs: now, NowMonoMs: now,
+			Input: &settingspb.AgentStep_RemoteConfig{RemoteConfig: remote(doc)}})
+	}
+	if err != nil {
+		t.Fatal(err)
+	}
+	var status *protobufs.RemoteConfigStatus
+	var apply *settingspb.Settings
+	for _, e := range out.GetEffects() {
+		if e.GetStatus() != nil {
+			status = e.GetStatus()
+		}
+		if e.GetApply() != nil {
+			apply = e.GetApply()
+		}
+	}
+	return status, apply, out.GetEffective()
 }
 
 const policyFile = "logfire-sdk-policy.json"

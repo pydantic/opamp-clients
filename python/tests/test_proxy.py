@@ -1,11 +1,10 @@
 # Copyright (c) 2026 Pydantic Services Inc.
 # SPDX-License-Identifier: MIT
 """Proxies as the application configures them: HTTP (CONNECT for every connection, to an http://
-or https:// proxy) and SOCKS5, with credentials, over both transports, for downloads too."""
+or https:// proxy) and SOCKS5, with credentials, over both transports."""
 
 import asyncio
 import base64
-import hashlib
 import ssl
 from urllib.parse import quote
 
@@ -16,9 +15,7 @@ from hypothesis import given
 from hypothesis import strategies as st
 
 from logfire_fleet_client import TLS, Client, Config, Proxy, Status
-from logfire_fleet_client._executor import Executor
-from logfire_fleet_client._proto.opamp.core.v1 import core_pb2 as corepb
-from logfire_fleet_client._transport import Transport, _route
+from logfire_fleet_client._transport import _route
 
 TRANSPORTS = ["http", "ws"]
 
@@ -167,39 +164,6 @@ def test_socks5_proxy_refusing_the_credentials_is_a_failed_connection(transport:
 
 
 # covers: RULE-PROXY-01
-@pytest.mark.parametrize("kind", ["http", "socks5"])
-def test_downloads_go_the_same_way(kind: str, tmp_path) -> None:
-    """Package downloads use the same TLS settings and proxy."""
-    async def run() -> None:
-        ca = trustme.CA()
-        server = await OpampServer(server_context(ca)).start()
-        proxy = await (HttpProxy if kind == "http" else Socks5Proxy)("agent", "secret").start()
-        got: list[corepb.Input] = []
-        arrived = asyncio.Event()
-
-        def deliver(i: corepb.Input) -> None:
-            got.append(i)
-            arrived.set()
-
-        x = Executor(deliver, str(tmp_path / "state"),
-                     Transport(TLS(ca_pem=ca.cert_pem.bytes()), f"{kind}://agent:secret@127.0.0.1:{proxy.port}"))
-        try:
-            x.do(corepb.Effect(download=corepb.Download(
-                id=1, url=f"https://127.0.0.1:{server.port}/file", max_bytes=1 << 20, timeout_ms=5000)))
-            await asyncio.wait_for(arrived.wait(), 10)
-        finally:
-            await x.close()
-            await proxy.close()
-            await server.close()
-        assert got[-1].WhichOneof("kind") == "download_response", got[-1]
-        assert got[-1].download_response.status == 200
-        assert got[-1].download_response.sha256 == hashlib.sha256(OpampServer.BODY).digest()
-        through(proxy, server)
-
-    asyncio.run(run())
-
-
-# covers: RULE-PROXY-01
 @pytest.mark.parametrize("mode", MODES)
 @pytest.mark.parametrize("transport", TRANSPORTS)
 @pytest.mark.parametrize("server_tls", [False, True], ids=["plain", "tls"])
@@ -298,43 +262,6 @@ def test_direct_ignores_the_environment(transport: str, direct, monkeypatch, mod
             await proxy.close()
             await server.close()
         assert server.arrivals and not proxy.log
-
-    asyncio.run(run())
-
-
-# covers: RULE-PROXY-01
-@pytest.mark.parametrize("bypass", [False, True], ids=["proxied", "no_proxy"])
-def test_downloads_use_the_environment_too(bypass: bool, tmp_path, monkeypatch, opamp_test) -> None:
-    """Each download's URL is matched on its own: NO_PROXY names other hosts, and the
-    download's too, or not."""
-    async def run() -> None:
-        ca = trustme.CA()
-        server = await OpampServer(server_context(ca)).start()
-        proxy = await HttpProxy(None, None).start()
-        monkeypatch.setenv("HTTPS_PROXY", f"http://127.0.0.1:{proxy.port}")
-        monkeypatch.setenv("NO_PROXY", "127.0.0.1" + (",opamp.test" if bypass else ""))
-        got: list[corepb.Input] = []
-        arrived = asyncio.Event()
-
-        def deliver(i: corepb.Input) -> None:
-            got.append(i)
-            arrived.set()
-
-        x = Executor(deliver, str(tmp_path / "state"), Transport(TLS(ca_pem=ca.cert_pem.bytes())))
-        try:
-            x.do(corepb.Effect(download=corepb.Download(
-                id=1, url=f"https://opamp.test:{server.port}/file", max_bytes=1 << 20, timeout_ms=5000)))
-            await asyncio.wait_for(arrived.wait(), 10)
-        finally:
-            await x.close()
-            await proxy.close()
-            await server.close()
-        assert got[-1].download_response.status == 200, got[-1]
-        if bypass:
-            assert not proxy.log
-        else:
-            through(proxy, server)
-            assert {e["target"] for e in proxy.log} == {f"opamp.test:{server.port}"}
 
     asyncio.run(run())
 

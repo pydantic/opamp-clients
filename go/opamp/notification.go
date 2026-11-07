@@ -10,6 +10,7 @@ import (
 	"github.com/open-telemetry/opamp-go/protobufs"
 
 	"github.com/pydantic/opamp-clients/go/opamp/internal/corepb"
+	"github.com/pydantic/opamp-clients/go/opamp/internal/plumb"
 )
 
 // NotificationKind says what happened.
@@ -25,8 +26,6 @@ const (
 	ErrorResponse
 	// RemoteConfig: a config to apply (RemoteConfig); answer with SetRemoteConfigStatus.
 	RemoteConfig
-	// Command: a command from the server (Command).
-	Command
 	// InstanceUIDChanged: the server assigned a new UID (InstanceUID); persist it if you persist the UID.
 	InstanceUIDChanged
 	// HeartbeatInterval: the heartbeat or polling interval changed (HeartbeatInterval; 0: off).
@@ -41,28 +40,13 @@ const (
 	// ConnectionSettings: settings for the agent's own telemetry and other connections, all of
 	// them (ConnectionSettings); answer with SetConnectionSettingsStatus.
 	ConnectionSettings
-	// CustomMessage: a custom message from the server, for a custom capability the agent
-	// declared (CustomMessage).
-	CustomMessage
-	// ServerCustomCapabilities: the custom capabilities the server supports changed
-	// (CustomCapabilities).
-	ServerCustomCapabilities
-	// CustomMessageNotSent: a custom message the application sent won't be (CustomMessage,
-	// Detail: why).
-	CustomMessageNotSent
-	// InstallPackage: install package PackageName (Package) from the file at Path; answer with
-	// PackageInstalled. Checking the file's signature is the application's job; the client
-	// deletes the file after the answer.
-	InstallPackage
-	// RemovePackage: remove package PackageName, no longer offered; answer with PackageRemoved.
-	RemovePackage
 	// SaveStalled: the save under way has run for its stall time without ending (Stalled), and
 	// the client waits on it still, saving nothing else meanwhile; or it has ended at last (not
 	// Stalled). Waited: how long it had run. A disk that hangs is the application's to see to.
 	SaveStalled
 	// StateFromNewerVersion: the saved state is a newer core's, in a format this one can't read
 	// (StateVersion). The client starts from its configuration, as on first use, and runs without
-	// saving (no offered connection settings, no packages), leaving that state as it is. Worth a
+	// saving (no offered connection settings), leaving that state as it is. Worth a
 	// warning: an older release was started on a newer one's state directory.
 	StateFromNewerVersion
 )
@@ -91,21 +75,10 @@ type Notification struct {
 	RemoteConfig *protobufs.AgentRemoteConfig
 	// ConnectionSettings: the telemetry settings (no OpAMP part: the client applies that itself).
 	ConnectionSettings *protobufs.ConnectionSettingsOffers
-	// CustomMessage: the message (CustomMessage, CustomMessageNotSent).
-	CustomMessage *protobufs.CustomMessage
-	// CustomCapabilities: the server's (ServerCustomCapabilities).
-	CustomCapabilities []string
-	Command            *protobufs.ServerToAgentCommand
-	// PackageName: the package (InstallPackage, RemovePackage).
-	PackageName string
-	// Package: the package as offered: version, hash, type, and the file's signature (InstallPackage).
-	Package *protobufs.PackageAvailable
-	// Path: the downloaded file (InstallPackage).
-	Path              string
-	InstanceUID       [16]byte
-	HeartbeatInterval time.Duration
-	Bytes             int
-	Field             StatusField
+	InstanceUID        [16]byte
+	HeartbeatInterval  time.Duration
+	Bytes              int
+	Field              StatusField
 	// FieldName: the field's name in AgentToServer ("health", say), as the core gives it
 	// (StatusTooLarge).
 	FieldName string
@@ -117,6 +90,12 @@ type Notification struct {
 	StateVersion uint32
 	// Err: why the client stopped on its own (Stopped); nil after Stop. Stop returns it too.
 	Err error
+
+	// raw is the core's notification, for package collector's kinds (plumb.Kind*): what it says
+	// is package collector's to carry.
+	raw *corepb.Notification
+	// path is the downloaded file (plumb.KindInstallPackage).
+	path string
 }
 
 func fromCore(n *corepb.Notification) Notification {
@@ -131,20 +110,19 @@ func fromCore(n *corepb.Notification) Notification {
 	case *corepb.Notification_RemoteConfig:
 		return Notification{Kind: RemoteConfig, RemoteConfig: k.RemoteConfig}
 	case *corepb.Notification_CustomMessage:
-		return Notification{Kind: CustomMessage, CustomMessage: k.CustomMessage}
+		return Notification{Kind: plumb.KindCustomMessage, raw: n}
 	case *corepb.Notification_ServerCustomCapabilities:
-		return Notification{Kind: ServerCustomCapabilities, CustomCapabilities: k.ServerCustomCapabilities.Capabilities}
+		return Notification{Kind: plumb.KindServerCustomCapabilities, raw: n}
 	case *corepb.Notification_CustomMessageNotSent:
-		return Notification{Kind: CustomMessageNotSent, CustomMessage: k.CustomMessageNotSent.Message,
-			Detail: k.CustomMessageNotSent.Reason}
+		return Notification{Kind: plumb.KindCustomMessageNotSent, Detail: k.CustomMessageNotSent.Reason, raw: n}
 	case *corepb.Notification_InstallPackage:
-		return Notification{Kind: InstallPackage, PackageName: k.InstallPackage.Name, Package: k.InstallPackage.Package}
+		return Notification{Kind: plumb.KindInstallPackage, raw: n}
 	case *corepb.Notification_RemovePackage:
-		return Notification{Kind: RemovePackage, PackageName: k.RemovePackage.Name}
+		return Notification{Kind: plumb.KindRemovePackage, raw: n}
 	case *corepb.Notification_ConnectionSettings:
 		return Notification{Kind: ConnectionSettings, ConnectionSettings: k.ConnectionSettings}
 	case *corepb.Notification_Command:
-		return Notification{Kind: Command, Command: k.Command}
+		return Notification{Kind: plumb.KindCommand, raw: n}
 	case *corepb.Notification_InstanceUidChanged:
 		var uid [16]byte
 		copy(uid[:], k.InstanceUidChanged)

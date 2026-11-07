@@ -21,7 +21,7 @@ import javax.net.ssl.SSLParameters;
 
 /**
  * What the client reaches servers with: one {@link HttpClient}, used for OpAMP over HTTP and
- * WebSocket and for package downloads, and the headers every request carries (the proxy's
+ * WebSocket, and the headers every request carries (the proxy's
  * credentials). Built from the options, or the application's own client as it is.
  */
 final class Transport {
@@ -30,39 +30,20 @@ final class Transport {
   private static final AtomicBoolean WARNED = new AtomicBoolean();
 
   final HttpClient http;
-  /**
-   * For downloads of files not at the server's own origin (Download.server_origin false): the
-   * same, without the client certificate, which is the server's alone (made when first used). The
-   * same as {@link #http} without one, or for the application's client, which is its own.
-   */
-  final HttpClient elsewhere;
-  /** Headers for every request, upgrade and download: name, value. */
+  /** Headers for every request and upgrade: name, value. */
   final List<Map.Entry<String, String>> headers;
   /** The client is ours (built here), not the application's: it goes with the OpAMP client. */
   final boolean owned;
 
-  private Transport(HttpClient http, HttpClient elsewhere, List<Map.Entry<String, String>> headers, boolean owned) {
+  private Transport(HttpClient http, List<Map.Entry<String, String>> headers, boolean owned) {
     this.http = http;
-    this.elsewhere = elsewhere;
     this.headers = headers;
     this.owned = owned;
   }
 
   /** The application's client, as it is. */
   static Transport of(HttpClient http) {
-    return new Transport(http, http, List.of(), false);
-  }
-
-  /** The client for a download: the server's TLS settings only for a file at its own origin. */
-  HttpClient download(boolean serverOrigin) {
-    return serverOrigin ? http : elsewhere;
-  }
-
-  /** {@code http}'s twin for files elsewhere, if {@code tls} has a client certificate. */
-  private static HttpClient elsewhere(HttpClient http, Tls tls, Proxy proxy, boolean direct) {
-    return tls != null && tls.hasClientCertificate()
-        ? new Lazy(() -> build(tls.withoutClientCertificate(), proxy, direct).http)
-        : http;
+    return new Transport(http, List.of(), false);
   }
 
   /**
@@ -76,7 +57,7 @@ final class Transport {
     if (!owned) {
       return CompletableFuture.completedFuture(null);
     }
-    return elsewhere == http ? shutdown(http) : CompletableFuture.allOf(shutdown(http), shutdown(elsewhere));
+    return shutdown(http);
   }
 
   private static CompletableFuture<Void> shutdown(HttpClient http) {
@@ -103,7 +84,7 @@ final class Transport {
    * A client with these options (either may be null). With no proxy it uses the platform's proxy
    * settings, {@link ProxySelector#getDefault()} (http.proxyHost, https.proxyHost,
    * http.nonProxyHosts, java.net.useSystemProxies), unless {@code direct}. It follows no
-   * redirects: every 3xx goes to the core as it is, a download's too.
+   * redirects: every 3xx goes to the core as it is.
    */
   static Transport build(Tls tls, Proxy proxy, boolean direct) {
     if (proxy != null && direct) {
@@ -146,12 +127,12 @@ final class Transport {
       }
     }
     HttpClient http = b.build();
-    return new Transport(http, elsewhere(http, tls, proxy, direct), headers, true);
+    return new Transport(http, headers, true);
   }
 
   /**
    * {@link #build}'s transport, its HTTP client built only when first used: core mode's, for
-   * platform effects (http_request, ws_open, download) a core may still hand it (the adversary
+   * platform effects (http_request, ws_open) a core may still hand it (the adversary
    * does), which its own core never does: then no HTTP client, and none of its threads, is ever
    * made. The proxy's credentials are checked now, as build does.
    */
@@ -162,7 +143,7 @@ final class Transport {
     List<Map.Entry<String, String>> headers = proxy != null && proxy.user() != null
         ? List.of(Map.entry("Proxy-Authorization", proxy.authorization())) : List.of();
     HttpClient http = new Lazy(() -> build(tls, proxy, direct).http);
-    return new Transport(http, elsewhere(http, tls, proxy, direct), headers, true);
+    return new Transport(http, headers, true);
   }
 
   /** An HTTP client made when first used, then used as it is. */

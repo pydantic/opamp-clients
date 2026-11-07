@@ -9,9 +9,9 @@ URL's query says what to do; the adversary reports through the client's own call
 Each test runs in both modes (``MODES``). In core mode the client tells the core it speaks streams,
 and each run has a raw server of its own (_adversary_raw.py: ``raw=PORT`` and ``tls=NAME`` in the
 endpoint's query), which the adversary opens streams to: it hands the client the stream effects
-(stream_open, stream_write, stream_start_tls, stream_splice, download_data, ...), which
-src/logfire_fleet_client/_streams.py carries out, and the platform's as well (http_request, ws_open,
-download), which core mode's client passes on to the executor, as a core's saves are: core mode's
+(stream_open, stream_write, stream_start_tls, ...), which
+src/logfire_fleet_client/_streams.py carries out, and the platform's as well (http_request,
+ws_open), which core mode's client passes on to the executor, as a core's saves are: core mode's
 wiring (Streams is offered every effect first), its stop and its shutdown, with both kinds under
 way. Go's harness (go/opamp/adversary_properties_test.go) runs core mode the same way.
 
@@ -43,7 +43,7 @@ from logfire_fleet_client import TLS, Client, Config, Notification, Status, opam
 
 PREFIX = "opamp-adversary"
 STOP_DEADLINE = 15.0  # stop must return within this
-SETTLE = 3.0  # after stop: connections closed, nothing new, downloads unchanged
+SETTLE = 3.0  # after stop: connections closed, nothing new
 ASK_DEADLINE = 120.0  # the script asks for stop well within this
 AT_ONCE = 4
 # The harness's marker (_mark) is answered within this of being sent: a server that never answers
@@ -69,10 +69,10 @@ KNOWN: dict[str, dict[str, tuple[str, str, str]]] = {
 }
 
 # The cancel productions (RULE-SHELL-06), in every run's grammar.
-CANCELS = ["cancel_download", "cancel_http", "cancel_http_done", "cancel_store", "cancel_twice",
+CANCELS = ["cancel_http", "cancel_http_done", "cancel_store", "cancel_twice",
            "cancel_ws_closing", "cancel_ws_opening", "stop_cancel"]
-# And those of the streams and their files, in core mode's.
-STREAM_CANCELS = ["cancel_file", "cancel_splice", "cancel_stream_open", "cancel_stream_opening",
+# And those of the streams, in core mode's.
+STREAM_CANCELS = ["cancel_stream_open", "cancel_stream_opening",
                   "cancel_stream_resolving"]
 
 # The name the raw server's certificate is for, which the adversary starts TLS under (tls=NAME).
@@ -284,13 +284,6 @@ def _parse_verdict(detail: str) -> dict[str, str]:
     return dict(kv.split("=", 1) for kv in detail[len(PREFIX) + len(" verdict "):].split(" ") if "=" in kv)
 
 
-def _listing(path: str) -> dict[str, tuple[int, int]]:
-    try:
-        return {e.name: (e.stat().st_size, e.stat().st_mtime_ns) for e in os.scandir(path)}
-    except FileNotFoundError:
-        return {}
-
-
 async def run_seed(server: AdversaryServer, wasm: bytes, seed: int, *, mode: str, off: list[str],
                    focus: str | None = None, steps: int | None = None, raw: RawServer | None = None,
                    ca: bytes | None = None) -> SeedResult:
@@ -300,7 +293,9 @@ async def run_seed(server: AdversaryServer, wasm: bytes, seed: int, *, mode: str
     streams)."""
     result = SeedResult(seed)
     problems = result.problems
-    query = f"seed={seed}&off={','.join(off)}"
+    # downloads=0: this client takes no packages, so the adversary, as the real core, hands it no
+    # download and no download's file.
+    query = f"seed={seed}&off={','.join(off)}&downloads=0"
     if steps is not None:
         query += f"&steps={steps}"
     if focus:
@@ -411,8 +406,6 @@ async def run_seed(server: AdversaryServer, wasm: bytes, seed: int, *, mode: str
             except Exception as e:  # noqa: BLE001
                 if not any("stopped with an error" in p for p in problems):
                     problems.append(f"a second stop raised {e!r}")
-            downloads = state_file + ".downloads"
-            before = _listing(downloads)
             counts = server.counts(str(seed))
             for _ in range(int(SETTLE * 100)):
                 if counts.open_ws == 0:
@@ -437,8 +430,6 @@ async def run_seed(server: AdversaryServer, wasm: bytes, seed: int, *, mode: str
                 if still:
                     problems.append(f"RULE-SHELL-07: {still} stream connection(s) still open {SETTLE:.0f} s after "
                                     f"stop returned ({anonymous} never said who they were)")
-            if (after := _listing(downloads)) != before:
-                problems.append(f"downloads changed after stop: {before} -> {after}")
         if len(stopped) != 1:
             problems.append(f"stopped {len(stopped)} times")
         for n in stopped:

@@ -18,6 +18,7 @@ import (
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 	"go.opentelemetry.io/otel/sdk/trace/tracetest"
 	"google.golang.org/protobuf/encoding/protojson"
+	"google.golang.org/protobuf/proto"
 
 	"github.com/pydantic/opamp-clients/go/opamp/sdksettings/settingspb"
 )
@@ -92,47 +93,47 @@ func TestTheHealthVectors(t *testing.T) {
 	decodeStrict(t, readVectors[json.RawMessage](t, "health.json"), &v)
 	for _, c := range v.Cases {
 		t.Run(c.Name, func(t *testing.T) {
+			// A wall clock set back is the layer's case: the agent's flow never steps back in time.
+			for i := 1; i < len(c.Steps); i++ {
+				if c.Steps[i].Now < c.Steps[i-1].Now {
+					t.Skip("the wall clock goes back")
+				}
+			}
 			ft := newFakeTime(c.Steps[0].Now)
 			a, rep := timedAgent(t, t.TempDir(), ft)
-			a.mu.Lock()
-			a.nextHealth = ft.now().Add(a.healthEvery) // as start does
-			a.arm()
-			a.mu.Unlock()
 			for i, s := range c.Steps {
 				doc := s.Settings
 				if doc == nil {
 					doc = json.RawMessage(v1()) // left out: every control local
 				}
-				settings := settingsOf(t, doc, s.Now)
 				counts := &settingspb.ExportCounts{}
 				if s.Counts != nil {
 					if err := protojson.Unmarshal(s.Counts, counts); err != nil {
 						t.Fatal(err)
 					}
 				}
+				// The clock first, no timer run; the settings in force sent, then the exporters and
+				// their counts; then the timers due and the exporters told: health is built at once.
 				ft.mu.Lock()
-				ft.at = time.UnixMilli(int64(s.Now)) // the clock first (it may go back), then the timer
+				ft.at = time.UnixMilli(int64(s.Now))
 				ft.mu.Unlock()
+				a.remoteConfig(context.Background(), remote(string(doc)))
 				a.mu.Lock()
-				a.controls.Apply(settings)
-				a.settings = settings
 				a.exporters = s.Exporters
 				setCounts(a.controls, counts)
-				a.nextHealth = time.UnixMilli(int64(s.Now)) // due now: the timer goes off
-				a.arm()
-				a.mu.Unlock()
 				sent := len(rep.health)
+				a.mu.Unlock()
 				ft.set(s.Now)
 				a.mu.Lock()
-				report := a.health
-				next := a.nextHealth
+				a.built("")
+				report := flowHealth(t, a)
 				a.mu.Unlock()
 				w := s.Want
 				if w.Send != nil && (len(rep.health) > sent) != *w.Send {
 					t.Fatalf("step %d: sent %v, want %v", i, len(rep.health) > sent, *w.Send)
 				}
-				if !next.Equal(time.UnixMilli(int64(s.Now)).Add(30 * time.Second)) {
-					t.Fatalf("step %d: the next report at %v, want 30 s on", i, next)
+				if next := ft.next(); next != s.Now+30_000 {
+					t.Fatalf("step %d: the next report at %d, want 30 s on", i, next)
 				}
 				if w.SentUnixMs != nil && report.GetSentUnixMs() != *w.SentUnixMs {
 					t.Fatalf("step %d: sent at %d, want %d", i, report.GetSentUnixMs(), *w.SentUnixMs)
@@ -140,7 +141,7 @@ func TestTheHealthVectors(t *testing.T) {
 				exporters := report.GetExporters()
 				if len(rep.health) > sent {
 					got := rep.health[len(rep.health)-1]
-					if !got.GetHealthy() || got.GetComponentHealthMap()["exporters"] != exporters {
+					if !got.GetHealthy() || !proto.Equal(got.GetComponentHealthMap()["exporters"], exporters) {
 						t.Fatalf("step %d: sent %v: the application healthy, export health under exporters", i, got)
 					}
 				}
@@ -177,6 +178,23 @@ func TestTheHealthVectors(t *testing.T) {
 		t.Fatalf("%d cases: health.json was cut short", len(v.Cases))
 	}
 }
+
+// flowState is the agent's flow as it stands. Under a.mu.
+func flowState(t testing.TB, a *agent) *settingspb.AgentState {
+	t.Helper()
+	var st settingspb.AgentState
+	if err := proto.Unmarshal(a.flow, &st); err != nil {
+		t.Fatal(err)
+	}
+	return &st
+}
+
+// flowHealth is the export health the agent's flow last built. Under a.mu.
+func flowHealth(t testing.TB, a *agent) *settingspb.HealthReport { return flowState(t, a).GetHealth() }
+
+// flowRefreshAt is when the agent's flow asks the layer again (debug mode's end), in Unix
+// milliseconds (0: never). Under a.mu.
+func flowRefreshAt(t testing.TB, a *agent) uint64 { return flowState(t, a).GetRefreshAtUnixMs() }
 
 func attributeInt(kvs []*protobufs.KeyValue, key string) int64 {
 	for _, kv := range kvs {
@@ -267,11 +285,10 @@ func TestExportHealthIsReportedOnTheTimer(t *testing.T) {
 	ft := newFakeTime(vectorNow)
 	a, rep := timedAgent(t, t.TempDir(), ft)
 	a.mu.Lock()
-	first, send := a.healthReport(context.Background(), ft.now())
-	a.nextHealth = ft.now().Add(a.healthEvery)
-	a.arm()
+	first := a.built("")
 	a.mu.Unlock()
-	if !send || !first.GetHealthy() || first.GetComponentHealthMap()["exporters"].GetStatus() != "ok" {
+	rep.health = nil // the client's first status carries it
+	if !first.GetHealthy() || first.GetComponentHealthMap()["exporters"].GetStatus() != "ok" {
 		t.Fatalf("at start: %v", first)
 	}
 	spans := &failingSpans{InMemoryExporter: tracetest.NewInMemoryExporter(), err: errors.New("connection refused")}
@@ -308,7 +325,7 @@ func TestExportHealthIsReportedOnTheTimer(t *testing.T) {
 		t.Fatalf("%d timers armed", ft.pending())
 	}
 	ft.set(vectorNow + 120_000)
-	if a.refreshAt != 0 || len(rep.effective) != 1 {
+	if len(rep.effective) != 2 { // the config's, then the end's
 		t.Fatal("debug mode didn't end on the shared timer")
 	}
 }

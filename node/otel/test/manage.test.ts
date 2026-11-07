@@ -43,10 +43,11 @@ async function body(req: IncomingMessage): Promise<Uint8Array> {
 
 /** An OpAMP server that offers `offer` in its first answer: the statuses and descriptions it hears. */
 async function configServer(offer: string) {
-  const seen = { polls: 0, statuses: [] as { status: number; error: string }[], serviceNames: [] as string[] };
+  const seen = { polls: 0, statuses: [] as { status: number; error: string }[], serviceNames: [] as string[], uids: new Set<string>() };
   const s = createServer(async (req, res) => {
     const msg = fromBinary(AgentToServerSchema, await body(req));
     seen.polls++;
+    seen.uids.add(Buffer.from(msg.instanceUid).toString("hex"));
     if (msg.remoteConfigStatus) {
       seen.statuses.push({ status: msg.remoteConfigStatus.status, error: msg.remoteConfigStatus.errorMessage });
     }
@@ -75,7 +76,7 @@ async function configServer(offer: string) {
  * makes `spans` and exits. Its output.
  */
 async function app(endpoint: string, resource: Record<string, string>, spans: string, ready: () => boolean,
-  processor = "new SimpleSpanProcessor(new ConsoleSpanExporter())") {
+  processor = "new SimpleSpanProcessor(new ConsoleSpanExporter())", again = false) {
   const program = `
     import { NodeSDK } from "@opentelemetry/sdk-node";
     import { ConsoleSpanExporter, SimpleSpanProcessor } from "@opentelemetry/sdk-trace-base";
@@ -88,6 +89,8 @@ async function app(endpoint: string, resource: Record<string, string>, spans: st
     const { shutdown } = manage({ endpoint: ${JSON.stringify(endpoint)}, heartbeatIntervalMs: 100, stateDir: "none" });
     const tracer = trace.getTracer("logfire");
     process.stdin.once("data", async () => {
+      ${again ? `manage({ endpoint: ${JSON.stringify(endpoint)}, heartbeatIntervalMs: 100, stateDir: "none" });
+      await new Promise((r) => setTimeout(r, 300));` : ""}
       ${spans}
       await shutdown();
       await sdk.shutdown();
@@ -122,6 +125,23 @@ test("the application's own NodeSDK: its exporter gets the gates, and it is desc
     assert.doesNotMatch(out, /secret/);
     assert.match(out, /manage\(\) keeps the application's own sampler/);
     assert.ok(s.seen.serviceNames.includes("mine"), String(s.seen.serviceNames));
+  } finally {
+    s.close();
+  }
+});
+
+test("manage() called again keeps the instance, its client and the policy in force", async () => {
+  // It used to set the agent up again: a new instance UID with a second client, the first one
+  // never stopped, and the SDK's own settings back in force (the redaction gone).
+  const s = await configServer(policy({ attribute_redaction: { drop: ["x"] } }));
+  try {
+    const { code, out } = await app(s.endpoint, { "service.name": "mine" },
+      `tracer.startSpan("after", { attributes: { x: "secret", y: "kept" } }).end();`, s.applied, undefined, true);
+    assert.equal(code, 0, out);
+    assert.match(out, /name: 'after'/);
+    assert.match(out, /y: 'kept'/);
+    assert.doesNotMatch(out, /secret/);
+    assert.equal(s.seen.uids.size, 1, [...s.seen.uids].join(", "));
   } finally {
     s.close();
   }

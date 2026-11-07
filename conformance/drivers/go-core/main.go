@@ -23,6 +23,7 @@ import (
 	"github.com/open-telemetry/opamp-go/protobufs"
 
 	"github.com/pydantic/opamp-clients/go/opamp"
+	"github.com/pydantic/opamp-clients/go/opamp/collector"
 )
 
 var outMu sync.Mutex
@@ -79,7 +80,9 @@ func main() {
 	runFor := time.Duration(envFloat("DRIVER_RUN_S", 30) * float64(time.Second))
 	poll := time.Duration(envFloat("DRIVER_POLL_S", 2) * float64(time.Second))
 
-	cfg := opamp.Config{
+	// The Collector's client (package collector): conformance covers packages and custom messages
+	// too, which package opamp's SDK client leaves out.
+	cfg := collector.Config{Config: opamp.Config{
 		Endpoint:    endpoint,
 		InstanceUID: instanceUID(),
 		// What the driver reports, declared: the client takes no status field whose bit isn't.
@@ -89,7 +92,7 @@ func main() {
 			protobufs.AgentCapabilities_AgentCapabilities_ReportsHealth |
 			protobufs.AgentCapabilities_AgentCapabilities_ReportsEffectiveConfig),
 		HeartbeatInterval: poll,
-	}
+	}}
 	if n, err := strconv.ParseUint(os.Getenv("DRIVER_MAX_SEND_BYTES"), 10, 64); err == nil {
 		cfg.MaxSendBytes = n
 	}
@@ -104,7 +107,7 @@ func main() {
 	if token := os.Getenv("DRIVER_TOKEN"); token != "" {
 		cfg.Header = http.Header{"Authorization": {"Bearer " + token}}
 	}
-	if err := connectionOptions(&cfg); err != nil {
+	if err := connectionOptions(&cfg.Config); err != nil {
 		emit("fatal", map[string]any{"error": err.Error()})
 		os.Exit(1)
 	}
@@ -120,11 +123,11 @@ func main() {
 	// The status to start from, a restart after a crash going on from where the application was
 	// (DRIVER_FIRST_CHANGE): the changes count on from it.
 	first, _ := strconv.Atoi(strings.TrimSpace(os.Getenv("DRIVER_FIRST_CHANGE")))
-	status := opamp.Status{
+	status := collector.Status{Status: opamp.Status{
 		Description:     description(first),
 		Health:          &protobufs.ComponentHealth{Healthy: true, StartTimeUnixNano: uint64(time.Now().UnixNano())},
 		EffectiveConfig: &protobufs.EffectiveConfig{ConfigMap: &protobufs.AgentConfigMap{}},
-	}
+	}}
 	if os.Getenv("DRIVER_COMPONENTS") == "1" {
 		cfg.Capabilities |= uint64(protobufs.AgentCapabilities_AgentCapabilities_ReportsAvailableComponents)
 		status.AvailableComponents = components()
@@ -135,14 +138,14 @@ func main() {
 
 	// The callback applies remote config and telemetry settings. Other notifications reach
 	// the main loop.
-	notes := make(chan opamp.Notification, 64)
+	notes := make(chan collector.Notification, 64)
 	// DRIVER_THROW_ON_CONFIG: the callback itself panics on the first remote config (RULE-SHELL-02).
 	throwOnConfig := os.Getenv("DRIVER_THROW_ON_CONFIG") == "1"
 	thrown := false
 	// Closed once "started" is said: a run's events begin there, so a config the callback hears
 	// first (Start has returned, the driver not yet said so) waits for it.
 	said := make(chan struct{})
-	client, err := opamp.Start(context.Background(), cfg, status, func(c *opamp.Client, n opamp.Notification) {
+	client, err := collector.Start(context.Background(), cfg, status, func(c *collector.Client, n collector.Notification) {
 		if throwOnConfig && !thrown && n.Kind == opamp.RemoteConfig {
 			thrown = true
 			emit("throwing", nil)
@@ -210,7 +213,7 @@ loop:
 
 // lingerThenExit stays DRIVER_LINGER_S seconds after a fatal, still reporting what the client says
 // (nothing, if it keeps RULE-SHELL-02: a second Stopped is a second fatal), then exits 1.
-func lingerThenExit(client *opamp.Client, notes <-chan opamp.Notification) {
+func lingerThenExit(client *collector.Client, notes <-chan collector.Notification) {
 	deadline := time.After(time.Duration(envFloat("DRIVER_LINGER_S", 0) * float64(time.Second)))
 	for {
 		select {
@@ -227,7 +230,7 @@ func lingerThenExit(client *opamp.Client, notes <-chan opamp.Notification) {
 }
 
 // answerConfig reports a remote config and answers it APPLIED.
-func answerConfig(client *opamp.Client, n opamp.Notification) {
+func answerConfig(client *collector.Client, n collector.Notification) {
 	emit("message", map[string]any{"remote_config_hash": hex.EncodeToString(n.RemoteConfig.ConfigHash)})
 	client.SetRemoteConfigStatus(&protobufs.RemoteConfigStatus{
 		LastRemoteConfigHash: n.RemoteConfig.ConfigHash,
@@ -235,7 +238,7 @@ func answerConfig(client *opamp.Client, n opamp.Notification) {
 	})
 }
 
-func handle(client *opamp.Client, notes <-chan opamp.Notification, n opamp.Notification) {
+func handle(client *collector.Client, notes <-chan collector.Notification, n collector.Notification) {
 	switch n.Kind {
 	case opamp.Stopped:
 		if n.Err != nil {
@@ -251,15 +254,15 @@ func handle(client *opamp.Client, notes <-chan opamp.Notification, n opamp.Notif
 		emit("error_response", map[string]any{"type": n.ErrorType.String(), "message": n.Message})
 	case opamp.RemoteConfig:
 		answerConfig(client, n)
-	case opamp.CustomMessage:
+	case collector.CustomMessage:
 		m := n.CustomMessage
 		emit("custom_message", map[string]any{"capability": m.Capability, "type": m.Type, "data": hex.EncodeToString(m.Data)})
 		if m.Type == "ping" {
 			client.SendCustomMessage(&protobufs.CustomMessage{Capability: echo, Type: "pong", Data: m.Data})
 		}
-	case opamp.CustomMessageNotSent:
+	case collector.CustomMessageNotSent:
 		emit("custom_message_not_sent", map[string]any{"reason": n.Detail})
-	case opamp.ServerCustomCapabilities:
+	case collector.ServerCustomCapabilities:
 		emit("server_custom_capabilities", map[string]any{"capabilities": n.CustomCapabilities})
 	case opamp.ConnectionSettings:
 		s := n.ConnectionSettings
@@ -272,13 +275,13 @@ func handle(client *opamp.Client, notes <-chan opamp.Notification, n opamp.Notif
 			LastConnectionSettingsHash: s.Hash,
 			Status:                     protobufs.ConnectionSettingsStatuses_ConnectionSettingsStatuses_APPLIED,
 		})
-	case opamp.InstallPackage:
+	case collector.InstallPackage:
 		file, err := os.ReadFile(n.Path)
 		sum := sha256.Sum256(file)
 		emit("install_package", map[string]any{"name": n.PackageName, "version": n.Package.Version,
 			"sha256": hex.EncodeToString(sum[:]), "error": errString(err)})
 		client.PackageInstalled(n.PackageName, n.Package.Hash, err)
-	case opamp.RemovePackage:
+	case collector.RemovePackage:
 		emit("remove_package", map[string]any{"name": n.PackageName})
 		client.PackageRemoved(n.PackageName, nil)
 	case opamp.InstanceUIDChanged:

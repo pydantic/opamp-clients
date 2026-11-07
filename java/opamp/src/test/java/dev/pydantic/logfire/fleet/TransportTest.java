@@ -47,7 +47,7 @@ import org.junit.jupiter.api.io.TempDir;
 
 /**
  * The transport built from the options: TLS with the CAs given, a client certificate, TLS versions,
- * and an HTTP proxy with credentials, over plain HTTP, WebSocket and downloads alike. The
+ * and an HTTP proxy with credentials, over plain HTTP and WebSocket alike. The
  * certificates are src/test/resources/tls (made by gen.sh there). The proxy tests need Basic
  * credentials through CONNECT tunnels, which the JDK allows only with
  * -Djdk.http.auth.tunneling.disabledSchemes= (pom.xml sets it for the tests).
@@ -74,12 +74,11 @@ class TransportTest {
 
   // covers: RULE-TLS-01
   @Test
-  void trustsTheGivenCaOverHttpWebSocketAndDownloads(@TempDir Path dir) throws Exception {
+  void trustsTheGivenCaOverHttpAndWebSocket(@TempDir Path dir) throws Exception {
     try (Origin origin = Origin.tls(false, null)) {
       Probe p = new Probe(Transport.build(trusting(CA), null, false), dir);
       assertEquals(CoreProto.Input.KindCase.HTTP_RESPONSE, p.post(origin.url("https")).getKindCase());
       assertEquals(CoreProto.Input.KindCase.WS_OPENED, p.open(origin.url("wss")).getKindCase());
-      assertEquals(CoreProto.Input.KindCase.DOWNLOAD_RESPONSE, p.download(origin.url("https") + "/file").getKindCase());
       // The system's CAs as well: still the given one.
       Probe both = new Probe(Transport.build(Tls.builder().trustedCa(CA).includeSystemCas(true).build(), null, false), dir);
       assertEquals(CoreProto.Input.KindCase.HTTP_RESPONSE, both.post(origin.url("https")).getKindCase());
@@ -99,7 +98,6 @@ class TransportTest {
         CoreProto.Input ws = p.open(origin.url("wss"));
         assertEquals(CoreProto.Input.KindCase.WS_FAILED, ws.getKindCase());
         assertFalse(ws.getWsFailed().hasStatus());
-        assertEquals(CoreProto.Input.KindCase.DOWNLOAD_FAILED, p.download(origin.url("https") + "/file").getKindCase());
       }
       assertTrue(origin.requests.isEmpty(), origin.requests.toString());
     }
@@ -112,8 +110,7 @@ class TransportTest {
       Probe p = new Probe(Transport.build(withClientCert(), null, false), dir);
       assertEquals(CoreProto.Input.KindCase.HTTP_RESPONSE, p.post(origin.url("https")).getKindCase());
       assertEquals(CoreProto.Input.KindCase.WS_OPENED, p.open(origin.url("wss")).getKindCase());
-      assertEquals(CoreProto.Input.KindCase.DOWNLOAD_RESPONSE, p.download(origin.url("https") + "/file").getKindCase());
-      assertEquals(3, origin.peers.size(), origin.peers.toString());
+      assertEquals(2, origin.peers.size(), origin.peers.toString());
       for (String peer : origin.peers) {
         assertEquals("CN=opamp-test-agent", peer);
       }
@@ -121,10 +118,7 @@ class TransportTest {
       Probe none = new Probe(Transport.build(trusting(CA), null, false), dir);
       assertEquals(CoreProto.Input.KindCase.HTTP_FAILED, none.post(origin.url("https")).getKindCase());
       assertEquals(CoreProto.Input.KindCase.WS_FAILED, none.open(origin.url("wss")).getKindCase());
-      // The client certificate goes only to a file at the server's own origin, as the core says
-      // (Download.server_origin): told otherwise, the client presents none, and is refused.
-      assertEquals(CoreProto.Input.KindCase.DOWNLOAD_FAILED, p.download(origin.url("https") + "/file", false).getKindCase());
-      assertEquals(3, origin.requests.size());
+      assertEquals(2, origin.requests.size());
     }
   }
 
@@ -155,16 +149,12 @@ class TransportTest {
       assertEquals(CoreProto.Input.KindCase.WS_OPENED, p.open(plain.url("ws")).getKindCase());
       assertEquals(CoreProto.Input.KindCase.HTTP_RESPONSE, p.post(tls.url("https")).getKindCase());
       assertEquals(CoreProto.Input.KindCase.WS_OPENED, p.open(tls.url("wss")).getKindCase());
-      assertEquals(CoreProto.Input.KindCase.DOWNLOAD_RESPONSE, p.download(plain.url("http") + "/file").getKindCase());
-      assertEquals(CoreProto.Input.KindCase.DOWNLOAD_RESPONSE, p.download(tls.url("https") + "/file").getKindCase());
       String plainHost = "127.0.0.1:" + plain.port();
       String tlsHost = "127.0.0.1:" + tls.port();
       assertEquals(List.of(
           "POST http://" + plainHost + "/v1/opamp", // absolute form for http://
           "CONNECT " + plainHost, // a tunnel for ws://
           "CONNECT " + tlsHost,
-          "CONNECT " + tlsHost,
-          "GET http://" + plainHost + "/file",
           "CONNECT " + tlsHost), proxy.seen, "every connection through the proxy");
       // The credentials are the proxy's: the server never sees them.
       for (Map<String, String> h : plain.headers) {
@@ -173,8 +163,8 @@ class TransportTest {
       for (Map<String, String> h : tls.headers) {
         assertNull(h.get("proxy-authorization"), h.toString());
       }
-      assertEquals(3, plain.requests.size(), plain.requests.toString());
-      assertEquals(3, tls.requests.size(), tls.requests.toString());
+      assertEquals(2, plain.requests.size(), plain.requests.toString());
+      assertEquals(2, tls.requests.size(), tls.requests.toString());
     }
   }
 
@@ -307,31 +297,6 @@ class TransportTest {
     assertNotNull(Tls.privateKey("# the key\n" + pem("client-key.pem")));
   }
 
-  /**
-   * Downloads follow no redirect: each is reported with its Location resolved, through the
-   * transport's proxy, with the headers the core gave (the core decides where they go).
-   */
-  @Test
-  void downloadRedirectsAreReportedNotFollowed(@TempDir Path dir) throws Exception {
-    try (Origin a = Origin.plain(); Origin b = Origin.plain(); HttpProxy proxy = new HttpProxy(null, null)) {
-      Probe p = new Probe(Transport.build(trusting(CA), Transport.Proxy.parse("http://127.0.0.1:" + proxy.port()), false), dir);
-      a.redirect("/here", "/file");
-      a.redirect("/there", b.url("http") + "/file");
-      CoreProto.Input here = p.download(a.url("http") + "/here");
-      assertEquals(302, here.getDownloadResponse().getStatus());
-      assertEquals(a.url("http") + "/file", here.getDownloadResponse().getLocation());
-      assertEquals(a.port(), here.getDownloadResponse().getLocationOrigin().getPort());
-      CoreProto.Input there = p.download(a.url("http") + "/there");
-      assertEquals(b.url("http") + "/file", there.getDownloadResponse().getLocation());
-      CoreProto.Input file = p.download(b.url("http") + "/file");
-      assertEquals(200, file.getDownloadResponse().getStatus());
-      assertArrayEquals(MessageDigest.getInstance("SHA-256").digest(Origin.FILE), file.getDownloadResponse().getSha256().toByteArray());
-      assertEquals(2, a.requests.size(), a.requests.toString());
-      assertEquals(1, b.requests.size(), b.requests.toString());
-      assertTrue(proxy.seen.stream().allMatch(s -> s.startsWith("GET http://")), proxy.seen.toString());
-    }
-  }
-
   /** Runs one effect at a time on an {@link Executor} over a transport, and returns what came of it. */
   static final class Probe {
     private final LinkedBlockingQueue<CoreProto.Input> got = new LinkedBlockingQueue<>();
@@ -362,17 +327,6 @@ class TransportTest {
       return in;
     }
 
-    CoreProto.Input download(String url) throws InterruptedException {
-      return download(url, true);
-    }
-
-    CoreProto.Input download(String url, boolean serverOrigin) throws InterruptedException {
-      x.run(CoreProto.Effect.newBuilder().setDownload(CoreProto.Download.newBuilder()
-          .setId(++id).setUrl(url).setMaxBytes(1 << 20).setTimeoutMs(5000).setServerOrigin(serverOrigin)
-          .addHeaders(CoreProto.Header.newBuilder().setName("Authorization").setValue("t"))).build());
-      return next();
-    }
-
     private CoreProto.Input next() throws InterruptedException {
       CoreProto.Input in = got.poll(20, TimeUnit.SECONDS);
       assertNotNull(in, "nothing came");
@@ -381,17 +335,13 @@ class TransportTest {
   }
 
   /**
-   * A server, plain or TLS, just enough for the client: a request gets 200 and a small body (a
-   * redirect where one is set), a WebSocket upgrade gets 101 and the connection held until the
+   * A server, plain or TLS, just enough for the client: a request gets 200 and a small body, a WebSocket upgrade gets 101 and the connection held until the
    * client goes. It records each request line, its headers, and the client certificate's subject.
    */
   static final class Origin implements AutoCloseable {
-    static final byte[] FILE = "package".repeat(50).getBytes(StandardCharsets.US_ASCII);
-
     final List<String> requests = new CopyOnWriteArrayList<>();
     final List<Map<String, String>> headers = new CopyOnWriteArrayList<>();
     final List<String> peers = new CopyOnWriteArrayList<>();
-    private final Map<String, String> redirects = new ConcurrentHashMap<>();
     private final ServerSocket listener;
     private final Set<Socket> sockets = ConcurrentHashMap.newKeySet();
 
@@ -421,10 +371,6 @@ class TransportTest {
 
     String url(String scheme) {
       return scheme + "://127.0.0.1:" + port();
-    }
-
-    void redirect(String path, String location) {
-      redirects.put(path, location);
     }
 
     @Override
@@ -461,7 +407,6 @@ class TransportTest {
         requests.add(h.line);
         headers.add(h.headers);
         in.readNBytes(Integer.parseInt(h.headers.getOrDefault("content-length", "0")));
-        String path = URI.create(h.line.split(" ")[1]).getPath();
         if ("websocket".equalsIgnoreCase(h.headers.get("upgrade"))) {
           String accept = Base64.getEncoder().encodeToString(MessageDigest.getInstance("SHA-1")
               .digest((h.headers.get("sec-websocket-key") + "258EAFA5-E914-47DA-95CA-C5AB0DC85B11")
@@ -476,16 +421,11 @@ class TransportTest {
           }
           return;
         }
-        String location = redirects.get(path);
-        byte[] body = path.equals("/file") ? FILE : new byte[] {1, 2, 3};
+        byte[] body = {1, 2, 3};
         // One request a connection: the proxy passes on one too.
-        String status = location != null ? "302 Found\r\nLocation: " + location : "200 OK";
-        out.write(("HTTP/1.1 " + status + "\r\nContent-Length: " + (location != null ? 0 : body.length)
-            + "\r\nConnection: close\r\n\r\n")
+        out.write(("HTTP/1.1 200 OK\r\nContent-Length: " + body.length + "\r\nConnection: close\r\n\r\n")
             .getBytes(StandardCharsets.US_ASCII));
-        if (location == null) {
-          out.write(body);
-        }
+        out.write(body);
         out.flush();
       } catch (Exception e) {
         // the connection went, or the handshake failed

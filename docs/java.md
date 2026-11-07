@@ -13,11 +13,11 @@ or later. Its [README](../java/opamp/README.md) has the full reference.
 <dependency>
   <groupId>dev.pydantic</groupId>
   <artifactId>logfire-fleet-client</artifactId>
-  <version>0.2.0</version>
+  <version>0.2.1</version>
 </dependency>
 ```
 
-Gradle: `implementation("dev.pydantic:logfire-fleet-client:0.2.0")`. The latest version is on
+Gradle: `implementation("dev.pydantic:logfire-fleet-client:0.2.1")`. The latest version is on
 [Maven Central](https://central.sonatype.com/artifact/dev.pydantic/logfire-fleet-client).
 
 ## Start and stop
@@ -91,8 +91,6 @@ agent's status to `start`, so the first message reports it in full.
 | Connection settings | `acceptConnectionSettings(true)` (needs a state file), `verifyTimeout(Duration)` | [connection-settings.md](connection-settings.md) |
 | Telemetry settings | `ReportsOwnTraces`, `ReportsOwnMetrics`, `ReportsOwnLogs`; answer `Notification.ConnectionSettings` with `setConnectionSettingsStatus` | [telemetry-settings.md](telemetry-settings.md) |
 | Available components | `Status` (the fifth component), `setAvailableComponents` | [available-components.md](available-components.md) |
-| Packages | `acceptPackages(true)` (needs a state file), `maxPackageBytes`, `downloadTimeout`; answer with `packageInstalled`, `packageRemoved` | [packages.md](packages.md) |
-| Custom messages | `Status` (the sixth component), `setCustomCapabilities`, `sendCustomMessage` | [custom-messages.md](custom-messages.md) |
 | Limits | `requestTimeout`, `connectTimeout`, `stopTimeout`, `maxSendBytes`, `maxReceiveBytes` | [how-it-works.md](how-it-works.md#effects-end) |
 
 Certificates and keys are read when given, and the proxy URL and the mode by `build()`, so
@@ -120,9 +118,7 @@ The callback gets a `Notification`, a sealed interface of records.
 | `Connected`, `ConnectFailed` | `status`, `detail` | |
 | `RemoteConfig` | `config` | `setRemoteConfigStatus` |
 | `ConnectionSettings` | `settings` | `setConnectionSettingsStatus` |
-| `InstallPackage`, `RemovePackage` | `name`, `pkg`, `path` | `packageInstalled`, `packageRemoved` |
-| `CustomMessage`, `ServerCustomCapabilities`, `CustomMessageNotSent` | `message`, `capabilities`, `reason` | |
-| `InstanceUidChanged`, `HeartbeatInterval`, `Command` | `instanceUid`, `interval`, `command` | |
+| `InstanceUidChanged`, `HeartbeatInterval` | `instanceUid`, `interval` | |
 | `ErrorResponse`, `BadMessage`, `StatusTooLarge`, `SaveStalled` | `type`, `message`, `detail`, `field`, `bytes`, `stalled`, `waited` | |
 | `StateFromNewerVersion` | `version`: the format of a state a newer release saved, which is kept as it is; the client saves nothing this run | log it as a warning |
 | `Stopped` | `error`: why it stopped on its own, or null after `stop()` | |

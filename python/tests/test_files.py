@@ -1,15 +1,15 @@
 # Copyright (c) 2026 Pydantic Services Inc.
 # SPDX-License-Identifier: MIT
-"""The file operations of saves and download files: journaled in the core tap (kind 5) and
+"""The file operations of saves: journaled in the core tap (kind 5) and
 held to what the checker (opamp-tap's file records) asks of them; and, through the seam that
 stands in for the file system (``_files.Files``), faults injected into them: an error, a write
 cut short then a full disk, a slow operation, a rename that lands with a directory sync that
-fails; for downloads, a directory that can't be made and a discard that can't delete. Whatever
+fails. Whatever
 the fault: the client keeps heartbeating, every save is answered once, stop is bounded, the state
 file is whole afterwards (a version saved, or the one before) and a temporary file left over never
 makes a later save fail.
 
-The fault runs are seeded: ``OPAMP_FILE_FAULT_SEEDS`` (8 saves, 12 downloads) of each, from
+The fault runs are seeded: ``OPAMP_FILE_FAULT_SEEDS`` (8) of them, from
 ``OPAMP_FILE_FAULT_BASE`` (0); ``OPAMP_FILE_FAULT_SEED=S`` replays one. With
 ``target/release/opamp-tap`` there (``scripts/fetch_core.py fetch`` puts it there), every tap is checked
 by it too."""
@@ -36,14 +36,12 @@ import pytest
 from _servers import MODES
 from aiohttp import web
 
-from logfire_fleet_client import Client, Config, Notification, Status, opamp_pb2 as pb
+from logfire_fleet_client import Client, Config, Status, opamp_pb2 as pb
 from logfire_fleet_client import _executor
-from logfire_fleet_client._client import STOP_GRACE_S
-from logfire_fleet_client._executor import Executor, _save, download_path, downloads_dir, read_state
+from logfire_fleet_client._executor import _save, read_state
 from logfire_fleet_client._files import REAL, Files, Journal
 from logfire_fleet_client._proto.opamp.core.v1 import core_pb2 as corepb
-from logfire_fleet_client._streams import Streams
-from logfire_fleet_client._transport import Proxy, Transport
+from logfire_fleet_client._transport import Proxy
 
 ROOT = Path(__file__).resolve().parents[2]  # the repository
 OPAMP_TAP = ROOT / "target" / "release" / "opamp-tap"
@@ -133,14 +131,9 @@ async def until(what: str, done: Callable[[], bool], seconds: float = 20) -> Non
 # asked to.
 
 class Server:
-    def __init__(self, configs: int = 0, package: bytes | None = None, hold_first: bool = False) -> None:
+    def __init__(self, configs: int = 0) -> None:
         self.configs = configs
-        self.package = package
-        self.hold_first = hold_first
         self.arrivals: list[float] = []  # time.monotonic() of each message
-        self.downloads = 0
-        self.held = asyncio.Event()
-        self.release = asyncio.Event()
         self.port = 0
         self._runner: web.AppRunner | None = None
 
@@ -159,37 +152,11 @@ class Server:
                 file = pb.AgentConfigObject(body=body, content_type="text/plain")
                 reply.remote_config.CopyFrom(pb.AgentRemoteConfig(
                     config=pb.AgentConfigMap(config_map={"": file}), config_hash=hashlib.sha256(body).digest()))
-            if self.package is not None:
-                reply.packages_available.CopyFrom(pb.PackagesAvailable(all_packages_hash=b"\1", packages={
-                    "pkg": pb.PackageAvailable(type=pb.PackageType_TopLevel, version="1", hash=b"\2",
-                                               file=pb.DownloadableFile(
-                                                   download_url=f"http://127.0.0.1:{self.port}/file",
-                                                   content_hash=hashlib.sha256(self.package).digest()))}))
         return web.Response(body=reply.SerializeToString(), content_type="application/x-protobuf")
-
-    async def _file(self, req: web.Request) -> web.StreamResponse:
-        self.downloads += 1
-        assert self.package is not None
-        resp = web.StreamResponse()
-        resp.content_length = len(self.package) if not (self.hold_first and self.downloads == 1) else None
-        await resp.prepare(req)
-        if self.hold_first and self.downloads == 1:
-            # A part, then nothing until released: then the rest, and stale bytes after it.
-            await resp.write(self.package[:100])
-            self.held.set()
-            await self.release.wait()
-            await resp.write(self.package[100:] + b"OLD" * 100)
-            await resp.write_eof()
-            return resp
-        for at in range(0, len(self.package), 64 * 1024):
-            await resp.write(self.package[at:at + 64 * 1024])
-        await resp.write_eof()
-        return resp
 
     async def start(self) -> Server:
         app = web.Application()
         app.router.add_post("/v1/opamp", self._opamp)
-        app.router.add_get("/file", self._file)
         self._runner = web.AppRunner(app)
         await self._runner.setup()
         site = web.TCPSite(self._runner, "127.0.0.1", 0)
@@ -198,7 +165,6 @@ class Server:
         return self
 
     async def close(self) -> None:
-        self.release.set()
         if self._runner is not None:
             await self._runner.cleanup()
 
@@ -209,23 +175,6 @@ CAPS = pb.AgentCapabilities_AcceptsRemoteConfig
 def config(server: Server, state: str, mode: str, **kw) -> Config:
     return Config(endpoint=server.endpoint, state_file=state, mode=mode, capabilities=CAPS, proxy=Proxy.DIRECT,
                   heartbeat_interval_ms=kw.pop("heartbeat_interval_ms", 100), **kw)
-
-
-class App:
-    """The application: installs each package it is handed (checking its file's hash first)."""
-
-    def __init__(self) -> None:
-        self.client: Client | None = None
-        self.notes: list[Notification] = []
-        self.installed: list[tuple[str, bytes]] = []  # each package's file: its path and content
-
-    def __call__(self, n: Notification) -> None:
-        self.notes.append(n)
-        if n.kind == "install_package":
-            with open(n.path, "rb") as f:
-                self.installed.append((n.path, f.read()))
-            assert self.client is not None
-            self.client.package_installed(n.package_name, n.package.hash)
 
 
 # The save's recipe, journaled.
@@ -346,12 +295,6 @@ class Faulty(Files):
     def remove(self, path: str) -> None:
         self._do("remove", path, lambda: REAL.remove(path))
 
-    def mkdir(self, path: str) -> bool:
-        return self._do("mkdir", path, lambda: REAL.mkdir(path))  # type: ignore[return-value]
-
-    def clear(self, path: str) -> bool:
-        return self._do("clear", path, lambda: REAL.clear(path))  # type: ignore[return-value]
-
 
 def test_a_write_cut_short_is_followed_by_the_rest_or_the_save_fails(tmp_path) -> None:
     """write(2) may take part of what it is given: the rest follows, or (the disk is full) the
@@ -377,40 +320,27 @@ def test_a_write_cut_short_once_is_written_in_full(tmp_path) -> None:
     assert Path(state).read_bytes() == b"a whole new state"
 
 
-# The journal of a client's saves and downloads, in its tap.
+# The journal of a client's saves, in its tap.
 
 @pytest.mark.parametrize("mode", MODES)
-def test_a_clients_saves_and_downloads_are_journaled_in_its_tap(mode: str, tmp_path, monkeypatch) -> None:
+def test_a_clients_saves_are_journaled_in_its_tap(mode: str, tmp_path, monkeypatch) -> None:
     monkeypatch.setenv("OPAMP_CORE_TAP", str(tmp_path / "core.tap"))
     state = str(tmp_path / "state.bin")
-    package = os.urandom(150_000)
-    # A crashed run's download: cleared at start.
-    os.makedirs(downloads_dir(state))
-    Path(downloads_dir(state), "left-1").write_bytes(b"partial")
 
     async def run() -> None:
-        server = await Server(configs=3, package=package).start()
-        app = App()
+        server = await Server(configs=3).start()
         try:
-            app.client = Client.start(config(server, state, mode, accept_packages=True), Status(), app)
+            client = Client.start(config(server, state, mode), Status())
             tap = tap_path(tmp_path)
-
-            def settled() -> bool:
-                t = read_tap(str(tap))
-                downloads = [o for o in t.ops if o.get("path", "").startswith("state.bin.downloads/")]
-                return (len([a for a in t.answers() if a[0] == "stored"]) >= 3 and bool(app.installed)
-                        and any(o["op"] == "remove" for o in downloads))
-
-            await until("three saves, a package installed and its file deleted", settled)
-            await asyncio.wait_for(app.client.stop(), 10)
+            # The core takes in what comes while a save is under way at once, so the three configs
+            # (coming one a message, fast) may make as few as two saves.
+            await until("two saves", lambda: len([a for a in read_tap(str(tap)).answers() if a[0] == "stored"]) >= 2)
+            await asyncio.wait_for(client.stop(), 10)
         finally:
             await server.close()
 
         t = read_tap(str(tap))
-        assert not os.path.exists(downloads_dir(state)) or not os.listdir(downloads_dir(state))
-        ops = t.ops
-        assert ops[:2] == [{"op": "state", "path": "state.bin"}, {"op": "clear", "path": "state.bin.downloads"}]
-
+        assert t.ops[0] == {"op": "state", "path": "state.bin"}
         # Each save: a new temporary file, its data written and synced, renamed over the state
         # file, the directory synced; stored only after that.
         for id_, data in t.stores:
@@ -418,8 +348,7 @@ def test_a_clients_saves_and_downloads_are_journaled_in_its_tap(mode: str, tmp_p
                 continue
             at = t.index(lambda e, id_=id_, data=data: e == ("store", id_, data))
             done = t.index(lambda e, id_=id_: e == ("stored", id_))
-            save = [e[1] for e in t.events[at:done]
-                    if e[0] == "file" and not e[1].get("path", "").startswith("state.bin.downloads")]
+            save = [e[1] for e in t.events[at:done] if e[0] == "file"]
             assert save == [{"op": "create", "path": "state.bin.tmp"},
                             {"op": "write", "path": "state.bin.tmp", "data": data.hex()},
                             {"op": "sync", "path": "state.bin.tmp"},
@@ -427,23 +356,6 @@ def test_a_clients_saves_and_downloads_are_journaled_in_its_tap(mode: str, tmp_p
                             # Windows can't sync a directory (Files.sync_dir): none is journaled there.
                             *([] if os.name == "nt" else [{"op": "syncdir", "path": "."}])], f"save {id_}"
         assert Path(state).read_bytes() == [d for i, d in t.stores if ("stored", i) in t.answers()][-1]
-
-        # The download's file: its directory made, the file made new, written in full, synced
-        # before the core hears of it; deleted once installed.
-        files = [o for o in ops if o.get("path", "").startswith("state.bin.downloads/") or o == {
-            "op": "mkdir", "path": "state.bin.downloads"}]
-        made = [o["path"] for o in files if o["op"] == "create"]
-        assert made, f"the download's file was not made new (create): {files}"
-        name = made[0]
-        assert files[0] == {"op": "mkdir", "path": "state.bin.downloads"}
-        assert files[1] == {"op": "create", "path": name}
-        writes = [o for o in files if o["op"] == "write"]
-        assert sum(o["len"] for o in writes) == len(package) and files[2:2 + len(writes)] == writes
-        assert files[2 + len(writes):] == [{"op": "sync", "path": name}, {"op": "remove", "path": name}]
-        synced = t.index(lambda e: e == ("file", {"op": "sync", "path": name}))
-        heard = t.index(lambda e: e[0] in ("download_response", "downloaded"))
-        assert synced < heard, "the core heard of the download before its file was synced"
-        assert app.installed[0][1] == package
         opamp_tap(tap)
 
     asyncio.run(run())
@@ -565,335 +477,6 @@ def test_a_fault_in_a_save_is_survived_answered_once_and_leaves_the_state_whole(
     asyncio.run(run())
 
 
-# Faults in download files.
-
-DOWNLOAD_FAULTS = [("mkdir", "eio"), ("create", "eio"), ("write", "half"), ("sync", "eio"), ("remove", "eio"),
-                   ("write", "slow")]
-
-
-@pytest.mark.parametrize("seed", _seeds(12))
-def test_a_fault_in_a_download_file_is_survived_and_no_partial_file_is_handed_over(seed: int, tmp_path,
-                                                                                   monkeypatch) -> None:
-    rng = random.Random(seed)
-    op, kind = DOWNLOAD_FAULTS[seed % len(DOWNLOAD_FAULTS)]
-    mode = MODES[(seed // len(DOWNLOAD_FAULTS)) % len(MODES)]
-    state = str(tmp_path / "state.bin")
-    downloads = downloads_dir(state)
-    faulty = Faulty(op, 0, kind, lambda p: p == downloads or p.startswith(downloads + os.sep),
-                    rng.uniform(*SLOW_S))
-    package = rng.randbytes(rng.randrange(1, 400_000))
-    what = Said(lambda: f"{_replay(seed)}: {mode} mode, {faulty}, a package of {len(package)} bytes")
-    monkeypatch.setenv("OPAMP_CORE_TAP", str(tmp_path / "core.tap"))
-
-    async def run() -> None:
-        server = await Server(package=package).start()
-        app = App()
-        try:
-            app.client = Client.start(config(server, state, mode, accept_packages=True,
-                                             stop_timeout_ms=int(STOP_S * 1000)), Status(), app, _files=faulty)
-            tap = tap_path(tmp_path)
-
-            def over() -> bool:
-                t = read_tap(str(tap))
-                return bool(t.inputs("download_failed")) or (
-                    bool(app.installed) and (faulty.fired is not None or any(o["op"] == "remove" for o in t.ops)))
-
-            await until(f"the download to end ({what})", over, 30)
-            # It goes on: the client still talks to the server.
-            n = len(server.arrivals)
-            await until(f"messages after the download ({what})", lambda: len(server.arrivals) >= n + 3, 10)
-            t0 = time.monotonic()
-            await app.client.stop()
-            took = time.monotonic() - t0
-            assert took < STOP_S + SLOW_S[1] + 3, f"{what}: stop took {took:.1f} s"
-        finally:
-            await server.close()
-
-        assert faulty.fired is not None, f"{what}: the fault was never reached"
-        # The client kept heartbeating while a file operation was slow.
-        for begun, ended in faulty.slow:
-            during = [a for a in server.arrivals if begun < a < ended]
-            assert during, f"{what}: no message in the {ended - begun:.1f} s a download's file operation took"
-        # Only a whole file is handed over.
-        for _path, content in app.installed:
-            assert hashlib.sha256(content).digest() == hashlib.sha256(package).digest(), (
-                f"{what}: the file handed over ({len(content)} bytes) isn't the package")
-        if kind != "slow":
-            assert not app.installed or op == "remove", f"{what}: a file whose write failed was handed over"
-        # Nothing is left but a file whose deletion failed.
-        left = os.listdir(downloads) if os.path.isdir(downloads) else []
-        assert len(left) <= (1 if op == "remove" else 0), f"{what}: left {left}"
-        opamp_tap(tap_path(tmp_path))
-
-        # The next client clears what is left.
-        server2 = await Server().start()
-        try:
-            again = Client.start(config(server2, state, mode), Status())
-            await again.stop()
-        finally:
-            await server2.close()
-        assert not os.path.exists(downloads), f"{what}: {os.listdir(downloads)}"
-
-    asyncio.run(run())
-
-
-# Downloads: a slow disk under a download's file holds up neither heartbeats nor the loop.
-
-@pytest.mark.parametrize("op", ["mkdir", "create", "write", "sync", "remove"])
-@pytest.mark.parametrize("mode", MODES)
-def test_a_slow_download_file_holds_up_neither_heartbeats_nor_the_loop(mode: str, op: str, tmp_path) -> None:
-    state = str(tmp_path / "state.bin")
-    downloads = downloads_dir(state)
-    faulty = Faulty(op, 0, "slow", lambda p: p == downloads or p.startswith(downloads + os.sep), 1.5)
-    package = os.urandom(200_000)
-
-    async def run() -> None:
-        server = await Server(package=package).start()
-        app = App()
-        # The loop's longest stall while the operation was slow.
-        stalls: list[float] = []
-
-        async def ticker() -> None:
-            last = time.monotonic()
-            while True:
-                await asyncio.sleep(0.01)
-                now = time.monotonic()
-                stalls.append(now - last)
-                last = now
-
-        tick = asyncio.get_running_loop().create_task(ticker())
-        try:
-            app.client = Client.start(config(server, state, mode, accept_packages=True), Status(), app, _files=faulty)
-            await until("the slow operation", lambda: bool(faulty.slow), 30)
-            await until("the package installed and its file deleted", lambda: bool(app.installed) and (
-                not os.path.isdir(downloads) or not os.listdir(downloads)), 30)
-            await asyncio.wait_for(app.client.stop(), 10)
-        finally:
-            tick.cancel()
-            await server.close()
-        (begun, ended), = faulty.slow
-        during = [a for a in server.arrivals if begun < a < ended]
-        assert len(during) >= 3, f"{mode} mode, slow {op}: {len(during)} messages in the {ended - begun:.1f} s it took"
-        assert max(stalls) < 1, f"{mode} mode, slow {op}: the loop stalled {max(stalls):.1f} s"
-        assert app.installed[0][1] == package
-
-    asyncio.run(run())
-
-
-# At start: deleting the downloads a run before left holds up neither start nor the loop, and
-# no download makes its file before it is over.
-
-@pytest.mark.parametrize("mode", MODES)
-def test_the_downloads_left_before_are_deleted_beside_the_loop(mode: str, tmp_path) -> None:
-    state = str(tmp_path / "state.bin")
-    downloads = downloads_dir(state)
-    os.makedirs(downloads)
-    Path(downloads, "left-1").write_bytes(b"partial")
-    package = os.urandom(100_000)
-    release = threading.Event()
-    order: list[str] = []
-
-    class SlowClear(Files):
-        """A disk on which deleting the downloads takes until the test says."""
-
-        def clear(self, path: str) -> bool:
-            order.append("clearing")
-            release.wait(30)
-            cleared = REAL.clear(path)
-            order.append("cleared")
-            return cleared
-
-        def mkdir(self, path: str) -> bool:
-            if path == downloads:
-                order.append("mkdir")
-            return REAL.mkdir(path)
-
-        def create(self, path: str) -> int:
-            if path.startswith(downloads + os.sep):
-                order.append("create")
-            return REAL.create(path)
-
-    async def run() -> None:
-        server = await Server(package=package).start()
-        app = App()
-        loop = asyncio.get_running_loop()
-        try:
-            began = loop.time()
-            app.client = Client.start(config(server, state, mode, accept_packages=True), Status(), app,
-                                      _files=SlowClear())
-            assert loop.time() - began < 1, "start waited for the downloads left before to be deleted"
-            # The loop goes on, and so does the client: it polls, and asks for the package.
-            await until("three messages", lambda: len(server.arrivals) >= 3)
-            await until("the download asked for", lambda: server.downloads >= 1)
-            await asyncio.sleep(0.3)
-            assert order == ["clearing"], f"a download made its file while the old ones were being deleted: {order}"
-            release.set()
-            await until("the package installed", lambda: bool(app.installed))
-            assert app.installed[0][1] == package
-            await asyncio.wait_for(app.client.stop(), 10)
-        finally:
-            release.set()
-            await server.close()
-        assert order[:2] == ["clearing", "cleared"], order
-        assert not os.path.exists(os.path.join(downloads, "left-1"))
-
-    asyncio.run(run())
-
-
-@pytest.mark.parametrize("how", ["cancel", "close"])
-@pytest.mark.parametrize("op", ["mkdir", "create", "write", "sync"])
-def test_platform_mode_a_download_ended_while_its_file_operation_runs_leaves_nothing(op: str, how: str,
-                                                                                    tmp_path) -> None:
-    """A cancel (or close, at stop) while the download's file operation is running in its worker
-    thread: once that operation is over, the file is closed and deleted, nothing is reported, and
-    close waits for it (within its bound)."""
-    state = str(tmp_path / "state")
-    downloads = downloads_dir(state)
-    faulty = Faulty(op, 0, "slow", lambda p: p == downloads or p.startswith(downloads + os.sep), 0.5)
-
-    async def run() -> None:
-        server = await Server(package=os.urandom(100_000)).start()
-        got: list[corepb.Input] = []
-        x = Executor(got.append, state, files=faulty)
-        try:
-            x.do(corepb.Effect(download=corepb.Download(id=1, url=f"http://127.0.0.1:{server.port}/file",
-                                                        max_bytes=1 << 20, timeout_ms=5000)))
-            await until("the slow operation", lambda: faulty.fired is not None)
-            if how == "cancel":
-                x.do(corepb.Effect(cancel=corepb.Id(id=1)))
-                await asyncio.sleep(0.8)
-            t0 = time.monotonic()
-            await x.close(5)
-            assert time.monotonic() - t0 < 2
-        finally:
-            await server.close()
-        assert got == []
-        assert faulty.slow, "the operation ended"
-        assert not os.path.exists(x.download_path(1))
-
-    asyncio.run(run())
-
-
-# RULE-SHELL-07: a download whose file is still being flushed when the core says stopped is the
-# shell's to delete (the core gave up on it), once the flush is over; and by the time stop
-# returns, however much of the stop timeout the core took. The shell gave it what was left of
-# the stop timeout: a core that took all of it left nothing, and the file was deleted after stop
-# had returned (the adversary's harness, on loaded runners: "downloads changed after stop").
-
-@pytest.mark.parametrize("mode", MODES)
-def test_a_download_file_being_flushed_as_the_core_stops_is_gone_when_stop_returns(mode: str, tmp_path) -> None:
-    state = str(tmp_path / "state")
-    downloads = downloads_dir(state)
-    flush_s = 0.6  # longer than the stop timeout, well within STOP_GRACE_S of it
-    faulty = Faulty("sync", 0, "slow", lambda p: p.startswith(downloads + os.sep), flush_s)
-
-    def listing() -> list[str]:
-        return sorted(os.listdir(downloads)) if os.path.isdir(downloads) else []
-
-    async def run() -> tuple[float, list[str], list[str]]:
-        server = await Server(package=os.urandom(100_000)).start()
-        app = App()
-        try:
-            app.client = Client.start(config(server, state, mode, accept_packages=True, stop_timeout_ms=100),
-                                      Status(), app, _files=faulty)
-            await until("the download's file being flushed", lambda: faulty.fired is not None, 30)
-            t0 = time.monotonic()
-            await asyncio.wait_for(app.client.stop(), 10)
-            took = time.monotonic() - t0
-            at_return = listing()
-            await asyncio.sleep(flush_s + 0.5)
-            return took, at_return, listing()
-        finally:
-            await server.close()
-            assert not app.installed
-
-    took, at_return, later = asyncio.run(run())
-    assert faulty.slow, "the flush ended"
-    assert at_return == [], f"{mode} mode: stop returned with {at_return} still there (deleted later: {later == []})"
-    assert later == []
-    assert took < 0.1 + STOP_GRACE_S + 0.5, f"{mode} mode: stop took {took:.2f} s"
-
-
-# A client restarted on the same state file mid-download.
-
-@pytest.mark.parametrize("mode", MODES)
-def test_a_download_does_not_outlive_stop_into_the_next_clients_file(mode: str, tmp_path) -> None:
-    """The server holds the first client's download; that client stops; a second one starts on
-    the same state file, and its download (the same id) completes; then the first download is
-    released, stale bytes after it. The file the second client hands over is the package."""
-    package = b"the package, version 1" * 1000
-    state = str(tmp_path / "state")
-
-    async def run() -> None:
-        server = await Server(package=package, hold_first=True).start()
-        try:
-            first = App()
-            first.client = Client.start(config(server, state, mode, accept_packages=True), Status(), first)
-            await asyncio.wait_for(server.held.wait(), 20)
-            await asyncio.wait_for(first.client.stop(), 10)
-
-            second = App()
-            second.client = Client.start(config(server, state, mode, accept_packages=True), Status(), second)
-            await until("the second client's package", lambda: bool(second.installed))
-            path, content = second.installed[0]
-            server.release.set()  # the first client's download, were it still there, goes on now
-            await asyncio.sleep(0.5)
-            await asyncio.wait_for(second.client.stop(), 10)
-        finally:
-            await server.close()
-        assert hashlib.sha256(content).digest() == hashlib.sha256(package).digest()
-        assert not first.installed
-
-    asyncio.run(run())
-
-
-# A download's file is made new: a file already where it goes (a crashed run's) is never written
-# over, deleted, or handed over.
-
-PLANTED = b"left by a run that crashed"
-
-
-def test_core_mode_never_reuses_a_file_already_at_a_downloads_path(tmp_path) -> None:
-    async def run() -> None:
-        got: list[corepb.Input] = []
-        state = str(tmp_path / "state")
-        s = Streams(got.append, Transport(proxy=Proxy.DIRECT), state, client="c")
-        os.makedirs(downloads_dir(state))
-        path = download_path(state, "c", 4)
-        Path(path).write_bytes(PLANTED)
-        s.do(corepb.Effect(download_data=corepb.WsMessage(id=4, data=b"new")))
-        s.do(corepb.Effect(download_done=corepb.Id(id=4)))
-        await until("an answer", lambda: bool(got))
-        await s.shutdown()
-        assert [i.WhichOneof("kind") for i in got] == ["download_failed"]
-        assert Path(path).read_bytes() == PLANTED
-
-    asyncio.run(run())
-
-
-def test_platform_mode_never_reuses_a_file_already_at_a_downloads_path(tmp_path) -> None:
-    async def run() -> None:
-        server = await Server(package=b"new").start()
-        got: list[corepb.Input] = []
-        state = str(tmp_path / "state")
-        x = Executor(got.append, state)
-        os.makedirs(downloads_dir(state))
-        path = x.download_path(4)
-        Path(path).write_bytes(PLANTED)
-        try:
-            x.do(corepb.Effect(download=corepb.Download(id=4, url=f"http://127.0.0.1:{server.port}/file",
-                                                        max_bytes=1 << 20, timeout_ms=5000)))
-            await until("an answer", lambda: bool(got))
-            x.do(corepb.Effect(discard=corepb.Id(id=4)))
-        finally:
-            await x.close()
-            await server.close()
-        assert [i.WhichOneof("kind") for i in got] == ["download_failed"]
-        assert Path(path).read_bytes() == PLANTED
-
-    asyncio.run(run())
-
-
 # On macOS fsync(2) hands the data to the drive, which may keep it in its cache: only
 # fcntl(F_FULLFSYNC) asks the drive to write it out (fsync(2) on macOS says so, as do Python's
 # os.fsync docs). RULE-SHELL-09 says a save answered stored is on disk. Rust's std
@@ -998,7 +581,7 @@ def test_on_windows_a_saves_rename_is_written_through(tmp_path) -> None:
 
 
 @pytest.mark.skipif(os.name != "nt", reason="Windows access-control lists")
-def test_on_windows_a_save_a_download_and_the_tap_allow_the_user_alone(tmp_path, monkeypatch) -> None:
+def test_on_windows_a_save_and_the_tap_allow_the_user_alone(tmp_path, monkeypatch) -> None:
     from logfire_fleet_client import _core, _windows
 
     user = _windows.user_sid()
@@ -1014,15 +597,6 @@ def test_on_windows_a_save_a_download_and_the_tap_allow_the_user_alone(tmp_path,
     REAL.close(fd)
     with pytest.raises(FileExistsError):
         REAL.create(state + ".tmp")  # made new: never one already there
-
-    # The downloads directory, inherited by what is made in it; a download's file.
-    d = _executor.downloads_dir(state)
-    assert REAL.mkdir(d)
-    assert not REAL.mkdir(d)
-    assert _windows.dacl(d) == _windows.canonical(_windows.user_only(directory=True))
-    fd = REAL.create(os.path.join(d, "1"))
-    REAL.close(fd)
-    assert _windows.dacl(os.path.join(d, "1")) == _windows.canonical(_windows.user_only())
 
     # The core tap: appended to, the user's only.
     tap = tmp_path / "core.tap"

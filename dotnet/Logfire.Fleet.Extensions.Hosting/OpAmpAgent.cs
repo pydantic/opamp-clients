@@ -11,6 +11,7 @@ using OpenTelemetry.Logs;
 using OpenTelemetry.Metrics;
 using OpenTelemetry.Trace;
 using Logfire.Fleet.Client.Sdk;
+using AgentLog = Logfire.Fleet.Otel.AgentLog;
 using Logfire.Fleet.Otel;
 using Exporters = Logfire.Fleet.Otel.Exporters;
 

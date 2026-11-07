@@ -17,8 +17,6 @@ import java.net.http.WebSocket;
 import java.net.http.WebSocketHandshakeException;
 import java.nio.ByteBuffer;
 import java.nio.file.Path;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
@@ -30,12 +28,11 @@ import java.util.concurrent.CompletionStage;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.RejectedExecutionException;
-import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Consumer;
 
 /**
- * Carries out the core's effects with the JDK's HTTP client (HTTP requests, WebSocket connections,
- * downloads) and the state file, and reports what happened as inputs, each naming the effect it
+ * Carries out the core's effects with the JDK's HTTP client (HTTP requests, WebSocket connections)
+ * and the state file, and reports what happened as inputs, each naming the effect it
  * belongs to. It decides nothing about OpAMP and keeps no time of its own: every effect ends with
  * its result or the core's cancel. What is in flight, and so what reaches the core, is {@link
  * InFlight}'s. {@link #run} is called on the client's thread; the inputs arrive from the HTTP
@@ -44,8 +41,6 @@ import java.util.function.Consumer;
 final class Executor {
   // Headers the JDK sets itself and refuses from the caller.
   private static final Set<String> RESTRICTED = Set.of("connection", "content-length", "expect", "host", "upgrade");
-  /** Clients made in this process: download files are named per client. */
-  private static final AtomicLong CLIENTS = new AtomicLong();
 
   private final Transport transport;
   private final HttpClient http;
@@ -58,15 +53,13 @@ final class Executor {
    */
   volatile String used;
   private final Path stateFile;
-  /** This client's prefix for download files: another client's download never touches them. */
-  private final String files;
   final InFlight inFlight = new InFlight();
   /** Saves, one at a time and in order, beside the client's thread: a slow disk holds up nothing. */
   private final ExecutorService saver;
-  /** Where saves and downloads' files are written (journaled into the core tap, if there is one). */
+  /** Where saves are written (journaled into the core tap, if there is one). */
   private final Disk disk;
   /**
-   * Where response bodies are read and download files written, never the client's thread: a
+   * Where response bodies are read, never the client's thread: a
    * continuation attached to a future already complete runs on the thread attaching it, so each
    * is attached with an executor of its own. Shut down when the client ends.
    */
@@ -83,7 +76,6 @@ final class Executor {
     this.extra = transport.headers;
     this.deliver = deliver;
     this.stateFile = stateFile;
-    this.files = ProcessHandle.current().pid() + "-" + CLIENTS.incrementAndGet() + "-";
     this.bodies = Executors.newCachedThreadPool(r -> {
       Thread t = new Thread(r, "opamp-body");
       t.setDaemon(true);
@@ -111,13 +103,12 @@ final class Executor {
         }
       }
       case STORE -> store(effect.getStore());
-      case DOWNLOAD -> download(effect.getDownload());
-      case DISCARD -> delete(effect.getDiscard().getId());
       // covers: RULE-CLIENT-15
       case CANCEL -> inFlight.cancel(effect.getCancel().getId());
       case NOTIFY -> {} // notifications are the client's
-      // A newer module than this client: fail loudly rather than skip what the core asked for.
-      case KIND_NOT_SET -> throw new IllegalStateException("the core asked for an effect this client doesn't know: the client is older than its core");
+      // A newer module than this client, or what this client never asks the core for (a download):
+      // fail loudly rather than skip what the core asked for.
+      default -> throw new IllegalStateException("the core asked for an effect this client doesn't know: the client is older than its core");
     }
   }
 
@@ -182,171 +173,6 @@ final class Executor {
 
   private static CoreProto.Input storeFailed(long id, String detail) {
     return CoreProto.Input.newBuilder().setStoreFailed(CoreProto.Failed.newBuilder().setId(id).setDetail(detail)).build();
-  }
-
-  /** Where package files are downloaded, beside the state file. */
-  static Path downloadsDir(Path stateFile) {
-    return stateFile.resolveSibling(stateFile.getFileName() + ".downloads");
-  }
-
-  /** The file of this client's download {@code id}. */
-  Path downloadPath(long id) {
-    return downloadsDir(stateFile).resolve(files + Long.toUnsignedString(id));
-  }
-
-  /** Delete what was downloaded (before a restart). */
-  static void deleteDownloads(Path stateFile) {
-    deleteDownloads(Disk.REAL, stateFile);
-  }
-
-  /** Delete what was downloaded (at start: the core downloads again what it still needs). */
-  static void deleteDownloads(Disk disk, Path stateFile) {
-    try {
-      disk.clear(downloadsDir(stateFile));
-    } catch (IOException e) {
-      // what is left is never reused: download files are made new
-    }
-  }
-
-  /** Delete the file of download {@code id}, if there is one. */
-  private void delete(long id) {
-    if (stateFile == null) {
-      return;
-    }
-    try {
-      disk.remove(downloadPath(id));
-    } catch (IOException e) {
-      // it goes at the next start
-    }
-  }
-
-  /**
-   * GET a package file into its path, hashing it as it goes, whatever the status, and following no
-   * redirect: the core decides what the response means. A redirect is reported with its Location
-   * resolved. On a failure or a cancel nothing is left: the thread writing the file deletes it after
-   * its last write (a cancel only ends the transfer). A file already at its path (left by a run
-   * that crashed) is not its own: the download fails, and leaves it alone.
-   */
-  private void download(CoreProto.Download d) {
-    long id = d.getId();
-    Body body = new Body();
-    CompletableFuture<HttpResponse<InputStream>> sent;
-    try {
-      if (stateFile == null) {
-        throw new IllegalArgumentException("no state file");
-      }
-      HttpRequest.Builder req = HttpRequest.newBuilder(URI.create(d.getUrl())).GET();
-      if (d.getTimeoutMs() > 0) {
-        req.timeout(Duration.ofMillis(d.getTimeoutMs()));
-      }
-      headers(d.getHeadersList(), h -> req.header(h.getName(), h.getValue()));
-      extra.forEach(h -> req.header(h.getKey(), h.getValue()));
-      // The server's client certificate only for a file at its own origin (the core says which).
-      sent = transport.download(d.getServerOrigin()).sendAsync(req.build(), HttpResponse.BodyHandlers.ofInputStream());
-    } catch (IllegalArgumentException e) {
-      sent = CompletableFuture.failedFuture(e);
-    }
-    CompletableFuture<HttpResponse<InputStream>> request = sent;
-    if (stateFile != null) {
-      StateFile.begin(stateFile); // until its file is written, or deleted
-    }
-    CompletableFuture<Void> task = request
-        .thenApplyAsync(resp -> save(id, resp, body, limit(d.getMaxBytes())), bodies)
-        .handle((ok, e) -> {
-          CoreProto.Input.Builder in = CoreProto.Input.newBuilder();
-          if (e == null && !body.cancelled()) {
-            in.setDownloadResponse(ok);
-          } else {
-            if (body.made()) {
-              delete(id);
-            }
-            in.setDownloadFailed(CoreProto.Failed.newBuilder().setId(id).setDetail(message(e == null ? new IOException("cancelled") : e)));
-          }
-          if (stateFile != null) {
-            StateFile.end(stateFile);
-          }
-          return in.build();
-        })
-        .thenAccept(deliver);
-    inFlight.add(id, () -> {
-      body.cancel();
-      request.cancel(true);
-    }, task);
-  }
-
-  /** Write the response body to download {@code id}'s file, up to {@code max} bytes: the response. */
-  private CoreProto.DownloadResponse save(long id, HttpResponse<InputStream> resp, Body body, long max) {
-    try (InputStream in = body.take(resp.body())) {
-      if (body.cancelled()) {
-        throw new IOException("cancelled");
-      }
-      MessageDigest sha = MessageDigest.getInstance("SHA-256");
-      long size = 0;
-      disk.mkdir(downloadsDir(stateFile));
-      try (Disk.Handle out = disk.create(downloadPath(id), true)) {
-        body.made = true;
-        byte[] buf = new byte[64 * 1024];
-        for (int n = in.read(buf); n >= 0; n = in.read(buf)) {
-          if (body.cancelled()) {
-            throw new IOException("cancelled");
-          }
-          size += n;
-          if (size > max) {
-            throw new IOException("file over " + max + " bytes");
-          }
-          sha.update(buf, 0, n);
-          out.write(buf, 0, n);
-        }
-        // On the disk before the response reaches the core.
-        out.sync();
-      }
-      CoreProto.DownloadResponse.Builder r = CoreProto.DownloadResponse.newBuilder()
-          .setId(id)
-          .setStatus(resp.statusCode())
-          .setSha256(ByteString.copyFrom(sha.digest()));
-      if (resp.statusCode() >= 300 && resp.statusCode() < 400) {
-        resp.headers().firstValue("Location").ifPresent(l -> location(r, resp.request().uri(), l));
-      }
-      return r.build();
-    } catch (IOException | NoSuchAlgorithmException e) {
-      throw new CompletionException(e);
-    }
-  }
-
-  /**
-   * Where a redirect points: {@code given} resolved against the URL requested by {@link
-   * URI#resolve}, and that URL's origin (the port 0 when it is the scheme's default or absent). A
-   * Location that doesn't resolve goes as given, with no origin: the core refuses it.
-   */
-  static void location(CoreProto.DownloadResponse.Builder r, URI requested, String given) {
-    URI to;
-    try {
-      // RFC 3986 5.2.3: a base with an authority and no path merges as "/" (URI.resolve would
-      // glue a relative reference to the host).
-      URI base = requested.getRawAuthority() != null && requested.getRawPath() != null && requested.getRawPath().isEmpty()
-          ? requested.resolve("/") : requested;
-      to = base.resolve(given);
-    } catch (IllegalArgumentException e) {
-      r.setLocation(given);
-      return;
-    }
-    r.setLocation(to.toString());
-    String scheme = to.getScheme() == null ? "" : to.getScheme();
-    int port = to.getPort() == defaultPort(scheme) ? 0 : Math.max(to.getPort(), 0);
-    r.setLocationOrigin(CoreProto.Origin.newBuilder()
-        .setScheme(scheme)
-        .setHost(to.getHost() == null ? "" : to.getHost())
-        .setPort(port));
-  }
-
-  /** The scheme's default port, as the WHATWG URL standard knows them; -1 if it has none. */
-  private static int defaultPort(String scheme) {
-    return switch (scheme.toLowerCase(java.util.Locale.ROOT)) {
-      case "http", "ws" -> 80;
-      case "https", "wss" -> 443;
-      case "ftp" -> 21;
-      default -> -1;
-    };
   }
 
   private static void headers(List<CoreProto.Header> hs, Consumer<CoreProto.Header> set) {
@@ -437,12 +263,6 @@ final class Executor {
   private static final class Body {
     private InputStream in;
     private boolean cancelled;
-    /** A download's: its file was made (so it is its to delete). On the thread writing it. */
-    volatile boolean made;
-
-    boolean made() {
-      return made;
-    }
 
     synchronized InputStream take(InputStream s) {
       in = s;

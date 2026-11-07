@@ -21,10 +21,10 @@ import {
   SimpleSpanProcessor,
   TraceIdRatioBasedSampler,
 } from "@opentelemetry/sdk-trace-base";
-import { type Client, RemoteConfigStatuses } from "@pydantic/logfire-fleet-client";
+import { type Client, type Notification, RemoteConfigStatuses } from "@pydantic/logfire-fleet-client";
 import { SdkSettings } from "@pydantic/logfire-fleet-client/sdk";
 import { keepApplied } from "./kept.js";
-import { config as policyConfig, off, overridden, policy } from "./policy.js";
+import { config as policyConfig, decide, off, overridden, policy } from "./policy.js";
 
 import {
   Agent,
@@ -39,18 +39,31 @@ import {
   metricReaderOptions,
   preparing,
   programName,
-  Reachability,
   release,
   say,
   samplerFromEnv,
-  shownEndpoint,
-  setupFromEnv,
+  setupFromEnv as claimed,
   type Options,
   type Setup,
 } from "../src/index.js";
 
 /** Processes of one program that each keep their own identity by default (the core's). */
 const SLOTS = 16;
+
+/** Named state directories it can make and lock (it does both, as a process starting would). */
+const NAMED = mkdtempSync(join(tmpdir(), "opamp-otel-named-"));
+const CODE_DIR = join(NAMED, "code");
+const ENV_DIR = join(NAMED, "env");
+
+/**
+ * The Setup a process of its own makes, which then ends: its state directory's lock is let go, so
+ * the next call is a restart. The tests of locking itself call `claimed`.
+ */
+function setupFromEnv(...args: Parameters<typeof claimed>): Setup | undefined {
+  const s = claimed(...args);
+  released(s);
+  return s;
+}
 
 /** What a Setup carries to the client, without what it logs (the endpoint shown, the hints). */
 function bare(s: Setup | undefined): Partial<Setup> | undefined {
@@ -73,8 +86,7 @@ beforeEach(() => {
 });
 
 const LAYER = new SdkSettings();
-const text = (s: string) => new TextEncoder().encode(s);
-const settings = (doc: string) => LAYER.load(text(doc), hostFromEnv()).settings;
+const settings = (doc: string) => decide(LAYER, config(doc), hostFromEnv()).apply;
 // Every setting (docs/sdk-settings.md).
 const SETTINGS = ["debug_sampling_rate", "debug_send_logs_level", "debug_until", "deactivate_all_instrumentations",
   "deactivate_instrumentations", "drop_attributes", "mask_attributes", "sampling_rate",
@@ -101,10 +113,33 @@ function said(fn: () => void): [string, string][] {
   return out;
 }
 
+/**
+ * An agent for an endpoint, built with a service name, without a client: what it says of the
+ * notifications it is told. `inUse`: the endpoint the client would say it uses now.
+ */
+class Told {
+  readonly agent = new Agent();
+  readonly uid: string;
+  inUse: string | undefined;
+
+  constructor(url: string, service = "", env: Record<string, string> = {}, options: Options = {}) {
+    this.agent.prepare({ OTEL_OPAMP_ENDPOINT: url, OTEL_OPAMP_STATE_DIR: "none", ...env }, options);
+    this.agent.built(service);
+    this.uid = this.agent.uid!;
+  }
+
+  notified(n: Notification): void {
+    this.agent.tell(n, this.inUse);
+  }
+}
+
 function prepared(dir: string, extra: Record<string, string> = {}): { agent: Agent; env: NodeJS.ProcessEnv } {
   const env: NodeJS.ProcessEnv = { OTEL_OPAMP_ENDPOINT: "http://server/v1/opamp", OTEL_OPAMP_STATE_DIR: dir, ...extra };
   const agent = new Agent();
   agent.prepare(env);
+  // Each agent is a start of its own process: its state directory's lock is let go at once, as
+  // that process ending would, so the next one is the restart that takes it back.
+  released(agent.setup);
   return { agent, env };
 }
 
@@ -430,13 +465,13 @@ test("a UID the server assigns is the one the next start uses", () => {
   const dir = mkdtempSync(join(tmpdir(), "opamp-otel-"));
   const { agent } = prepared(dir);
   const assigned = "0192f3a4-5b6c-7d8e-9f01-23456789abcd";
-  agent.instanceUidChanged(Uint8Array.from(Buffer.from(assigned.replaceAll("-", ""), "hex")));
+  agent.tell({ kind: "instanceUidChanged", instanceUid: Uint8Array.from(Buffer.from(assigned.replaceAll("-", ""), "hex")) });
   assert.equal(readFileSync(join(dir, "instance-uid"), "utf8"), assigned);
   assert.equal(prepared(dir).agent.uid, assigned);
   // Without a state directory there is nowhere to keep it, and nothing fails.
   const bare = new Agent();
   bare.prepare({ OTEL_OPAMP_ENDPOINT: "http://server/v1/opamp" });
-  bare.instanceUidChanged(Uint8Array.from(Buffer.from(assigned.replaceAll("-", ""), "hex")));
+  bare.tell({ kind: "instanceUidChanged", instanceUid: Uint8Array.from(Buffer.from(assigned.replaceAll("-", ""), "hex")) });
 });
 
 test("a service.instance.id it can't decode never stops the application: a UID of its own", () => {
@@ -569,26 +604,25 @@ test("OTEL_SDK_DISABLED: the package stays out of the way too", () => {
   assert.throws(() => readFileSync(join(dir, "instance-uid")));
 });
 
-test("the settings to start with are the config the client kept applied, else the file kept before", () => {
+test("the settings to start with are the config the client kept applied", () => {
   const dir = mkdtempSync(join(tmpdir(), "opamp-otel-"));
   const rate = () => prepared(dir).agent.controls.sampler.samplingRate;
-  // Kept before the client kept the config applied (an earlier release): it carries over.
-  writeFileSync(join(dir, "sdk-settings.json"), policy({ head_sampling: { ratio: 0.25 } }));
-  assert.equal(rate(), 0.25);
-  // Once the client keeps a config applied, that is where a start begins: the old file is ignored.
+  // Nothing kept: the SDK's own.
+  assert.equal(rate(), undefined);
   keepApplied(dir, policy({ head_sampling: { ratio: 0.5 } }));
   assert.equal(rate(), 0.5);
-  // A config applied with no policy: every setting the SDK's own, not the old file's.
+  // A config applied with no policy: every setting the SDK's own.
   keepApplied(dir, undefined);
   assert.equal(rate(), undefined);
-  // A client state that doesn't read: the old file again.
+  // A client state that doesn't read: the SDK's own too.
   writeFileSync(join(dir, "opamp-state"), new Uint8Array([0xff, 0xff]));
-  assert.equal(rate(), 0.25);
+  assert.equal(rate(), undefined);
 });
 
 /** The process that held the default state directory ends. */
 function released(setup: Setup | undefined): void {
   if (setup?.stateLock) release(setup.stateLock);
+  delete setup?.stateLock;
 }
 
 test("by default an instance keeps its UID across restarts", () => {
@@ -622,6 +656,46 @@ test("by default an instance keeps its UID across restarts", () => {
   released(elsewhere.setup);
 });
 
+test("processes sharing a named state directory each keep their own instance", () => {
+  // Workers a cluster or PM2 starts inherit OTEL_OPAMP_STATE_DIR. They used to read and write one
+  // state, so joined the fleet as one instance UID. Now the first keeps the directory and the UID
+  // already in it; the others take numbered folders in it, each its own UID, taken back at their
+  // next start.
+  const dir = mkdtempSync(join(tmpdir(), "opamp-otel-"));
+  const named = join(dir, "mine");
+  const env: NodeJS.ProcessEnv = { OTEL_OPAMP_ENDPOINT: "http://s/v1/opamp", OTEL_SERVICE_NAME: "checkout",
+    OTEL_OPAMP_STATE_DIR: named };
+  const before = new Agent();
+  before.prepare({ ...env });
+  assert.equal(before.setup!.stateDir, named);
+  released(before.setup);
+  const [first, second, third] = [new Agent(), new Agent(), new Agent()];
+  for (const a of [first, second, third]) a.prepare({ ...env });
+  assert.deepEqual([first, second, third].map((a) => a.setup!.stateDir), [named, join(named, "2"), join(named, "3")]);
+  assert.equal(first.uid, before.uid);
+  assert.equal(new Set([first.uid, second.uid, third.uid]).size, 3);
+  released(second.setup);
+  const again = new Agent();
+  again.prepare({ ...env });
+  assert.deepEqual([again.setup!.stateDir, again.uid], [join(named, "2"), second.uid]);
+  for (const a of [first, third, again]) released(a.setup);
+  // Every slot taken: a new instance each start, said once at INFO.
+  const held = Array.from({ length: SLOTS }, () => claimed({ ...env }));
+  let last: Setup | undefined;
+  assert.deepEqual(said(() => void (last = claimed({ ...env }))).filter(([, m]) => m.startsWith("OpAMP:")),
+    [["info", `OpAMP: ${SLOTS} processes already keep their identity in ${named}: this one is a new instance each start`]]);
+  assert.equal(last!.stateDir, undefined);
+  held.forEach(released);
+  // One that can't be used: a warning (the default one's only at debug), a new instance each start.
+  const file = join(dir, "file");
+  writeFileSync(file, "");
+  const warned = said(() => void (last = setupFromEnv({ ...env, OTEL_OPAMP_STATE_DIR: file })))
+    .filter(([, m]) => m.startsWith("OpAMP:"));
+  assert.equal(last!.stateDir, undefined);
+  assert.deepEqual(warned.map(([level]) => level), ["warn"]);
+  assert.ok(warned[0]![1].startsWith(`OpAMP: the state directory ${file} can't be used (`), warned[0]![1]);
+});
+
 test("a service.instance.id that isn't a UUID keeps the default state directory, so the UID is the same each start", () => {
   // It can't be the instance UID, so it is replaced by one: kept in the default directory, rather
   // than a new one each start.
@@ -645,10 +719,11 @@ test("the default state directory gives way", () => {
   assert.equal(setupFromEnv({ ...base, OTEL_OPAMP_STATE_DIR: "none" })!.stateDir, undefined);
   assert.equal(setupFromEnv({ ...base, OTEL_RESOURCE_ATTRIBUTES: `service.instance.id=${randomUUID()}` })!.stateDir,
     undefined);
-  // Named: that one, unlocked as before.
-  const named = setupFromEnv({ ...base, OTEL_OPAMP_STATE_DIR: join(dir, "mine") })!;
+  // Named: that one, locked as the default one is.
+  const named = claimed({ ...base, OTEL_OPAMP_STATE_DIR: join(dir, "mine") })!;
   assert.equal(named.stateDir, join(dir, "mine"));
-  assert.equal(named.stateLock, undefined);
+  assert.ok(named.stateLock);
+  released(named);
   // Nowhere to keep it: none, and no error.
   assert.equal(setupFromEnv({ OTEL_OPAMP_ENDPOINT: "http://s" })!.stateDir, undefined);
   const file = join(dir, "file");
@@ -656,9 +731,9 @@ test("the default state directory gives way", () => {
   assert.equal(setupFromEnv({ OTEL_OPAMP_ENDPOINT: "http://s", XDG_STATE_HOME: file, HOME: file, LOCALAPPDATA: file })!
     .stateDir, undefined);
   // Every slot taken: none.
-  const held = Array.from({ length: SLOTS }, () => setupFromEnv(base));
+  const held = Array.from({ length: SLOTS }, () => claimed(base));
   assert.ok(held.every((h) => h?.stateDir !== undefined));
-  assert.equal(setupFromEnv(base)!.stateDir, undefined);
+  assert.equal(claimed(base)!.stateDir, undefined);
   held.forEach(released);
 });
 
@@ -685,8 +760,8 @@ const ROWS: Row[] = [
     fromCode: "https://code/v1/opamp", fromEnv: "https://env/v1/opamp", neither: undefined, read: (s) => s?.endpoint },
   { option: "headers", variable: "OTEL_OPAMP_HEADERS", code: { Authorization: "Bearer code" }, env: "Authorization=Bearer%20env,x=1",
     fromCode: { Authorization: "Bearer code" }, fromEnv: { Authorization: "Bearer env", x: "1" }, neither: {}, read: (s) => s?.headers },
-  { option: "stateDir", variable: "OTEL_OPAMP_STATE_DIR", code: "/state/code", env: "/state/env",
-    fromCode: "/state/code", fromEnv: "/state/env", neither: undefined, read: (s) => s?.stateDir },
+  { option: "stateDir", variable: "OTEL_OPAMP_STATE_DIR", code: CODE_DIR, env: ENV_DIR,
+    fromCode: CODE_DIR, fromEnv: ENV_DIR, neither: undefined, read: (s) => s?.stateDir },
   { option: "heartbeatIntervalMs", variable: "OTEL_OPAMP_HEARTBEAT_INTERVAL", code: 1500, env: "5s",
     fromCode: 1500, fromEnv: 5000, neither: 0, read: (s) => s?.heartbeatMs },
 ];
@@ -782,10 +857,10 @@ const ENV: NodeJS.ProcessEnv = {
   ...NO_DEFAULT_DIR,
   OTEL_OPAMP_ENDPOINT: "http://env/v1/opamp",
   OTEL_OPAMP_HEADERS: "a=env",
-  OTEL_OPAMP_STATE_DIR: "/state/env",
+  OTEL_OPAMP_STATE_DIR: ENV_DIR,
   OTEL_OPAMP_HEARTBEAT_INTERVAL: "5s",
 };
-const FROM_ENV = { endpoint: "http://env/v1/opamp", headers: { a: "env" }, stateDir: "/state/env", heartbeatMs: 5000 };
+const FROM_ENV = { endpoint: "http://env/v1/opamp", headers: { a: "env" }, stateDir: ENV_DIR, heartbeatMs: 5000 };
 const notMs = (v: string) => `OpAMP: heartbeatIntervalMs ${v} is not a number of milliseconds: it is not used`;
 const INVALID: [string, unknown, string | undefined, Partial<Setup>][] = [
   // Kept: the client refuses it when it starts, and the SDK runs unmanaged; nothing stops.
@@ -856,6 +931,7 @@ test("an endpoint in code turns the package on; OTEL_SDK_DISABLED still turns it
   assert.equal(agent.on, true);
   assert.equal(agent.setup!.stateDir, dir);
   assert.match(readFileSync(join(dir, "instance-uid"), "utf8"), /^[0-9a-f-]{36}$/);
+  released(agent.setup); // its process ends
   // The application's state directory, given in code, keeps the UID across restarts as the variable's.
   const again = new Agent();
   again.prepare({}, { endpoint: "http://server/v1/opamp", stateDir: dir });
@@ -870,32 +946,32 @@ test("an endpoint in code turns the package on; OTEL_SDK_DISABLED still turns it
 test("a lock left by a process that is gone is taken over; a running one's isn't", () => {
   const dir = mkdtempSync(join(tmpdir(), "opamp-otel-"));
   const env: NodeJS.ProcessEnv = { OTEL_OPAMP_ENDPOINT: "http://s", XDG_STATE_HOME: dir, HOME: dir, LOCALAPPDATA: dir };
-  const first = setupFromEnv(env)!;
-  released(first);
+  const first = claimed(env)!;
+  released({ ...first });
   const lock = first.stateLock!;
   // Killed, so it never removed its lock.
   const gone = spawnSync(process.execPath, ["-e", ""]).pid!;
   writeFileSync(lock, `${gone} 0`);
-  const after = setupFromEnv(env)!;
+  const after = claimed(env)!;
   assert.equal(after.stateDir, first.stateDir);
   released(after);
   // This pid, from an earlier start (a container's application is often pid 1 each time).
   writeFileSync(lock, `${process.pid} 0`);
-  const restarted = setupFromEnv(env)!;
+  const restarted = claimed(env)!;
   assert.equal(restarted.stateDir, first.stateDir);
   released(restarted);
   // Another process, running: its slot stays its own.
   writeFileSync(lock, `${process.ppid} 0`);
-  const next = setupFromEnv(env)!;
+  const next = claimed(env)!;
   assert.notEqual(next.stateDir, first.stateDir);
   released(next);
 });
 
 test("connecting, failing and recovering are each said once", () => {
-  const uid = "00000000-0000-0000-0000-000000000007";
+  let uid = "";
   const lines = said(() => {
-    const s = shownFor("https://user:secret@opamp.example.com/v1/opamp?token=x");
-    const r = new Reachability(s.shown, "checkout", uid, s.hints);
+    const r = new Told("https://user:secret@opamp.example.com/v1/opamp?token=x", "checkout");
+    uid = r.uid;
     r.notified({ kind: "connectFailed", status: 401, detail: "HTTP 401" });
     r.notified({ kind: "connectFailed", status: 401, detail: "HTTP 401" });
     r.notified({ kind: "connected" });
@@ -917,12 +993,10 @@ test("connecting, failing and recovering are each said once", () => {
 });
 
 test("after the server moved the agent, what is said names the endpoint the client uses now", () => {
-  let inUse: string | undefined; // none yet: the configured one
   const lines = said(() => {
-    const r = new Reachability(shownFor("https://a.example.com/v1/opamp").shown);
-    r.inUse = () => inUse;
+    const r = new Told("https://a.example.com/v1/opamp");
     r.notified({ kind: "connected" });
-    inUse = "https://user:secret@b.example.com/v1/opamp?token=x";
+    r.inUse = "https://user:secret@b.example.com/v1/opamp?token=x";
     r.notified({ kind: "connectFailed", detail: "connection refused" });
     r.notified({ kind: "connected" });
   }).filter(([level]) => level !== "debug");
@@ -945,9 +1019,8 @@ test("the warning names what gave the server: the option given in code, else the
     [{ headers: {} }, "OTEL_OPAMP_ENDPOINT", "the headers given to register()"],
   ];
   for (const [options, endpointFrom, headersFrom] of cases) {
-    const s = setupFromEnv(env, options)!;
     const lines = said(() => {
-      const r = new Reachability(s.shown, "", "u", s.hints);
+      const r = new Told(env.OTEL_OPAMP_ENDPOINT, "", env, options);
       for (const status of [401, 404, undefined]) {
         r.notified({ kind: "connectFailed", status, detail: "" });
         r.notified({ kind: "connected" });
@@ -1015,11 +1088,11 @@ test("an endpoint without a scheme is refused: off, with a warning", () => {
 });
 
 test("the endpoint is logged without its secrets, whatever it is", () => {
-  assert.equal(shownEndpoint("https://user:secret@opamp.example.com:4320/v1/opamp?token=x#f"),
+  assert.equal(shownFor("https://user:secret@opamp.example.com:4320/v1/opamp?token=x#f").shown,
     "https://opamp.example.com:4320/v1/opamp");
-  assert.equal(shownEndpoint("https://user:secret@opamp.example.com:notaport/v1/opamp?token=x"),
+  assert.equal(shownFor("https://user:secret@opamp.example.com:notaport/v1/opamp?token=x").shown,
     "https://opamp.example.com:notaport/v1/opamp");
-  assert.equal(shownEndpoint("https://user:secret@[::1/v1/opamp?k=v"), "https://[::1/v1/opamp");
+  assert.equal(shownFor("https://user:secret@[::1/v1/opamp?k=v").shown, "https://[::1/v1/opamp");
 });
 
 test("without OTEL_LOG_LEVEL, warnings, errors and the first connection go to the console; other info stays on diag", (t) => {
@@ -1028,11 +1101,12 @@ test("without OTEL_LOG_LEVEL, warnings, errors and the first connection go to th
   const before = say.console;
   say.console = true;
   const lines: string[] = [];
+  let uid = "";
   diag.setLogger({ error: () => {}, warn: () => {}, info: (m) => void lines.push(m), debug: () => {}, verbose: () => {} },
     DiagLogLevel.ALL);
   try {
-    const s = shownFor("http://opamp.example.com/v1/opamp");
-    const r = new Reachability(s.shown, "", "u", s.hints);
+    const r = new Told("http://opamp.example.com/v1/opamp");
+    uid = r.uid;
     r.notified({ kind: "connectFailed", status: 404, detail: "" });
     r.notified({ kind: "connected" });
     r.notified({ kind: "connectFailed", status: 404, detail: "" });
@@ -1047,7 +1121,7 @@ test("without OTEL_LOG_LEVEL, warnings, errors and the first connection go to th
     + "current settings meanwhile";
   assert.deepEqual(warned.mock.calls.map((c) => c.arguments), [
     [notFound],
-    ["OpAMP: connected to http://opamp.example.com/v1/opamp; this SDK is managed, instance u"],
+    [`OpAMP: connected to http://opamp.example.com/v1/opamp; this SDK is managed, instance ${uid}`],
     [notFound],
   ]);
   assert.deepEqual(errored.mock.calls.map((c) => c.arguments), [["OpAMP: x"]]);

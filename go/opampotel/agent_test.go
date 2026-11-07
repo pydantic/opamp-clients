@@ -5,10 +5,8 @@ package opampotel
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"io"
-	"io/fs"
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
@@ -80,10 +78,6 @@ func TestInstrumentationSwitchesTakeEffectAtOnceAndAtTheNextStart(t *testing.T) 
 	if got := effectiveBody(a); !strings.Contains(got, `"instrumentations":{"disabled":["otelhttp"],"mode":"override"}`) {
 		t.Fatalf("effective config %s", got)
 	}
-	// The client keeps the config applied, in its own state: nothing of the package's own.
-	if _, err := os.Stat(filepath.Join(dir, "sdk-settings.json")); !errors.Is(err, fs.ErrNotExist) {
-		t.Fatalf("sdk-settings.json written (%v)", err)
-	}
 	keepApplied(t, dir, body) // as the client does, before APPLIED goes out
 
 	next := newTestAgent(t, dir)
@@ -95,13 +89,13 @@ func TestInstrumentationSwitchesTakeEffectAtOnceAndAtTheNextStart(t *testing.T) 
 func TestAnUnusableConfigChangesNothing(t *testing.T) {
 	a := newTestAgent(t, t.TempDir())
 	a.remoteConfig(context.Background(), remote(v1("signal_exports", exports("off", "", ""))))
-	before := string(a.current)
+	before := effectiveBody(a)
 	st := a.remoteConfig(context.Background(), remote(every("head_sampling", override(`"ratio":7`),
 		"instrumentations", override(`"disabled":["otelhttp"]`))))
 	if st.GetStatus() != failed_ || !strings.HasPrefix(st.GetErrorMessage(), "head_sampling:") {
 		t.Fatalf("status %v", st)
 	}
-	if a.controls.Off(otelhttp) || a.controls.gates.Load().traces || string(a.current) != before {
+	if a.controls.Off(otelhttp) || a.controls.gates.Load().traces || effectiveBody(a) != before {
 		t.Fatal("all or nothing: nothing of a FAILED config is in force")
 	}
 }
@@ -341,22 +335,15 @@ func TestAConfigAppliedThroughTheServerIsWhereTheNextStartBegins(t *testing.T) {
 	if err := a.stop(ctx); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := os.Stat(filepath.Join(dir, "sdk-settings.json")); !errors.Is(err, fs.ErrNotExist) {
-		t.Fatalf("sdk-settings.json written (%v)", err)
-	}
 	next := newTestAgent(t, dir)
 	if !next.controls.Off(otelhttp) || *next.controls.Sampler.rate != 0.25 {
 		t.Fatal("the next start: the config applied should be in force")
 	}
 }
 
-// The settings to start with are the config the client kept applied, else the file this package
-// kept before (an earlier release's), which carries over until a config is applied.
-func TestTheSettingsToStartWithAreTheConfigTheClientKeptAppliedElseTheFileKeptBefore(t *testing.T) {
+// The settings to start with are the config the client kept applied, else the SDK's own.
+func TestTheSettingsToStartWithAreTheConfigTheClientKeptApplied(t *testing.T) {
 	dir := t.TempDir()
-	if err := os.WriteFile(filepath.Join(dir, "sdk-settings.json"), []byte(v1("head_sampling", override(`"ratio":0.25`))), 0o600); err != nil {
-		t.Fatal(err)
-	}
 	rate := func() any {
 		a := newTestAgent(t, dir)
 		if r := a.controls.Sampler.rate; r != nil {
@@ -364,21 +351,21 @@ func TestTheSettingsToStartWithAreTheConfigTheClientKeptAppliedElseTheFileKeptBe
 		}
 		return nil
 	}
-	if r := rate(); r != 0.25 {
-		t.Fatalf("kept before: rate %v", r)
+	if r := rate(); r != nil {
+		t.Fatalf("nothing kept: rate %v", r)
 	}
 	keepApplied(t, dir, v1("head_sampling", override(`"ratio":0.5`)))
 	if r := rate(); r != 0.5 {
 		t.Fatalf("kept applied by the client: rate %v", r)
 	}
-	keepApplied(t, dir, v1()) // a config applied with every control local: the SDK's own, not the old file's
+	keepApplied(t, dir, v1()) // a config applied with every control local: the SDK's own
 	if r := rate(); r != nil {
 		t.Fatalf("a config applied with every control local: rate %v", r)
 	}
 	if err := os.WriteFile(filepath.Join(dir, "opamp-state"), []byte{0xff, 0xff}, 0o600); err != nil {
 		t.Fatal(err)
 	}
-	if r := rate(); r != 0.25 {
+	if r := rate(); r != nil {
 		t.Fatalf("a client state that doesn't read: rate %v", r)
 	}
 }
@@ -420,7 +407,7 @@ func TestAUIDTheServerAssignsIsTheNextStarts(t *testing.T) {
 	dir := t.TempDir()
 	a := newTestAgent(t, dir)
 	assigned := uuid.Must(uuid.NewV7())
-	a.notified(nil, opamp.Notification{Kind: opamp.InstanceUIDChanged, InstanceUID: assigned})
+	a.tell("", opamp.Notification{Kind: opamp.InstanceUIDChanged, InstanceUID: assigned})
 	if next := newTestAgent(t, dir); next.uid != assigned {
 		t.Fatalf("the next start is %s, want the server's %s", next.uid, assigned)
 	}
@@ -430,7 +417,7 @@ func TestAUIDTheServerAssignsIsTheNextStarts(t *testing.T) {
 func TestAStateFromANewerVersionIsWarnedAbout(t *testing.T) {
 	a := newTestAgent(t, t.TempDir())
 	said := records(t)
-	a.notified(nil, opamp.Notification{Kind: opamp.StateFromNewerVersion, StateVersion: 2})
+	a.tell("", opamp.Notification{Kind: opamp.StateFromNewerVersion, StateVersion: 2})
 	if len(*said) != 1 || !strings.HasPrefix((*said)[0], "WARN opamp: the saved state was written by a newer version") ||
 		!strings.Contains((*said)[0], "(state format 2)") {
 		t.Fatalf("said %q", *said)
@@ -544,10 +531,10 @@ func (h handlerFunc) WithGroup(string) slog.Handler                 { return h }
 
 func TestConnectingFailingAndRecoveringAreEachSaidOnce(t *testing.T) {
 	said := records(t)
-	uid := uuid.UUID{15: 7}
 	s := serverFromEnv(env(map[string]string{"OTEL_OPAMP_ENDPOINT": "https://user:secret@opamp.example.com/v1/opamp?token=x#frag",
 		"OTEL_OPAMP_STATE_DIR": "none"}))
-	r := &reachability{endpoint: s.shown, service: "checkout", uid: uid, hints: s.hints}
+	r := reachAgent(t, s, "checkout")
+	uid := r.uid
 	for _, n := range []opamp.Notification{
 		{Kind: opamp.ConnectFailed, Status: 401, Detail: "HTTP 401"},
 		{Kind: opamp.ConnectFailed, Status: 401, Detail: "HTTP 401"},
@@ -556,7 +543,7 @@ func TestConnectingFailingAndRecoveringAreEachSaidOnce(t *testing.T) {
 		{Kind: opamp.ConnectFailed, Detail: "connection refused"},
 		{Kind: opamp.Connected},
 	} {
-		r.notified(n)
+		r.tell("", n)
 	}
 	want := []string{
 		"WARN opamp: can't reach https://opamp.example.com/v1/opamp (HTTP 401): the server refused this agent's credentials: " +
@@ -589,12 +576,12 @@ func TestTheWarningNamesTheOptionThatGaveTheServer(t *testing.T) {
 	} {
 		s := serverFromEnv(env(c.vars), c.opts...)
 		said := records(t)
-		r := &reachability{endpoint: s.shown, hints: s.hints}
-		r.notified(opamp.Notification{Kind: opamp.ConnectFailed, Status: 401})
-		r.notified(opamp.Notification{Kind: opamp.Connected})
-		r.notified(opamp.Notification{Kind: opamp.ConnectFailed, Status: 404})
-		r.notified(opamp.Notification{Kind: opamp.Connected})
-		r.notified(opamp.Notification{Kind: opamp.ConnectFailed, Detail: "connection refused"})
+		r := reachAgent(t, s, "")
+		r.tell("", opamp.Notification{Kind: opamp.ConnectFailed, Status: 401})
+		r.tell("", opamp.Notification{Kind: opamp.Connected})
+		r.tell("", opamp.Notification{Kind: opamp.ConnectFailed, Status: 404})
+		r.tell("", opamp.Notification{Kind: opamp.Connected})
+		r.tell("", opamp.Notification{Kind: opamp.ConnectFailed, Detail: "connection refused"})
 		want := []string{"check " + c.headers + " (Authorization=Bearer <token>)",
 			"check " + c.endpointFrom + " (it usually ends in /v1/opamp)", "check " + c.endpointFrom + " and that the server is up"}
 		if len(*said) != 5 || !strings.Contains((*said)[0], want[0]) || !strings.Contains((*said)[2], want[1]) ||
@@ -607,28 +594,12 @@ func TestTheWarningNamesTheOptionThatGaveTheServer(t *testing.T) {
 func TestWithoutAServiceNameTheInstanceAloneIsNamed(t *testing.T) {
 	said := records(t)
 	s := serverFromEnv(env(map[string]string{"OTEL_OPAMP_ENDPOINT": "http://127.0.0.1:4320/v1/opamp", "OTEL_OPAMP_STATE_DIR": "none"}))
-	r := &reachability{endpoint: s.shown, hints: s.hints}
-	r.notified(opamp.Notification{Kind: opamp.ConnectFailed, Status: 404, Detail: ""})
-	r.notified(opamp.Notification{Kind: opamp.Connected})
+	r := reachAgent(t, s, "")
+	r.tell("", opamp.Notification{Kind: opamp.ConnectFailed, Status: 404, Detail: ""})
+	r.tell("", opamp.Notification{Kind: opamp.Connected})
 	if len(*said) != 2 || !strings.Contains((*said)[0], "(HTTP 404): nothing serves OpAMP at that path") ||
-		(*said)[1] != "INFO opamp: connected to http://127.0.0.1:4320/v1/opamp; this SDK is managed, instance "+uuid.Nil.String() {
+		(*said)[1] != "INFO opamp: connected to http://127.0.0.1:4320/v1/opamp; this SDK is managed, instance "+r.uid.String() {
 		t.Fatalf("said: %q", *said)
-	}
-}
-
-// What is logged of an endpoint is the core's rule (no user info, query or fragment), and an
-// endpoint it can't parse is still logged, never an error.
-func TestTheEndpointIsLoggedWithoutCredentials(t *testing.T) {
-	for in, want := range map[string]string{
-		"https://user:secret@opamp.example.com:8443/v1/opamp?token=x#f": "https://opamp.example.com:8443/v1/opamp",
-		"wss://[::1]:4320/v1/opamp":                                     "wss://[::1]:4320/v1/opamp",
-		"https://user:secret@opamp.example.com:notaport/v1/opamp?k=v":   "https://opamp.example.com:notaport/v1/opamp",
-		"https://[::1/v1/opamp?k=v":                                     "https://[::1/v1/opamp",
-		"https://opamp.example.com":                                     "https://opamp.example.com",
-	} {
-		if got := shownEndpoint(in, "unused"); got != want {
-			t.Errorf("shownEndpoint(%q) = %q, want %q", in, got, want)
-		}
 	}
 }
 
@@ -636,9 +607,7 @@ func TestTheEndpointIsLoggedWithoutCredentials(t *testing.T) {
 // (the layer refuses a host naming anything else) and every one it carries out.
 func TestTheHostDeclaresEverySettingThisPackageCarriesOut(t *testing.T) {
 	h := goHost()
-	if _, err := testLayer(t).LoadAt(context.Background(), nil, h, vectorNow); err != nil {
-		t.Fatal(err)
-	}
+	startWith(t, h, nil, vectorNow) // the layer refuses a host naming anything but settings
 	seen := map[string]bool{}
 	for _, k := range h.GetLive() {
 		seen[k] = true
@@ -685,15 +654,28 @@ func TestAMetricsReaderOfAutoexportsOwnIsListedUngovernedAndThePolicyApplied(t *
 // (as the client gives it, logged without credentials), not the one configured.
 func TestWhatIsSaidNamesTheEndpointInUse(t *testing.T) {
 	said := records(t)
-	inUse := "" // none yet: the configured one
-	r := &reachability{endpoint: shownEndpoint("https://a.example.com/v1/opamp", ""), inUse: func() string { return inUse }}
-	r.notified(opamp.Notification{Kind: opamp.Connected})
-	inUse = "https://user:secret@b.example.com/v1/opamp?token=x"
-	r.notified(opamp.Notification{Kind: opamp.ConnectFailed, Detail: "connection refused"})
-	r.notified(opamp.Notification{Kind: opamp.Connected})
+	r := reachAgent(t, &server{endpoint: "https://a.example.com/v1/opamp"}, "")
+	r.tell("", opamp.Notification{Kind: opamp.Connected}) // none yet: the configured one
+	inUse := "https://user:secret@b.example.com/v1/opamp?token=x"
+	r.tell(inUse, opamp.Notification{Kind: opamp.ConnectFailed, Detail: "connection refused"})
+	r.tell(inUse, opamp.Notification{Kind: opamp.Connected})
 	if len(*said) != 3 || !strings.HasPrefix((*said)[0], "INFO opamp: connected to https://a.example.com/v1/opamp;") ||
 		!strings.HasPrefix((*said)[1], "WARN opamp: can't reach https://b.example.com/v1/opamp (connection refused)") ||
 		(*said)[2] != "INFO opamp: connected to https://b.example.com/v1/opamp again" {
 		t.Fatalf("said: %q", *said)
 	}
+}
+
+// reachAgent is an agent for s, built with the service name given, without a client.
+func reachAgent(t *testing.T, s *server, service string) *agent {
+	t.Helper()
+	a, err := newAgent(context.Background(), s, NewControls(), "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = a.stop(context.Background()) })
+	a.mu.Lock()
+	a.built(service)
+	a.mu.Unlock()
+	return a
 }

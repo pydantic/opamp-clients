@@ -36,10 +36,10 @@ import org.junit.jupiter.params.provider.EnumSource;
  * core hands it over on the first step, or without one); application calls from the test's
  * thread, from a thread of their own, or from inside the callback; a callback that throws on its
  * k-th call; stop from outside, or requested from inside the callback; the server offering a
- * remote config, a custom message (every answer carries a numbered one) or a heartbeat interval.
+ * remote config (besides the numbered one every answer carries) or a heartbeat interval.
  * After each step the notifications seen so far are checked against the model: never two
  * callbacks at once, none before {@code start} returned, none after {@code stopped}, the server's
- * custom messages in its order and the saved config before them; and at the end, {@code stopped}
+ * numbered configs in its order and the saved config before them; and at the end, {@code stopped}
  * exactly once, with the error the callback threw, and every {@code stop} returning within its
  * bound with that error; and in the core's tap, each call the callback made (its answers to
  * remote configs, its numbered calls) the next thing the core was fed after the step that called
@@ -59,7 +59,8 @@ import org.junit.jupiter.params.provider.EnumSource;
  */
 class CallbackPropertiesTest {
   private static final byte[] UID = new byte[16];
-  private static final String CAPABILITY = "io.example.tick";
+  /** The hash of the server's numbered configs, before the number. */
+  private static final String TICK = "tick-";
   private static final String SAVED = "saved";
   /** stop's bound: the longest request timeout in flight (2 s, set below) plus a margin. */
   private static final long STOP_BOUND_MS = 10_000;
@@ -70,7 +71,7 @@ class CallbackPropertiesTest {
     java.util.Arrays.fill(UID, (byte) 0x37);
   }
 
-  enum Op { CALL_OUTSIDE, CALL_THREAD, CALL_INSIDE, OFFER_CONFIG, OFFER_CUSTOM, OFFER_HEARTBEAT, WAIT, STOP_OUTSIDE, STOP_INSIDE }
+  enum Op { CALL_OUTSIDE, CALL_THREAD, CALL_INSIDE, OFFER_CONFIG, OFFER_TICK, OFFER_HEARTBEAT, WAIT, STOP_OUTSIDE, STOP_INSIDE }
 
   /** A step, and its argument (how long WAIT waits, in ms). */
   record Step(Op op, int arg) {}
@@ -85,7 +86,7 @@ class CallbackPropertiesTest {
   record Plan(boolean ws, boolean saved, int throwAt, boolean throwError, boolean throwAgain, boolean throwAtStopped,
       List<Step> steps) {}
 
-  private static final Op[] CALM = {Op.CALL_OUTSIDE, Op.CALL_THREAD, Op.CALL_INSIDE, Op.OFFER_CONFIG, Op.OFFER_CUSTOM,
+  private static final Op[] CALM = {Op.CALL_OUTSIDE, Op.CALL_THREAD, Op.CALL_INSIDE, Op.OFFER_CONFIG, Op.OFFER_TICK,
       Op.OFFER_HEARTBEAT, Op.WAIT};
 
   static Plan plan(SplittableRandom r) {
@@ -142,7 +143,7 @@ class CallbackPropertiesTest {
         long seed = 6_000 + i;
         // The first callback throws; the run waits for it, then stops.
         Plan plan = new Plan(i == 1, false, 1, true, false, false,
-            List.of(new Step(Op.OFFER_CUSTOM, 0), new Step(Op.WAIT, 50)));
+            List.of(new Step(Op.OFFER_TICK, 0), new Step(Op.WAIT, 50)));
         new Run(seed, plan, servers, dir.resolve("s6-" + i), mode).run();
       }
     }
@@ -160,7 +161,7 @@ class CallbackPropertiesTest {
     try (Servers servers = new Servers(dir)) {
       for (int i = 0; i < 2; i++) {
         long seed = 1_000 + i;
-        Plan plan = new Plan(i == 1, false, 0, false, false, true, List.of(new Step(Op.OFFER_CUSTOM, 0)));
+        Plan plan = new Plan(i == 1, false, 0, false, false, true, List.of(new Step(Op.OFFER_TICK, 0)));
         new Run(seed, plan, servers, dir.resolve("n1-" + i), mode).run();
       }
     }
@@ -230,15 +231,21 @@ class CallbackPropertiesTest {
     }
   }
 
-  /** The server's side of a run: a numbered custom message in every answer, and offers in turn. */
+  /**
+   * The server's side of a run: a numbered remote config in every answer (the callback answers
+   * each, so the core hands over the next), and offers in turn (an offered config takes the
+   * numbered one's place).
+   */
   static final class ServerSide {
     final AtomicLong tick = new AtomicLong();
     final ConcurrentLinkedQueue<Consumer<Opamp.ServerToAgent.Builder>> offers = new ConcurrentLinkedQueue<>();
 
     byte[] reply(Opamp.AgentToServer msg) {
       Opamp.ServerToAgent.Builder b = Opamp.ServerToAgent.newBuilder().setInstanceUid(msg.getInstanceUid());
-      b.setCustomMessage(Opamp.CustomMessage.newBuilder().setCapability(CAPABILITY).setType("tick")
-          .setData(ByteString.copyFromUtf8(Long.toString(tick.incrementAndGet()))));
+      // Not to an answer to one: else each answer brings another, and client and server chatter on.
+      if (!msg.hasRemoteConfigStatus()) {
+        b.setRemoteConfig(remoteConfig(TICK + tick.incrementAndGet()));
+      }
       Consumer<Opamp.ServerToAgent.Builder> offer = offers.poll();
       if (offer != null) {
         offer.accept(b);
@@ -275,8 +282,7 @@ class CallbackPropertiesTest {
   }
 
   static OpampClient.Status status() {
-    return new OpampClient.Status(null, health(0), null, null, null,
-        Opamp.CustomCapabilities.newBuilder().addCapabilities(CAPABILITY).build());
+    return new OpampClient.Status(null, health(0), null, null, null);
   }
 
   static Opamp.ComponentHealth health(int n) {
@@ -355,13 +361,13 @@ class CallbackPropertiesTest {
         if (n instanceof Notification.RemoteConfig rc && rc.config().getConfigHash().toStringUtf8().equals(SAVED)) {
           savedSeen = true;
         }
-        if (n instanceof Notification.CustomMessage m && m.message().getType().equals("tick")) {
-          long t = Long.parseLong(m.message().getData().toStringUtf8());
+        if (n instanceof Notification.RemoteConfig m && m.config().getConfigHash().toStringUtf8().startsWith(TICK)) {
+          long t = Long.parseLong(m.config().getConfigHash().toStringUtf8().substring(TICK.length()));
           if (t <= lastTick) {
-            violation("RULE-SHELL-01: the server's custom message " + t + " after " + lastTick);
+            violation("RULE-SHELL-01: the server's numbered config " + t + " after " + lastTick);
           }
           if (plan.saved() && !savedSeen && firstStopped == null) {
-            violation("RULE-SHELL-01: the server's custom message " + t + " before the saved remote config");
+            violation("RULE-SHELL-01: the server's numbered config " + t + " before the saved remote config");
           }
           lastTick = t;
         }
@@ -502,7 +508,7 @@ class CallbackPropertiesTest {
           waitFor(() -> ended() || seen.stream().anyMatch(n -> n instanceof Notification.RemoteConfig rc
               && rc.config().getConfigHash().toStringUtf8().equals(hash)), STEP_WAIT_MS);
         }
-        case OFFER_CUSTOM -> {
+        case OFFER_TICK -> {
           long before = lastTick;
           trigger(c);
           waitFor(() -> lastTick > before || ended(), STEP_WAIT_MS);

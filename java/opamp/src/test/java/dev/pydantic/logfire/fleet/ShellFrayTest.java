@@ -29,22 +29,20 @@ import org.junit.jupiter.api.Test;
 /**
  * The client as a whole (the real core, in Chicory) under Fray: its loop, its saver, the
  * callback, the application's threads and a {@link FakeHttp} network (one thread answering
- * requests, downloads and connection attempts, one completing WebSocket writes and answering
+ * requests and connection attempts, one completing WebSocket writes and answering
  * them), with stop coming at any point Fray picks. Each schedule's plan (how the network answers,
  * what the application calls, where the callback fails) comes from its seed. Scenarios: stop while
- * a connection is being opened (S1's ground), a send racing the Close stop sends, a download still
- * coming as stop comes (S3's), a save still writing when stop's bound runs out, an {@code Error}
+ * a connection is being opened (S1's ground), a send racing the Close stop sends, saves of the
+ * server's remote configs going on as stop comes, a save still writing when stop's bound runs out, an {@code Error}
  * from the callback (S6's), and calls made from inside the callback while the server's answers
  * keep coming.
  *
  * <p>Checked against the shell contract (spec/shell-contract.md), the callback model of {@link
  * CallbackPropertiesTest} (RULE-SHELL-01, -02) and, at the network, what the shell must release:
  * callbacks one at a time, none after {@code stopped}, {@code stopped} once and last, with the
- * error the callback threw, which {@code stop} gives too ({@code stopped} last even when the core
- * emits a notification after it in one output, as Go's and Python's schedule tests found); {@code
- * stop} returning, though a slow save is writing and the goodbye is held; after it,
- * nothing started, every connection the network opened closed, every request and attempt given
- * up, and the downloads left as they were; never two sends outstanding, nor a send after our
+ * error the callback threw, which {@code stop} gives too; {@code stop} returning, though a slow
+ * save is writing and the goodbye is held; after it, nothing started, every connection the network
+ * opened closed, and every request and attempt given up; never two sends outstanding, nor a send after our
  * Close; and each connection's messages in order; and, where the callback calls the client, each
  * of its calls the next thing the core is fed after the step that called the callback, but for the
  * application's calls queued ahead of it (RULE-SHELL-10, read from the core's tap: {@link
@@ -54,8 +52,8 @@ import org.junit.jupiter.api.Test;
  * <p>In core mode (the {@code ...InCoreMode} scenarios) the same plans run over core mode's streams
  * in memory ({@link MemoryNet}, through the {@link Streams} seam): the network accepts, refuses or
  * holds each connection as the plan says (and accepts one after the client gave up on it), and a
- * minimal HTTP/1.1 and WebSocket server on the far end of each answers requests, downloads and
- * messages as the plan says (at once, slowly, failing, holding until the client goes). The same
+ * minimal HTTP/1.1 and WebSocket server on the far end of each answers requests and messages as
+ * the plan says (at once, slowly, failing, holding until the client goes). The same
  * checks, and after stop every connection the client had is closed or reset, and none is still
  * being made.
  */
@@ -72,8 +70,8 @@ class ShellFrayTest {
    * is checked in real time by {@link StopFoundTest}; here, that stop returns at all.
    */
   static final long STOP_BOUND_MS = 3_600_000;
-  static final String CAPABILITY = "io.example.tick";
-  static final byte[] PACKAGE = "the package".repeat(8).getBytes(java.nio.charset.StandardCharsets.US_ASCII);
+  /** The hash of the server's numbered remote configs, before the number. */
+  static final String TICK = "tick-";
 
   @Test
   void stopWhileOpening() throws Exception {
@@ -86,8 +84,8 @@ class ShellFrayTest {
   }
 
   @Test
-  void aDownloadFinishingAfterStop() throws Exception {
-    explore("aDownloadFinishingAfterStop", Scenario.DOWNLOAD);
+  void savesGoingOnAsStopComes() throws Exception {
+    explore("savesGoingOnAsStopComes", Scenario.SAVE);
   }
 
   @Test
@@ -99,7 +97,7 @@ class ShellFrayTest {
    * Stop while a save is writing, on a disk slower than the stop timeout: stop gives up on the
    * save when its bound runs out, on Fray's clock. The bound once ran on JDK 25's ForkJoinPool
    * delay scheduler (CompletableFuture.completeOnTimeout), a thread Fray doesn't schedule: the
-   * schedule never ended, and the nightly ran for hours in aDownloadFinishingAfterStop.
+   * schedule never ended, and the nightly ran for hours.
    */
   @Test
   void stopWhileASaveIsWriting() throws Exception {
@@ -132,8 +130,8 @@ class ShellFrayTest {
   }
 
   @Test
-  void aDownloadFinishingAfterStopInCoreMode() throws Exception {
-    exploreCore("aDownloadFinishingAfterStopInCoreMode", Scenario.DOWNLOAD);
+  void savesGoingOnAsStopComesInCoreMode() throws Exception {
+    exploreCore("savesGoingOnAsStopComesInCoreMode", Scenario.SAVE);
   }
 
   @Test
@@ -167,52 +165,47 @@ class ShellFrayTest {
     }
   }
 
-  enum Scenario { OPEN, SEND_CLOSE, DOWNLOAD, CALLBACK_ERROR, CALLBACK_CALL }
+  enum Scenario { OPEN, SEND_CLOSE, SAVE, CALLBACK_ERROR, CALLBACK_CALL }
 
   /** In {@link Scenario#CALLBACK_CALL}: the callback calls the client on its first notifications, this many. */
   static final int CALLBACK_CALLS = 3;
 
-  /** How the network answers a request, a download or an attempt to open. */
+  /** How the network answers a request or an attempt to open. */
   enum Answer { NOW, FAIL, SLOW, HOLD, HOLD_THEN_ANSWER }
 
   /** What the application does before it stops the client (WAIT_SAVE, until a save is writing: {@link Run} only). */
-  enum Step { CALL, CALL_THREAD, YIELD, WAIT_DOWNLOAD, WAIT_SAVE }
+  enum Step { CALL, CALL_THREAD, YIELD, WAIT_SAVE }
 
   /** What the server does when a write of ours arrives, before answering it. */
   enum Wire { ANSWER, SERVER_CLOSE, DROP }
 
   /**
-   * A schedule's plan: the transport; how the k-th request, download and attempt to open are
-   * answered (then at once); the server's act at the k-th write; the application's steps; the
+   * A schedule's plan: the transport; how the k-th request and attempt to open are answered (then
+   * at once); the server's act at the k-th write; the application's steps; the
    * callback call that throws (0: none), and whether it throws an {@code Error}.
    */
-  record Plan(Scenario scenario, boolean ws, List<Answer> opens, List<Answer> posts, List<Answer> gets,
+  record Plan(Scenario scenario, boolean ws, List<Answer> opens, List<Answer> posts,
       List<Wire> wire, List<Step> steps, int throwAt, boolean throwError, int slowSaveS, boolean holdGoodbye) {
     static Plan of(Scenario s, SplittableRandom r) {
       Answer[] all = Answer.values();
       List<Answer> opens = new ArrayList<>();
       List<Answer> posts = new ArrayList<>();
-      List<Answer> gets = new ArrayList<>();
       List<Wire> wire = new ArrayList<>();
       List<Step> steps = new ArrayList<>();
       boolean ws = switch (s) {
         case OPEN, SEND_CLOSE -> true;
-        case DOWNLOAD -> false;
+        case SAVE -> false;
         case CALLBACK_ERROR, CALLBACK_CALL -> r.nextBoolean();
       };
       for (int i = 0; i < 3; i++) {
         opens.add(s == Scenario.OPEN
             ? new Answer[] {Answer.NOW, Answer.FAIL, Answer.HOLD, Answer.HOLD_THEN_ANSWER, Answer.HOLD_THEN_ANSWER}[r.nextInt(5)]
             : Answer.NOW);
-        posts.add(s == Scenario.CALLBACK_ERROR || s == Scenario.CALLBACK_CALL || s == Scenario.DOWNLOAD ? Answer.NOW
+        posts.add(s == Scenario.CALLBACK_ERROR || s == Scenario.CALLBACK_CALL || s == Scenario.SAVE ? Answer.NOW
             : all[r.nextInt(all.length)]);
-        gets.add(new Answer[] {Answer.NOW, Answer.SLOW, Answer.SLOW, Answer.HOLD_THEN_ANSWER, Answer.FAIL}[r.nextInt(5)]);
       }
       for (int i = 0; i < 6; i++) {
         wire.add(s == Scenario.SEND_CLOSE && r.nextInt(4) == 0 ? (r.nextBoolean() ? Wire.SERVER_CLOSE : Wire.DROP) : Wire.ANSWER);
-      }
-      if (s == Scenario.DOWNLOAD && r.nextInt(3) != 0) {
-        steps.add(Step.WAIT_DOWNLOAD);
       }
       for (int n = (s == Scenario.SEND_CLOSE ? 1 : s == Scenario.CALLBACK_ERROR || s == Scenario.CALLBACK_CALL ? 2 : 0)
           + r.nextInt(3); n > 0; n--) {
@@ -221,11 +214,11 @@ class ShellFrayTest {
       int throwAt = s == Scenario.CALLBACK_ERROR ? 1 + r.nextInt(2) : 0;
       // A slow disk: each save takes this long (a save writing as stop comes must not hold stop
       // up for a second stop timeout).
-      int slowSaveS = s == Scenario.DOWNLOAD ? new int[] {0, 0, 2, 20}[r.nextInt(4)] : 0;
+      int slowSaveS = s == Scenario.SAVE ? new int[] {0, 0, 2, 20}[r.nextInt(4)] : 0;
       // The server holds what comes once stop is asked (the goodbye): the core spends its stop
       // timeout on it, and what it left is all a save still writing may have.
-      boolean holdGoodbye = s == Scenario.DOWNLOAD && r.nextBoolean();
-      return new Plan(s, ws, opens, posts, gets, wire, steps, throwAt, throwAt > 0 && r.nextInt(3) != 0, slowSaveS,
+      boolean holdGoodbye = s == Scenario.SAVE && r.nextBoolean();
+      return new Plan(s, ws, opens, posts, wire, steps, throwAt, throwAt > 0 && r.nextInt(3) != 0, slowSaveS,
           holdGoodbye);
     }
 
@@ -235,7 +228,7 @@ class ShellFrayTest {
      */
     static Plan saveWriting() {
       List<Answer> now = List.of(Answer.NOW, Answer.NOW, Answer.NOW);
-      return new Plan(Scenario.DOWNLOAD, false, now, now, now, List.of(), List.of(Step.WAIT_SAVE), 0, false, -1, false);
+      return new Plan(Scenario.SAVE, false, now, now, List.of(), List.of(Step.WAIT_SAVE), 0, false, -1, false);
     }
 
     static <T> T at(List<T> list, int k, T otherwise) {
@@ -258,16 +251,16 @@ class ShellFrayTest {
     final FakeHttp http = new FakeHttp();
     final List<String> violations = new CopyOnWriteArrayList<>();
     final Callbacks callbacks;
-    final CompletableFuture<Void> downloadAsked = new CompletableFuture<>();
     /** A save has begun (a slow one is writing from then on). */
     final CompletableFuture<Void> saveBegun = new CompletableFuture<>();
     /** Stop has returned (or given up: the run is over). */
     final CompletableFuture<Void> stopReturned = new CompletableFuture<>();
     final AtomicInteger opens = new AtomicInteger();
     final AtomicInteger posts = new AtomicInteger();
-    final AtomicInteger gets = new AtomicInteger();
     final AtomicInteger writes = new AtomicInteger();
     final AtomicInteger next = new AtomicInteger();
+    /** The server's numbered remote configs so far. */
+    final AtomicInteger ticks = new AtomicInteger();
     volatile boolean stopping;
     Path dir;
     Path state;
@@ -305,18 +298,18 @@ class ShellFrayTest {
             }
           };
         }
-        state = plan.scenario() == Scenario.DOWNLOAD ? dir.resolve("state") : null;
+        state = plan.scenario() == Scenario.SAVE ? dir.resolve("state") : null;
         calls.start();
         wire.start();
         OpampClient.Config.Builder b = OpampClient.Config
             .builder((plan.ws() ? "ws" : "http") + "://fake/v1/opamp", new byte[16])
             .mode(OpampClient.Mode.PLATFORM).httpClient(http)
+            .capabilities(Opamp.AgentCapabilities.AgentCapabilities_AcceptsRemoteConfig_VALUE)
             .heartbeatInterval(Duration.ofSeconds(30));
         if (state != null) {
-          b.stateFile(state).acceptPackages(true);
+          b.stateFile(state);
         }
-        OpampClient c = OpampClient.start(b.build(), new OpampClient.Status(null, null, null, null, null,
-            Opamp.CustomCapabilities.newBuilder().addCapabilities(CAPABILITY).build()), callbacks, null, tapFor(plan, dir),
+        OpampClient c = OpampClient.start(b.build(), OpampClient.Status.of(null), callbacks, null, tapFor(plan, dir),
             d -> d);
         tap = callbacks.calling(plan, c);
         for (Step s : plan.steps()) {
@@ -329,13 +322,6 @@ class ShellFrayTest {
               t.start();
             }
             case YIELD -> Thread.yield();
-            case WAIT_DOWNLOAD -> {
-              try {
-                downloadAsked.get(10, TimeUnit.SECONDS);
-              } catch (TimeoutException e) {
-                // the core decides when: stop comes anyway
-              }
-            }
             case WAIT_SAVE -> {
               try {
                 saveBegun.get(60, TimeUnit.SECONDS);
@@ -356,10 +342,6 @@ class ShellFrayTest {
           gave = e.getCause();
         }
         stopReturned.complete(null);
-        Map<String, String> downloads = listing();
-        if (!downloads.isEmpty()) {
-          FrayRun.saw("a download file there at stop");
-        }
         http.seal("stop returned");
         for (Thread t : app) {
           t.join();
@@ -370,7 +352,7 @@ class ShellFrayTest {
         http.wire.add(LAST);
         calls.join();
         wire.join();
-        check(gave, downloads);
+        check(gave);
       } catch (Exception e) {
         throw new IllegalStateException(e);
       } finally {
@@ -386,7 +368,7 @@ class ShellFrayTest {
       }
     }
 
-    void check(Throwable gave, Map<String, String> downloads) throws IOException {
+    void check(Throwable gave) throws IOException {
       callbacks.finish(gave);
       callbacks.checkCalls(tap);
       for (FakeHttp.FakeWs w : http.sockets) {
@@ -408,9 +390,6 @@ class ShellFrayTest {
           violation("RULE-SHELL-07: " + k + " still running after stop");
         }
       }
-      if (!listing().equals(downloads)) {
-        violation("RULE-SHELL-07: the downloads changed after stop returned (S3): " + downloads + " -> " + listing());
-      }
       violations.addAll(http.violations);
     }
 
@@ -418,31 +397,22 @@ class ShellFrayTest {
       return Opamp.ComponentHealth.newBuilder().setHealthy(true).setStatus("s" + n).build();
     }
 
-    /** The server's answer to a message: a numbered custom message, and the package on offer. */
+    /**
+     * The server's answer to a message: a numbered remote config (where the scenario has them), to
+     * any message but an answer to one, so the callback is called and saves go on without the
+     * answers making more of them.
+     */
     byte[] reply(Opamp.AgentToServer m) {
       Opamp.ServerToAgent.Builder s = Opamp.ServerToAgent.newBuilder().setInstanceUid(m.getInstanceUid());
-      if (plan.scenario() == Scenario.CALLBACK_ERROR || plan.scenario() == Scenario.CALLBACK_CALL) {
-        s.setCustomMessage(Opamp.CustomMessage.newBuilder().setCapability(CAPABILITY).setType("tick")
-            .setData(ByteString.copyFromUtf8(Long.toString(m.getSequenceNum()))));
-      }
-      if (plan.scenario() == Scenario.DOWNLOAD) {
-        try {
-          s.setPackagesAvailable(Opamp.PackagesAvailable.newBuilder()
-              .putPackages("p", Opamp.PackageAvailable.newBuilder()
-                  .setType(Opamp.PackageType.PackageType_TopLevel).setVersion("1")
-                  .setHash(ByteString.copyFromUtf8("p1"))
-                  .setFile(Opamp.DownloadableFile.newBuilder().setDownloadUrl("http://fake/p")
-                      .setContentHash(ByteString.copyFrom(MessageDigest.getInstance("SHA-256").digest(PACKAGE))))
-                  .build())
-              .setAllPackagesHash(ByteString.copyFromUtf8("all1")));
-        } catch (java.security.NoSuchAlgorithmException e) {
-          throw new IllegalStateException(e);
-        }
+      boolean ticking = plan.scenario() == Scenario.CALLBACK_ERROR || plan.scenario() == Scenario.CALLBACK_CALL
+          || plan.scenario() == Scenario.SAVE;
+      if (ticking && !m.hasRemoteConfigStatus()) {
+        s.setRemoteConfig(CallbackPropertiesTest.remoteConfig(TICK + ticks.incrementAndGet()));
       }
       return s.build().toByteArray();
     }
 
-    /** The network's calls: requests, downloads and attempts to open, each as the plan says. */
+    /** The network's calls: requests and attempts to open, each as the plan says. */
     void calls() {
       try {
         while (true) {
@@ -464,15 +434,10 @@ class ShellFrayTest {
               }
             }
           } else if (c instanceof FakeHttp.Request r) {
-            boolean download = r.request.method().equals("GET");
-            if (download) {
-              downloadAsked.complete(null);
-            }
-            Answer a = download ? Plan.at(plan.gets(), gets.getAndIncrement(), Answer.NOW)
-                : stopping && plan.holdGoodbye() ? Answer.HOLD
+            Answer a = stopping && plan.holdGoodbye() ? Answer.HOLD
                 : Plan.at(plan.posts(), posts.getAndIncrement(), Answer.NOW);
-            byte[] body = download ? PACKAGE : reply(Opamp.AgentToServer.parseFrom(r.body));
-            FrayRun.saw((download ? "download " : "request ") + a);
+            byte[] body = reply(Opamp.AgentToServer.parseFrom(r.body));
+            FrayRun.saw("request " + a);
             switch (a) {
               case NOW -> r.answer(200, body);
               case SLOW -> r.answer(200, body, true);
@@ -528,23 +493,6 @@ class ShellFrayTest {
         throw new IllegalStateException(e);
       }
     }
-
-    Map<String, String> listing() throws IOException {
-      Map<String, String> out = new TreeMap<>();
-      if (state == null || !Files.isDirectory(Executor.downloadsDir(state))) {
-        return out;
-      }
-      try (var files = Files.list(Executor.downloadsDir(state))) {
-        for (Path f : files.sorted(Comparator.naturalOrder()).toList()) {
-          try {
-            out.put(f.getFileName().toString(), Long.toString(Files.size(f)));
-          } catch (IOException e) {
-            out.put(f.getFileName().toString(), "gone");
-          }
-        }
-      }
-      return out;
-    }
   }
 
   /** The network's last dial: its thread ends. */
@@ -557,10 +505,8 @@ class ShellFrayTest {
     final MemoryNet net = new MemoryNet(4096);
     final List<String> violations = new CopyOnWriteArrayList<>();
     final Callbacks callbacks;
-    final CompletableFuture<Void> downloadAsked = new CompletableFuture<>();
     final AtomicInteger opens = new AtomicInteger();
     final AtomicInteger posts = new AtomicInteger();
-    final AtomicInteger gets = new AtomicInteger();
     final AtomicInteger writes = new AtomicInteger();
     final AtomicInteger next = new AtomicInteger();
     final List<Thread> servers = new CopyOnWriteArrayList<>();
@@ -576,7 +522,7 @@ class ShellFrayTest {
     Path dir;
     Path state;
 
-    /** A Run of the same plan, for its server's replies and the downloads' listing. */
+    /** A Run of the same plan, for its server's replies. */
     final Run like;
 
     CoreRun(long seed, Plan plan) {
@@ -605,7 +551,7 @@ class ShellFrayTest {
             }
           };
         }
-        state = plan.scenario() == Scenario.DOWNLOAD ? dir.resolve("state") : null;
+        state = plan.scenario() == Scenario.SAVE ? dir.resolve("state") : null;
         like.state = state;
         network.start();
         OpampClient.Config.Builder b = OpampClient.Config
@@ -613,15 +559,15 @@ class ShellFrayTest {
             .mode(OpampClient.Mode.CORE)
             .streamsPlatform(net)
             .environment(Map.of())
+            .capabilities(Opamp.AgentCapabilities.AgentCapabilities_AcceptsRemoteConfig_VALUE)
             .heartbeatInterval(Duration.ofSeconds(30));
         if (state != null) {
-          b.stateFile(state).acceptPackages(true);
+          b.stateFile(state);
         }
-        OpampClient c = OpampClient.start(b.build(), new OpampClient.Status(null, null, null, null, null,
-            Opamp.CustomCapabilities.newBuilder().addCapabilities(CAPABILITY).build()), callbacks, null, tapFor(plan, dir),
+        OpampClient c = OpampClient.start(b.build(), OpampClient.Status.of(null), callbacks, null, tapFor(plan, dir),
             d -> d);
         String tap = callbacks.calling(plan, c);
-        if (Math.floorMod(seed, 3) != 0 && plan.scenario() != Scenario.DOWNLOAD) {
+        if (Math.floorMod(seed, 3) != 0 && plan.scenario() != Scenario.SAVE) {
           try {
             reached.get(10, TimeUnit.SECONDS);
           } catch (TimeoutException e) {
@@ -638,13 +584,7 @@ class ShellFrayTest {
               t.start();
             }
             case YIELD -> Thread.yield();
-            case WAIT_DOWNLOAD -> {
-              try {
-                downloadAsked.get(10, TimeUnit.SECONDS);
-              } catch (TimeoutException e) {
-                // the core decides when: stop comes anyway
-              }
-            }
+            default -> {} // WAIT_SAVE is the platform run's
           }
         }
         stopping = true;
@@ -656,10 +596,6 @@ class ShellFrayTest {
           violation("RULE-SHELL-07: stop didn't return within " + STOP_BOUND_MS + " ms");
         } catch (ExecutionException e) {
           gave = e.getCause();
-        }
-        Map<String, String> downloads = like.listing();
-        if (!downloads.isEmpty()) {
-          FrayRun.saw("core: a download file there at stop");
         }
         // Nothing left: every connection the client had closed or reset, none still being made.
         String left = net.leftOpen();
@@ -678,9 +614,6 @@ class ShellFrayTest {
         }
         callbacks.finish(gave);
         callbacks.checkCalls(tap);
-        if (!like.listing().equals(downloads)) {
-          violation("RULE-SHELL-07: the downloads changed after stop returned (S3): " + downloads + " -> " + like.listing());
-        }
       } catch (Exception e) {
         throw new IllegalStateException(e);
       } finally {
@@ -749,26 +682,16 @@ class ShellFrayTest {
             websocket(e, in, out, headers.get("sec-websocket-key"));
             return;
           }
-          boolean download = line.startsWith("GET ");
-          if (download) {
-            downloadAsked.complete(null);
-          }
-          Answer a = download ? Plan.at(plan.gets(), gets.getAndIncrement(), Answer.NOW)
-              : stopping && plan.holdGoodbye() ? Answer.HOLD
+          Answer a = stopping && plan.holdGoodbye() ? Answer.HOLD
               : Plan.at(plan.posts(), posts.getAndIncrement(), Answer.NOW);
-          byte[] answer;
-          if (download) {
-            answer = PACKAGE;
-          } else {
-            Opamp.AgentToServer m = Opamp.AgentToServer.parseFrom(body);
-            // (0 again is the core holding the run's number 0: RULE-CLIENT-20.)
-            if (m.getSequenceNum() < last || (m.getSequenceNum() == last && last != 0)) {
-              violation("messages out of order on a connection: " + m.getSequenceNum() + " after " + last);
-            }
-            last = m.getSequenceNum();
-            answer = like.reply(m);
+          Opamp.AgentToServer m = Opamp.AgentToServer.parseFrom(body);
+          // (0 again is the core holding the run's number 0: RULE-CLIENT-20.)
+          if (m.getSequenceNum() < last || (m.getSequenceNum() == last && last != 0)) {
+            violation("messages out of order on a connection: " + m.getSequenceNum() + " after " + last);
           }
-          FrayRun.saw("core " + (download ? "download " : "request ") + a);
+          last = m.getSequenceNum();
+          byte[] answer = like.reply(m);
+          FrayRun.saw("core request " + a);
           if (plan.scenario() == Scenario.CALLBACK_ERROR || plan.scenario() == Scenario.CALLBACK_CALL) {
             reached.complete(null);
           }
@@ -1006,6 +929,13 @@ class ShellFrayTest {
           }
         }
         OpampClient c = client;
+        if (c != null && n instanceof Notification.RemoteConfig rc) {
+          // Answered, so the core hands over the next (a call from inside the callback).
+          c.setRemoteConfigStatus(Opamp.RemoteConfigStatus.newBuilder()
+              .setLastRemoteConfigHash(rc.config().getConfigHash())
+              .setStatus(Opamp.RemoteConfigStatuses.RemoteConfigStatuses_APPLIED).build());
+          asked.add(CallbackAnswerTest.answered(k, rc.config().getConfigHash()));
+        }
         if (c != null && asked.size() < CALLBACK_CALLS && !(n instanceof Notification.Stopped)) {
           // A call from inside the callback: the server's answers keep coming meanwhile.
           String status = "callback " + k;

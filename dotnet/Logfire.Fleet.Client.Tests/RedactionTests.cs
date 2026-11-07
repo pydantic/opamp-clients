@@ -12,8 +12,8 @@ namespace Logfire.Fleet.Client.Tests;
 /// print the same. What an application logs of them (a record's ToString, as <c>$"{options}"</c>
 /// or a structured logger formats it) is the same text. The secrets: the headers sent to the
 /// server, a password in the endpoint's or the proxy's URL, and the client key. The same for the
-/// notifications that carry what the server offers: a ConnectionSettings and an InstallPackage
-/// print no header's value, private key, or password in an endpoint's, proxy's or download's URL.
+/// notification that carries what the server offers: a ConnectionSettings prints no header's
+/// value, private key, or password in an endpoint's or proxy's URL.
 /// </summary>
 public class RedactionTests
 {
@@ -70,12 +70,7 @@ public class RedactionTests
                 },
             },
         };
-        var package = new PackageAvailable
-        {
-            Version = "1.0",
-            File = new DownloadableFile { DownloadUrl = $"https://agent:{password}@cdn.example/pkg", Headers = Headers() },
-        };
-        return $"{new OpAmpNotification.ConnectionSettings(offers)}\n{new OpAmpNotification.InstallPackage("pkg", package, "/downloads/pkg")}";
+        return new OpAmpNotification.ConnectionSettings(offers).ToString();
     }
 
     /// <summary>Two different secrets of one length.</summary>
@@ -108,7 +103,7 @@ public class RedactionTests
     public void WhatIsNotSecretIsStillShown()
     {
         var shown = Shown("tok", "pw", "key");
-        foreach (var part in new[] { "opamp.example/v1/opamp", "Authorization", "proxy.example:3128", "agent", "CERT", "CA", "otlp.example/v1/logs", "db.example:5432", "cdn.example/pkg", "/downloads/pkg", "\"value\": \"<redacted>\"", "\"privateKey\": \"<redacted>\"" })
+        foreach (var part in new[] { "opamp.example/v1/opamp", "Authorization", "proxy.example:3128", "agent", "CERT", "CA", "otlp.example/v1/logs", "db.example:5432", "\"value\": \"<redacted>\"", "\"privateKey\": \"<redacted>\"" })
         {
             Assert.Contains(part, shown, StringComparison.Ordinal);
         }
@@ -121,13 +116,11 @@ public class RedactionTests
         var tls = new OpAmpTlsOptions();
         var options = new OpAmpClientOptions { Endpoint = new Uri("https://opamp.example/v1/opamp") };
         var settings = new OpAmpNotification.ConnectionSettings(new ConnectionSettingsOffers());
-        var install = new OpAmpNotification.InstallPackage("pkg", new PackageAvailable(), "/downloads/pkg");
         foreach (var (value, type) in new (object, Type)[]
         {
             (tls, typeof(OpAmpTlsOptions)),
             (options, typeof(OpAmpClientOptions)),
             (settings, typeof(OpAmpNotification.ConnectionSettings)),
-            (install, typeof(OpAmpNotification.InstallPackage)),
         })
         {
             var shown = value.ToString();

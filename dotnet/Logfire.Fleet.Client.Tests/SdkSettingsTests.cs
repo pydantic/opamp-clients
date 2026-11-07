@@ -16,30 +16,73 @@ public class SdkSettingsTests
 {
     private static AgentRemoteConfig Config(string policy) => Policy.Config(policy, "h");
 
-    [Fact]
-    public void LoadDecideDescribe()
+    /// <summary>The layer's agent flow, stepped by a test, on clocks that move together from <see cref="Now"/>.</summary>
+    private sealed class Flow
     {
-        using var layer = new SdkSettings();
-        var loaded = layer.Load(System.Text.Encoding.UTF8.GetBytes(Policy.Stop("logs")), Declaring());
-        Assert.False(loaded.Settings.SendLogs);
-        Assert.Equal(Policy.Full(Policy.Stop("logs")), Policy.Text(loaded.Effective));
+        public readonly SdkSettings Layer = new();
+        public AgentOutput Out;
 
-        var kept = new List<string>();
-        var d = layer.Decide(Config(Policy.HeadSampling(0.25)), loaded.Current, loaded.Current, Declaring(), save: doc => kept.Add(System.Text.Encoding.UTF8.GetString(doc)));
-        Assert.Equal(RemoteConfigStatuses.Applied, d.Status.Status);
-        Assert.Equal(0.25, d.Apply.SamplingRate);
-        Assert.False(d.Apply.HasSendLogs); // local: the SDK's own
-        Assert.Equal(new[] { Policy.HeadSampling(0.25) }, kept);
-        Assert.Equal("""{"head_sampling":{"ratio":0.25}}""", Policy.Overrides(d.Effective));
+        public Flow(Host? host, bool stateDir = true, byte[]? coreState = null)
+        {
+            var start = new AgentStart
+            {
+                Host = host, StateDir = stateDir, Endpoint = "http://127.0.0.1:1", InstanceUid = ByteString.CopyFrom(new byte[16]),
+                NowUnixMs = Now, NowMonoMs = Now,
+            };
+            if (coreState is not null)
+            {
+                start.CoreState = ByteString.CopyFrom(coreState);
+            }
 
-        var bad = layer.Decide(Config(Policy.Of(("head_sampling", """{"ratio":"0.25"}"""))), d.Current, loaded.Current, Declaring(), save: doc => kept.Add("again"));
-        Assert.Equal(RemoteConfigStatuses.Failed, bad.Status.Status);
-        Assert.StartsWith("head_sampling:", bad.Status.ErrorMessage);
-        Assert.Null(bad.Apply);
-        Assert.Single(kept); // refused: nothing to keep
-        Assert.Equal("""{"head_sampling":{"ratio":0.25}}""", Policy.Overrides(bad.Effective)); // what is still in force
+            this.Out = this.Layer.Start(start);
+        }
 
-        var description = layer.Describe(
+        public Flow Step(ulong ms, AgentStep input)
+        {
+            input.Agent = this.Out.Agent;
+            input.NowUnixMs = Now + ms;
+            input.NowMonoMs = Now + ms;
+            this.Out = this.Layer.Step(input);
+            return this;
+        }
+
+        public Flow Decide(AgentRemoteConfig c, ulong ms = 1) => this.Step(ms, new AgentStep { RemoteConfig = c });
+
+        public RemoteConfigStatus Status => this.Out.Effects.LastOrDefault(e => e.EffectCase == AgentEffect.EffectOneofCase.Status)?.Status ?? new();
+
+        public Settings? Apply => this.Out.Effects.LastOrDefault(e => e.EffectCase == AgentEffect.EffectOneofCase.Apply)?.Apply;
+
+        public ComponentHealth? Health => this.Out.Effects.LastOrDefault(e => e.EffectCase == AgentEffect.EffectOneofCase.Health)?.Health;
+
+        public EffectiveConfig Effective => this.Out.Effective;
+
+        public bool Warned => this.Out.Effects.Any(e => e.EffectCase == AgentEffect.EffectOneofCase.Log && e.Log.Level >= AgentLog.Types.Level.Warn);
+
+        public AgentState State => AgentState.Parser.ParseFrom(this.Out.Agent);
+    }
+
+    [Fact]
+    public void StartDecideDescribe()
+    {
+        var f = new Flow(Declaring());
+        Assert.Equal(Policy.Full(Policy.Local), Policy.Text(f.Effective));
+        f.Decide(Config(Policy.HeadSampling(0.25)));
+        Assert.Equal(RemoteConfigStatuses.Applied, f.Status.Status);
+        Assert.Equal(0.25, f.Apply!.SamplingRate);
+        Assert.False(f.Apply.HasSendLogs); // local: the SDK's own
+        Assert.Equal("""{"head_sampling":{"ratio":0.25}}""", Policy.Overrides(f.Effective));
+
+        f.Decide(Config(Policy.Of(("head_sampling", """{"ratio":"0.25"}"""))), 2);
+        Assert.Equal(RemoteConfigStatuses.Failed, f.Status.Status);
+        Assert.StartsWith("head_sampling:", f.Status.ErrorMessage);
+        Assert.Null(f.Apply);
+        Assert.Equal("""{"head_sampling":{"ratio":0.25}}""", Policy.Overrides(f.Effective)); // what is still in force
+
+        // A step without an input, or on a state that isn't one, is an error.
+        Assert.ThrowsAny<Exception>(() => f.Layer.Step(new AgentStep { Agent = f.Out.Agent }));
+        Assert.ThrowsAny<Exception>(() => f.Layer.Step(new AgentStep { Agent = ByteString.CopyFrom(0xff), Timer = new ExportCounts() }));
+
+        var description = f.Layer.Describe(
             new[]
             {
                 new KeyValue { Key = "service.name", Value = new AnyValue { StringValue = "checkout" } },
@@ -86,7 +129,6 @@ public class SdkSettingsTests
     [Fact]
     public void AConfigWithoutThePolicyAsItsOnlyFileIsRefused()
     {
-        using var layer = new SdkSettings();
         var other = new AgentRemoteConfig
         {
             ConfigHash = ByteString.CopyFromUtf8("h"),
@@ -95,95 +137,70 @@ public class SdkSettingsTests
                 ConfigMap = { ["settings.json"] = new AgentConfigObject { Body = ByteString.CopyFromUtf8(Policy.Local), ContentType = "application/json" } },
             },
         };
-        var none = layer.Decide(other, ByteString.Empty, ByteString.Empty, Declaring());
-        Assert.Equal(RemoteConfigStatuses.Failed, none.Status.Status);
-        Assert.StartsWith("config_map:", none.Status.ErrorMessage);
+        var f = new Flow(Declaring()).Decide(other);
+        Assert.Equal(RemoteConfigStatuses.Failed, f.Status.Status);
+        Assert.StartsWith("config_map:", f.Status.ErrorMessage);
 
         var two = Config(Policy.HeadSampling(0.25));
         two.Config.ConfigMap["settings.json"] = new AgentConfigObject { Body = ByteString.CopyFromUtf8("{}"), ContentType = "application/json" };
-        var both = layer.Decide(two, ByteString.Empty, ByteString.Empty, Declaring());
-        Assert.Equal(RemoteConfigStatuses.Failed, both.Status.Status);
-        Assert.StartsWith("config_map:", both.Status.ErrorMessage);
-        Assert.Null(both.Apply);
+        f.Decide(two, 2);
+        Assert.Equal(RemoteConfigStatuses.Failed, f.Status.Status);
+        Assert.StartsWith("config_map:", f.Status.ErrorMessage);
+        Assert.Null(f.Apply);
     }
 
-    // A save that keeps nothing, for a host that has somewhere to keep state.
-    private static void Keep(byte[] doc)
-    {
-    }
-
-    // Decide, then commit: the integration saves what the layer asks it to keep, and the layer
-    // answers from how that went, the same in every language.
+    // Nowhere to keep state: a live change is applied, a next-start one refused.
     [Fact]
-    public void TheSaveTheLayerAsksForDecidesTheAnswer()
+    public void ANextStartChangeNeedsSomewhereToKeepState()
     {
-        using var layer = new SdkSettings();
-        var current = ByteString.CopyFromUtf8(Policy.HeadSampling(0.5));
-        var failed = layer.Decide(Config(Policy.HeadSampling(0.25)), current, current, Declaring(), save: _ => throw new IOException("No space left on device"));
-        Assert.Equal(RemoteConfigStatuses.Failed, failed.Status.Status);
-        Assert.Equal("can't save the settings: No space left on device", failed.Status.ErrorMessage);
-        Assert.Null(failed.Apply);
-        Assert.Equal(current, failed.Current);
-        Assert.Equal("""{"head_sampling":{"ratio":0.5}}""", Policy.Overrides(failed.Effective));
-
-        // Whatever stops the save refuses the config.
-        var odd = layer.Decide(Config(Policy.HeadSampling(0.25)), current, current, Declaring(), save: _ => throw new InvalidOperationException("odd"));
-        Assert.Equal("can't save the settings: odd", odd.Status.ErrorMessage);
-
-        // Nowhere to keep state: a live change is applied, a next-start one refused.
-        var live = layer.Decide(Config(Policy.HeadSampling(0.25)), current, current, Declaring());
-        Assert.Equal(RemoteConfigStatuses.Applied, live.Status.Status);
+        Assert.Equal(RemoteConfigStatuses.Applied, new Flow(Declaring(), stateDir: false).Decide(Config(Policy.HeadSampling(0.25))).Status.Status);
         var redis = Policy.Of(("instrumentations", """{"disabled":["redis"]}"""));
-        var later = layer.Decide(Config(redis), current, current, Declaring());
+        var later = new Flow(Declaring(), stateDir: false).Decide(Config(redis));
         Assert.Equal(RemoteConfigStatuses.Failed, later.Status.Status);
         Assert.Equal("instrumentations: takes effect at the next start, which needs somewhere to keep state", later.Status.ErrorMessage);
-        var saved = layer.Decide(Config(redis), current, current, Declaring(), save: Keep);
-        Assert.Equal(RemoteConfigStatuses.Applied, saved.Status.Status);
-        Assert.Equal(new[] { "deactivate_instrumentations" }, saved.PendingRestart);
+        Assert.Equal(RemoteConfigStatuses.Applied, new Flow(Declaring()).Decide(Config(redis)).Status.Status);
     }
 
     // An override that the host does not carry out refuses the whole policy, and nothing changes.
     [Fact]
     public void AnOverrideTheHostDoesNotCarryOutIsRefused()
     {
-        using var layer = new SdkSettings();
         var host = new Host { Live = { "sampling_rate" } };
-        var current = ByteString.CopyFromUtf8(Policy.HeadSampling(0.5));
+        var f = new Flow(host).Decide(Config(Policy.HeadSampling(0.5)));
+        Assert.Equal(RemoteConfigStatuses.Applied, f.Status.Status);
 
-        var logs = layer.Decide(Config(Policy.Of(("head_sampling", """{"ratio":0.25}"""), ("signal_exports.logs", """{"enabled":false}"""))), current, current, host, save: Keep);
-        Assert.Equal(RemoteConfigStatuses.Failed, logs.Status.Status);
-        Assert.Equal("signal_exports.logs: this SDK cannot apply the requested override", logs.Status.ErrorMessage);
-        Assert.Null(logs.Apply);
-        Assert.Equal(current, logs.Current);
-        Assert.Equal("""{"head_sampling":{"ratio":0.5}}""", Policy.Overrides(logs.Effective));
+        f.Decide(Config(Policy.Of(("head_sampling", """{"ratio":0.25}"""), ("signal_exports.logs", """{"enabled":false}"""))), 2);
+        Assert.Equal(RemoteConfigStatuses.Failed, f.Status.Status);
+        Assert.Equal("signal_exports.logs: this SDK cannot apply the requested override", f.Status.ErrorMessage);
+        Assert.Null(f.Apply);
+        Assert.Equal("""{"head_sampling":{"ratio":0.5}}""", Policy.Overrides(f.Effective));
 
-        var instrumentations = layer.Decide(Config(Policy.Of(("instrumentations", """{"disabled":["httpclient"]}"""))), current, current, host, save: Keep);
-        Assert.Equal(RemoteConfigStatuses.Failed, instrumentations.Status.Status);
-        Assert.Equal("instrumentations: disabled: this SDK cannot apply the requested override", instrumentations.Status.ErrorMessage);
-        Assert.Null(instrumentations.Apply);
+        f.Decide(Config(Policy.Of(("instrumentations", """{"disabled":["httpclient"]}"""))), 3);
+        Assert.Equal(RemoteConfigStatuses.Failed, f.Status.Status);
+        Assert.Equal("instrumentations: disabled: this SDK cannot apply the requested override", f.Status.ErrorMessage);
+        Assert.Null(f.Apply);
 
         // The same controls local need nothing of the host.
         var every = Policy.OfEvery(("head_sampling", """{"ratio":0.25}"""));
-        var local = layer.Decide(Config(every), current, current, host, save: Keep);
-        Assert.Equal(RemoteConfigStatuses.Applied, local.Status.Status);
-        Assert.Equal(Policy.Full(every), Policy.Text(local.Effective));
+        f.Decide(Config(every), 4);
+        Assert.Equal(RemoteConfigStatuses.Applied, f.Status.Status);
+        Assert.Equal(Policy.Full(every), Policy.Text(f.Effective));
 
         // A host naming what is no setting has a bug: an error, saying which.
-        var e = Assert.ThrowsAny<Exception>(() => layer.Load(null, new Host { Live = { "send_metric" } }));
+        var e = Assert.ThrowsAny<Exception>(() => new Flow(new Host { Live = { "send_metric" } }));
         Assert.Contains("send_metric", e.Message);
     }
 
     [Fact]
     public void ALogLevelArrivesAsTheLowestSeverityNumberToExport()
     {
-        using var layer = new SdkSettings();
-        var d = layer.Decide(Config(Policy.Of(("log_levels", """{"level":"warn"}"""))), ByteString.Empty, ByteString.Empty, Declaring());
-        Assert.Equal(RemoteConfigStatuses.Applied, d.Status.Status);
-        Assert.True(d.Apply.HasSendLogsMinSeverity);
-        Assert.Equal(13u, d.Apply.SendLogsMinSeverity);
-        Assert.Equal("""{"log_levels":{"level":"warn"}}""", Policy.Overrides(d.Effective));
-        // Local: every severity.
-        Assert.False(layer.Load(System.Text.Encoding.UTF8.GetBytes(Policy.Local), Declaring()).Settings.HasSendLogsMinSeverity);
+        var f = new Flow(Declaring());
+        Assert.False(f.Apply!.HasSendLogsMinSeverity); // local: every severity
+        f.Decide(Config(Policy.Of(("log_levels", """{"level":"warn"}"""))));
+        Assert.Equal(RemoteConfigStatuses.Applied, f.Status.Status);
+        Assert.True(f.Apply!.HasSendLogsMinSeverity);
+        Assert.Equal(13u, f.Apply.SendLogsMinSeverity);
+        Assert.Equal("""{"log_levels":{"level":"warn"}}""", Policy.Overrides(f.Effective));
     }
 
     // A host that declares every setting: each live one at once, each next-start one at the next start.
@@ -204,16 +221,15 @@ public class SdkSettingsTests
     [Fact]
     public void TheSettingsThatMatchTelemetryArriveTypedWhereTheHostDeclaresThem()
     {
-        using var layer = new SdkSettings();
         var doc = Policy.Of(
             ("sampling_rules", """{"rules":[{"rate":0,"kind":"server","path":"/health*"}]}"""),
             ("log_levels", """{"scopes":{"com.acme.db*":"debug"}}"""),
             ("attribute_redaction", """{"drop":["*token*"],"mask":["User.Email"]}"""),
             ("trace_rate_limit", """{"traces_per_second":50}"""),
             ("log_rate_limit", """{"records_per_second":0.5}"""));
-        var d = layer.Decide(Config(doc), ByteString.Empty, ByteString.Empty, Declaring(), Now);
+        var d = new Flow(Declaring()).Decide(Config(doc));
         Assert.Equal(RemoteConfigStatuses.Applied, d.Status.Status);
-        var s = d.Apply;
+        var s = d.Apply!;
         var rule = Assert.Single(s.SamplingRules);
         Assert.Equal(0.0, rule.Rate);
         Assert.Equal(SpanKind.Server, rule.Kind);
@@ -224,7 +240,7 @@ public class SdkSettingsTests
         Assert.Equal(new[] { "user.email" }, s.MaskAttributes);
         Assert.Equal((50.0, 0.5), (s.SamplingTracesPerSecond, s.SendLogsPerSecond));
         // Not declared: the policy is refused, and nothing is in force.
-        var plain = layer.Decide(Config(doc), ByteString.Empty, ByteString.Empty, new Host { Live = { "sampling_rate" } });
+        var plain = new Flow(new Host { Live = { "sampling_rate" } }).Decide(Config(doc));
         Assert.Equal(RemoteConfigStatuses.Failed, plain.Status.Status);
         Assert.Equal("sampling_rules: rules: this SDK cannot apply the requested override", plain.Status.ErrorMessage);
         Assert.Null(plain.Apply);
@@ -232,49 +248,49 @@ public class SdkSettingsTests
     }
 
     [Fact]
-    public void DebugModeArrivesFoldedInAndARefreshAtItsEndEndsIt()
+    public void DebugModeArrivesFoldedInAndTheTimerAtItsEndEndsIt()
     {
-        using var layer = new SdkSettings();
         var doc = Policy.Of(("head_sampling", """{"ratio":0.1}"""), ("debug", """{"until":"2026-10-14T12:30:00Z","log_level":"info"}"""));
-        var d = layer.Decide(Config(doc), ByteString.Empty, ByteString.Empty, Declaring(), Now, save: Keep);
-        Assert.Equal(RemoteConfigStatuses.Applied, d.Status.Status);
-        Assert.Equal(1.0, d.Apply.SamplingRate);
-        Assert.Equal(9u, d.Apply.SendLogsMinSeverity);
-        const ulong end = Now + (30 * 60_000);
-        Assert.Equal(end, d.RefreshAtUnixMs);
-        var r = layer.Refresh(d.Current, ByteString.Empty, end, Declaring());
-        Assert.Equal(0.1, r.Settings.SamplingRate);
-        Assert.Equal(0ul, r.RefreshAtUnixMs);
-        Assert.Equal("""{"head_sampling":{"ratio":0.1}}""", Policy.Overrides(r.Effective));
-        Assert.Equal(end, layer.Load(d.Current.ToByteArray(), Declaring(), Now).RefreshAtUnixMs);
+        var f = new Flow(Declaring()).Decide(Config(doc), 0);
+        Assert.Equal(RemoteConfigStatuses.Applied, f.Status.Status);
+        Assert.Equal(1.0, f.Apply!.SamplingRate);
+        Assert.Equal(9u, f.Apply.SendLogsMinSeverity);
+        const ulong end = 30 * 60_000;
+        Assert.Equal(Now + end, f.State.RefreshAtUnixMs);
+        Assert.InRange(f.Out.WakeAtMonoMs, 1ul, Now + end);
+        f.Step(end, new AgentStep { Timer = new ExportCounts() });
+        Assert.Equal(0.1, f.Apply!.SamplingRate);
+        Assert.Equal(0ul, f.State.RefreshAtUnixMs);
+        Assert.Equal("""{"head_sampling":{"ratio":0.1}}""", Policy.Overrides(f.Effective));
     }
 
     [Fact]
-    public void ExportHealthIsSentAtTheFirstCallAndOnAFailureAndHeldWhileNothingChanges()
+    public void ExportHealthIsSentWhenBuiltAndOnAFailureAndHeldWhileNothingChanges()
     {
-        using var layer = new SdkSettings();
-        var first = layer.Health(new ExportCounts(), null, Now);
-        Assert.True(first.Send);
-        Assert.Equal(3, first.Exporters.ComponentHealthMap.Count);
-        Assert.Equal("ok", first.Exporters.Status);
-        Assert.False(layer.Health(new ExportCounts(), first, Now + 30_000).Send);
-        var failed = layer.Health(
-            new ExportCounts
+        var f = new Flow(Declaring());
+        f.Step(0, new AgentStep { Built = new AgentBuilt { Service = "checkout" } });
+        f.Step(0, new AgentStep { Exporters = new AgentExporters { Counts = new ExportCounts() } });
+        var first = f.Health!.ComponentHealthMap["exporters"];
+        Assert.Equal(3, first.ComponentHealthMap.Count);
+        Assert.Equal("ok", first.Status);
+        Assert.Null(f.Step(30_000, new AgentStep { Exporters = new AgentExporters { Counts = new ExportCounts() } }).Health);
+        f.Step(60_000, new AgentStep
+        {
+            Exporters = new AgentExporters
             {
-                Traces = new SignalCounts { ExportsFailed = 1, ItemsFailed = 512, LastFailed = true, LastError = "connection refused" },
+                Counts = new ExportCounts
+                {
+                    Traces = new SignalCounts { ExportsFailed = 1, ItemsFailed = 512, LastFailed = true, LastError = "connection refused" },
+                },
+                Exporters = { new Exporter { Signal = "traces", Name = "zipkin" } },
             },
-            first,
-            Now + 30_000,
-            new Settings { SendLogs = false },
-            [new Exporter { Signal = "traces", Name = "zipkin" }]);
-        Assert.True(failed.Send);
-        // Each exporter is a child of its signal: one the gates don't reach is ungoverned, healthy all the same.
-        var zipkin = failed.Exporters.ComponentHealthMap["traces"].ComponentHealthMap["zipkin"];
+        });
+        var failed = f.Health!.ComponentHealthMap["exporters"];
+        Assert.False(failed.Healthy);
+        Assert.Equal("connection refused", failed.ComponentHealthMap["traces"].LastError);
+        var zipkin = failed.ComponentHealthMap["traces"].ComponentHealthMap["zipkin"];
         Assert.Equal("ungoverned", zipkin.Status);
         Assert.True(zipkin.Healthy);
-        Assert.False(failed.Exporters.Healthy);
-        Assert.Equal("connection refused", failed.Exporters.ComponentHealthMap["traces"].LastError);
-        Assert.Equal("off", failed.Exporters.ComponentHealthMap["logs"].Status);
     }
 
     // Every case of testdata/exporters.json through the wrapper: what is decided, compared whole.
@@ -382,20 +398,18 @@ public class SdkSettingsTests
     }
 
     // Every case of testdata/start.json through the wrapper: the settings to start with come from the
-    // policy of the last config applied in the core's saved state, else from the policy kept before.
+    // policy of the last config applied in the core's saved state, else the SDK's own.
     [Fact]
     public void TheStartVectors()
     {
-        using var layer = new SdkSettings();
         foreach (var c in Cases("start.json"))
         {
             var name = c.GetProperty("name").GetString();
             var coreState = c.TryGetProperty("core_state", out var h) ? Convert.FromHexString(h.GetString()!) : null;
-            var saved = c.TryGetProperty("saved", out var s) ? System.Text.Encoding.UTF8.GetBytes(s.GetString()!) : null;
-            var loaded = layer.Load(saved, DeclaringAll(), Now, coreState);
+            var f = new Flow(DeclaringAll(), coreState: coreState);
             var want = c.GetProperty("want").GetString();
-            Assert.True(want == loaded.Current.ToStringUtf8(), $"{name}: started from {loaded.Current.ToStringUtf8()}");
-            Assert.True(c.GetProperty("warns").GetBoolean() == (loaded.Warning.Length > 0), $"{name}: warning '{loaded.Warning}'");
+            Assert.True(want == f.State.Current.ToStringUtf8(), $"{name}: started from {f.State.Current.ToStringUtf8()}");
+            Assert.True(c.GetProperty("warns").GetBoolean() == f.Warned, $"{name}: warned {f.Warned}");
         }
     }
 

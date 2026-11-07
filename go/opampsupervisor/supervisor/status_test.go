@@ -17,6 +17,7 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/pydantic/opamp-clients/go/opamp"
+	"github.com/pydantic/opamp-clients/go/opamp/collector"
 )
 
 // The client keeps the status file up to date as it goes: the connection (a run of failures
@@ -30,9 +31,9 @@ func TestTheStatusFileFollowsTheClient(t *testing.T) {
 	c.reach = newReachability(c.logger, "wss://user:secret@opamp.example.com/v1/opamp")
 	c.report.started(c.logger, c.reach.endpoint, [16]byte{1})
 
-	c.onNotification(nil, opamp.Notification{Kind: opamp.ConnectFailed, Status: 401})
+	c.onNotification(nil, collector.Notification{Notification: opamp.Notification{Kind: opamp.ConnectFailed, Status: 401}})
 	clock = clock.Add(time.Minute)
-	c.onNotification(nil, opamp.Notification{Kind: opamp.ConnectFailed, Status: 401})
+	c.onNotification(nil, collector.Notification{Notification: opamp.Notification{Kind: opamp.ConnectFailed, Status: 401}})
 	st, err := ReadStatus(dir)
 	require.NoError(t, err)
 	require.NotNil(t, st.Server)
@@ -46,7 +47,7 @@ func TestTheStatusFileFollowsTheClient(t *testing.T) {
 	assert.Contains(t, out.String(), "can't reach it since")
 	assert.Contains(t, out.String(), "server.headers", "what to check")
 
-	c.onNotification(nil, opamp.Notification{Kind: opamp.Connected})
+	c.onNotification(nil, collector.Notification{Notification: opamp.Notification{Kind: opamp.Connected}})
 	require.NoError(t, c.SetHealth(&protobufs.ComponentHealth{Healthy: true}))
 	require.NoError(t, c.SetRemoteConfigStatus(&protobufs.RemoteConfigStatus{
 		LastRemoteConfigHash: []byte{0xab, 0xcd}, Status: protobufs.RemoteConfigStatuses_RemoteConfigStatuses_APPLIED,
@@ -79,7 +80,7 @@ func TestTheStatusFileFollowsTheClient(t *testing.T) {
 	}
 
 	c.report.close(c.logger)
-	c.onNotification(nil, opamp.Notification{Kind: opamp.ConnectFailed, Detail: "late"})
+	c.onNotification(nil, collector.Notification{Notification: opamp.Notification{Kind: opamp.ConnectFailed, Detail: "late"}})
 	st, err = ReadStatus(dir)
 	require.NoError(t, err)
 	assert.False(t, st.Running())

@@ -43,11 +43,7 @@ connection, with their own types and data.
 
 | Client | Declare | Send | Hear |
 |---|---|---|---|
-| Go | `Status.CustomCapabilities`, `SetCustomCapabilities` | `SendCustomMessage` | kinds `CustomMessage`, `ServerCustomCapabilities`, `CustomMessageNotSent` |
-| Node.js | `status.customCapabilities`, `setCustomCapabilities` | `sendCustomMessage` | `customMessage`, `serverCustomCapabilities`, `customMessageNotSent` |
-| Python | `Status.custom_capabilities`, `set_custom_capabilities` | `send_custom_message` | `custom_message`, `server_custom_capabilities`, `custom_message_not_sent` |
-| Java | `OpampClient.Status` (the sixth component), `setCustomCapabilities` | `sendCustomMessage` | `Notification.CustomMessage`, `ServerCustomCapabilities`, `CustomMessageNotSent` |
-| .NET | `OpAmpStatus.CustomCapabilities`, `SetCustomCapabilities` | `SendCustomMessage` | `OpAmpNotification.CustomMessage`, `ServerCustomCapabilities`, `CustomMessageNotSent` |
+| Go (`go/opamp/collector`, the Supervisor's and the extension's) | `Status.CustomCapabilities`, `SetCustomCapabilities` | `SendCustomMessage` | kinds `CustomMessage`, `ServerCustomCapabilities`, `CustomMessageNotSent` |
 
 ## How it is checked
 

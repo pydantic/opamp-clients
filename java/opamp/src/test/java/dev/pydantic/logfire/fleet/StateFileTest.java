@@ -19,7 +19,6 @@ import java.nio.file.FileSystem;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.attribute.AclEntry;
-import java.nio.file.attribute.AclEntryFlag;
 import java.nio.file.attribute.AclEntryPermission;
 import java.nio.file.attribute.AclEntryType;
 import java.nio.file.attribute.AclFileAttributeView;
@@ -28,7 +27,6 @@ import java.nio.file.attribute.UserPrincipal;
 import java.util.ArrayList;
 import java.util.EnumSet;
 import java.util.List;
-import java.util.Set;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -64,16 +62,14 @@ class StateFileTest {
   }
 
   @Test
-  void theListAllowsTheUserAloneAndADirectorysIsInherited() {
+  void theListAllowsTheUserAlone() {
     UserPrincipal alice = () -> "alice";
-    AclEntry file = StateFile.userOnly(alice, false).get(0);
-    assertEquals(1, StateFile.userOnly(alice, false).size());
+    AclEntry file = StateFile.userOnly(alice).get(0);
+    assertEquals(1, StateFile.userOnly(alice).size());
     assertEquals(AclEntryType.ALLOW, file.type());
     assertEquals(alice, file.principal());
     assertEquals(EnumSet.allOf(AclEntryPermission.class), file.permissions());
     assertTrue(file.flags().isEmpty());
-    AclEntry directory = StateFile.userOnly(alice, true).get(0);
-    assertEquals(Set.of(AclEntryFlag.FILE_INHERIT, AclEntryFlag.DIRECTORY_INHERIT), directory.flags());
   }
 
   @Test
@@ -97,15 +93,7 @@ class StateFileTest {
       StateFile.save(state, new byte[] {3});
       assertArrayEquals(new byte[] {3}, StateFile.load(state));
       UserPrincipal user = StateFile.currentUser(fs);
-      assertEquals(StateFile.userOnly(user, false), acl(state));
-
-      Path download = Executor.downloadsDir(state).resolve("7");
-      assertTrue(Disk.REAL.mkdir(download.getParent()));
-      try (Disk.Handle out = Disk.REAL.create(download, true)) {
-        out.write(new byte[] {4}, 0, 1);
-      }
-      assertArrayEquals(new byte[] {4}, Files.readAllBytes(download));
-      assertEquals(StateFile.userOnly(user, true), acl(download.getParent()));
+      assertEquals(StateFile.userOnly(user), acl(state));
     }
   }
 

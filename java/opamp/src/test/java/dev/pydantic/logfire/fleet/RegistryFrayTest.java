@@ -38,7 +38,7 @@ import org.junit.jupiter.api.Test;
  * core: an input only about an effect issued, of its kind, at most one end each, and nothing about
  * an effect after its cancel (RULE-SHELL-04, -06); after the end, every connection the network
  * opened is closed, every request and attempt given up (RULE-SHELL-06, -07), the end's wait over
- * within the stop bound, and no download file appearing or changing after it (S3). See {@link
+ * within the stop bound. See {@link
  * FrayRun} for the number of schedules, the seeds and replay.
  */
 // covers: RULE-SHELL-04, RULE-SHELL-06, RULE-SHELL-07
@@ -51,7 +51,7 @@ class RegistryFrayTest {
   static final long STOP_MS = 5_000;
 
   /**
-   * A request, a connection and a download (and with a state file, a save), some cancelled by the
+   * Requests and connections (and with a state file, saves), some cancelled by the
    * core while the network answers: nothing about a cancelled effect reaches the core, and a
    * connection that opens after its cancel is closed.
    */
@@ -68,14 +68,7 @@ class RegistryFrayTest {
         seed -> new Run(seed, Scenario.LATE_OPEN).run());
   }
 
-  /** A download whose body is still coming as the client ends: nothing of it is left, or changes, after. */
-  @Test
-  void aDownloadFinishingAfterTheEndLeavesNothing() throws Exception {
-    FrayRun.explore("RegistryFrayTest.aDownloadFinishingAfterTheEndLeavesNothing", RUNS, BUDGET_S,
-        seed -> new Run(seed, Scenario.DOWNLOAD).run());
-  }
-
-  enum Scenario { CANCEL, LATE_OPEN, DOWNLOAD }
+  enum Scenario { CANCEL, LATE_OPEN }
 
   /** How the network answers a call. */
   enum Answer { NOW, FAIL, SLOW, HOLD, HOLD_THEN_ANSWER }
@@ -86,37 +79,32 @@ class RegistryFrayTest {
       List<CoreProto.Effect> effects = new ArrayList<>();
       Map<Long, Answer> answers = new TreeMap<>();
       Answer[] all = Answer.values();
-      boolean state = scenario == Scenario.DOWNLOAD || r.nextBoolean();
+      boolean state = r.nextBoolean();
       long id = 1;
       int n = switch (scenario) {
         case CANCEL -> 3 + r.nextInt(3);
         case LATE_OPEN -> 1 + r.nextInt(2);
-        case DOWNLOAD -> 1 + r.nextInt(2);
       };
       List<Long> started = new ArrayList<>();
       for (int i = 0; i < n; i++, id++) {
         int kind = switch (scenario) {
-          case CANCEL -> r.nextInt(state ? 4 : 2) == 0 ? 0 : r.nextInt(state ? 4 : 2);
+          // 0 a request, 1 a connection, 2 a save (with a state file).
+          case CANCEL -> r.nextInt(state ? 3 : 2) == 0 ? 0 : r.nextInt(state ? 3 : 2);
           case LATE_OPEN -> r.nextInt(3) == 0 ? 0 : 1;
-          case DOWNLOAD -> r.nextInt(3) == 0 ? 0 : 2;
         };
         effects.add(switch (kind) {
           case 0 -> CoreProto.Effect.newBuilder().setHttpRequest(CoreProto.HttpRequest.newBuilder()
               .setId(id).setUrl("http://fake/v1/opamp").setBody(ByteString.copyFromUtf8("req" + id))).build();
           case 1 -> CoreProto.Effect.newBuilder().setWsOpen(CoreProto.WsOpen.newBuilder()
               .setId(id).setUrl("ws://fake/v1/opamp")).build();
-          case 2 -> CoreProto.Effect.newBuilder().setDownload(CoreProto.Download.newBuilder()
-              .setId(id).setUrl("http://fake/p" + id).setMaxBytes(1 << 20)).build();
           default -> CoreProto.Effect.newBuilder().setStore(CoreProto.Store.newBuilder()
               .setId(id).setData(ByteString.copyFromUtf8("state " + id))).build();
         });
-        if (kind != 3) {
+        if (kind != 2) {
           started.add(id);
           Answer a = scenario == Scenario.LATE_OPEN && kind == 1
               ? (r.nextInt(4) == 0 ? Answer.NOW : Answer.HOLD_THEN_ANSWER)
-              : scenario == Scenario.DOWNLOAD && kind == 2
-                  ? (r.nextInt(3) == 0 ? Answer.HOLD_THEN_ANSWER : Answer.SLOW)
-                  : all[r.nextInt(all.length)];
+              : all[r.nextInt(all.length)];
           answers.put(id, a);
         }
         // The core gives up on something under way, now and then (the scenario's point).
@@ -141,7 +129,6 @@ class RegistryFrayTest {
     return switch (e.getKindCase()) {
       case HTTP_REQUEST -> e.getHttpRequest().getId();
       case WS_OPEN -> e.getWsOpen().getId();
-      case DOWNLOAD -> e.getDownload().getId();
       case STORE -> e.getStore().getId();
       case CANCEL -> e.getCancel().getId();
       default -> -1;
@@ -196,10 +183,6 @@ class RegistryFrayTest {
         } catch (TimeoutException e) {
           violation("RULE-SHELL-07: what the end waits for wasn't over within " + STOP_MS + " ms");
         }
-        Map<String, String> downloads = listing();
-        if (!downloads.isEmpty()) {
-          FrayRun.saw("a download file there at the end");
-        }
         http.seal("the end's wait was over");
         http.calls.add(new FakeHttp.Request(-1, null, null)); // the network's last call
         net.join();
@@ -215,9 +198,6 @@ class RegistryFrayTest {
           if (!done) {
             violation("RULE-SHELL-07: " + c + " still running after the end");
           }
-        }
-        if (!listing().equals(downloads)) {
-          violation("RULE-SHELL-07: the downloads changed after the end's wait (S3): " + downloads + " -> " + listing());
         }
         violations.addAll(http.violations);
       } catch (Exception e) {
@@ -272,11 +252,6 @@ class RegistryFrayTest {
         case WS_LOST -> { id = in.getWsLost().getId(); of = CoreProto.Effect.KindCase.WS_OPEN; }
         case WS_MESSAGE -> { id = in.getWsMessage().getId(); of = CoreProto.Effect.KindCase.WS_OPEN; last = false; }
         case WS_CLOSED -> { id = in.getWsClosed().getId(); of = CoreProto.Effect.KindCase.WS_OPEN; last = false; }
-        case DOWNLOADED, DOWNLOAD_RESPONSE, DOWNLOAD_FAILED -> {
-          id = in.hasDownloaded() ? in.getDownloaded().getId()
-              : in.hasDownloadResponse() ? in.getDownloadResponse().getId() : in.getDownloadFailed().getId();
-          of = CoreProto.Effect.KindCase.DOWNLOAD;
-        }
         case STORED -> { id = in.getStored().getId(); of = CoreProto.Effect.KindCase.STORE; }
         case STORE_FAILED -> { id = in.getStoreFailed().getId(); of = CoreProto.Effect.KindCase.STORE; }
         default -> {
@@ -335,16 +310,12 @@ class RegistryFrayTest {
       }
     }
 
-    /** The effect a call is for: its URL's id (the plan names them so), from the request's path or body. */
+    /** The effect a call is for: its id (the plan names them so), from the request's body or the open's order. */
     long callId(FakeHttp.Call c) {
       if (c instanceof FakeHttp.Open o) {
         return wsIds().get(http.all.stream().filter(k -> k instanceof FakeHttp.Open).toList().indexOf(o));
       }
       FakeHttp.Request r = (FakeHttp.Request) c;
-      String path = r.request.uri().getPath();
-      if (path.startsWith("/p")) {
-        return Long.parseLong(path.substring(2));
-      }
       return Long.parseLong(new String(r.body, java.nio.charset.StandardCharsets.US_ASCII).substring(3));
     }
 
@@ -357,24 +328,6 @@ class RegistryFrayTest {
         }
       }
       return ids;
-    }
-
-    /** The downloads directory: each file's size, by name. */
-    Map<String, String> listing() throws IOException {
-      Map<String, String> out = new TreeMap<>();
-      if (state == null || !Files.isDirectory(Executor.downloadsDir(state))) {
-        return out;
-      }
-      try (var files = Files.list(Executor.downloadsDir(state))) {
-        for (Path f : files.toList()) {
-          try {
-            out.put(f.getFileName().toString(), Long.toString(Files.size(f)));
-          } catch (IOException e) {
-            out.put(f.getFileName().toString(), "gone");
-          }
-        }
-      }
-      return out;
     }
 
     static void delete(Path dir) {

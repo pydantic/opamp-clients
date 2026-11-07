@@ -9,6 +9,7 @@ and prefixes: no regular expressions, whose dialects differ between languages.""
 from __future__ import annotations
 
 import math
+import os
 import threading
 import time
 import weakref
@@ -88,6 +89,27 @@ def attribute_text(value) -> str | None:
     return None
 
 
+#: What holds a lock the gates or the sampler take, made again in a child forked from this
+#: process: a thread of the parent's that held one as it forked (an export, a sampling decision)
+#: isn't in the child, and the child would wait on it for ever.
+_FORKED_LOCKS: weakref.WeakSet = weakref.WeakSet()
+
+
+def fork_safe(o):
+    """`o`, whose `_new_locks()` makes its locks again in a forked child."""
+    _FORKED_LOCKS.add(o)
+    return o
+
+
+def _new_locks_in_child() -> None:
+    for o in list(_FORKED_LOCKS):
+        o._new_locks()
+
+
+if hasattr(os, "register_at_fork"):
+    os.register_at_fork(after_in_child=_new_locks_in_child)
+
+
 class Bucket:
     """A rate cap's token bucket, the algorithm every language runs
     (testdata/sdk-settings/caps.json pins it): full at its first take; refilled at `per_second` a
@@ -103,8 +125,8 @@ class Bucket:
         self._tokens = self._capacity
         self._last: int | None = None
         self._clock = clock
-        # Re-entrant: an item can be collected, and its decision forgotten, while the lock is held.
-        self._lock = threading.RLock()
+        self._new_locks()
+        fork_safe(self)
         #: id(item) -> (a weak reference to it, each repeat's decision in the batch it was decided
         #: in, ids of the gates that had it): kept while the item lives, so a slower exporter's queue
         #: never outlasts its decision, and dropped with it, so its id can't be another's meanwhile.
@@ -112,6 +134,10 @@ class Bucket:
         #: Items that can't be weakly referenced (none of the SDK's), held instead, the oldest
         #: forgotten past REMEMBERED.
         self._held: OrderedDict[int, tuple[object, list[bool], set[int]]] = OrderedDict()
+
+    def _new_locks(self) -> None:
+        # Re-entrant: an item can be collected, and its decision forgotten, while the lock is held.
+        self._lock = threading.RLock()
 
     def admitted(self, items: list, gate: object) -> list:
         """The items within the cap, in order, for the exporter behind `gate`: one decision per

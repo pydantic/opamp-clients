@@ -278,16 +278,14 @@ class Server:
 
 CAPABILITY = "io.example.fuzz"
 CAPABILITIES = (pb.AgentCapabilities_AcceptsRemoteConfig | pb.AgentCapabilities_ReportsRemoteConfig
-                | pb.AgentCapabilities_AcceptsPackages | pb.AgentCapabilities_ReportsPackageStatuses
-                | pb.AgentCapabilities_AcceptsOpAMPConnectionSettings | pb.AgentCapabilities_AcceptsRestartCommand
+                | pb.AgentCapabilities_AcceptsOpAMPConnectionSettings
                 | pb.AgentCapabilities_ReportsHealth | pb.AgentCapabilities_ReportsEffectiveConfig
                 | pb.AgentCapabilities_ReportsAvailableComponents | pb.AgentCapabilities_AcceptsOtherConnectionSettings
                 | pb.AgentCapabilities_ReportsConnectionSettingsStatus)
 
 # The application's calls a callback may make (and stop).
-CALLS = ["set_health", "set_description", "set_effective_config", "set_remote_config_status", "package_installed",
-         "package_removed", "set_connection_settings_status", "send_custom_message", "set_custom_capabilities",
-         "set_available_components", "stop", "nothing"]
+CALLS = ["set_health", "set_description", "set_effective_config", "set_remote_config_status",
+         "set_connection_settings_status", "set_available_components", "stop", "nothing"]
 
 
 def attributes(r: Reader) -> list[anyvalue_pb2.KeyValue]:
@@ -326,27 +324,11 @@ def call(r: Reader, client, what: str, seen: dict) -> str | None:
         h = last.remote_config.config_hash if last is not None and r.byte() & 1 else r.blob(32)
         client.set_remote_config_status(pb.RemoteConfigStatus(last_remote_config_hash=h, status=r.byte() % 5,
                                                               error_message=r.text()))
-    elif what == "package_installed":
-        last = seen.get("install_package")
-        if last is not None and r.byte() % 4:
-            name, h = last.package_name, last.package.hash if r.byte() % 4 else r.blob(16)
-        else:
-            name, h = r.pick(["pkg", "other", "", r.text(16)]), r.blob(16)
-        client.package_installed(name, h, None if r.byte() & 1 else r.text())
-    elif what == "package_removed":
-        last = seen.get("remove_package")
-        client.package_removed(last.package_name if last is not None and r.byte() & 1 else r.text(16))
     elif what == "set_connection_settings_status":
         last = seen.get("connection_settings")
         h = last.connection_settings.hash if last is not None and r.byte() & 1 else r.blob(16)
         client.set_connection_settings_status(pb.ConnectionSettingsStatus(
             last_connection_settings_hash=h, status=r.byte() % 4, error_message=r.text()))
-    elif what == "send_custom_message":
-        client.send_custom_message(pb.CustomMessage(capability=r.pick([CAPABILITY, r.text(24)]), type=r.text(16),
-                                                    data=r.blob(512)))
-    elif what == "set_custom_capabilities":
-        client.set_custom_capabilities(pb.CustomCapabilities(capabilities=[r.pick([CAPABILITY, r.text(24)])
-                                                                           for _ in range(r.byte() % 3)]))
     elif what == "set_available_components":
         ac = pb.AvailableComponents()
         for _ in range(r.byte() % 3):

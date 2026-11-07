@@ -1851,22 +1851,26 @@ def files_in_container(image: str) -> Callable[[Path], list[str]]:
     return files
 
 
+def _restarts_kept(events: list[dict], starts: list[float], heard: list[str | None]) -> bool:
+    """Whether each restart of check_slots' (the third start and the fourth) started on the policy
+    its slot kept: the drop, as its effective config, with no offer. (The server's answers carry no
+    UID: the offers looked for are those until the next start, when the agent that runs on has long
+    had the drop.)"""
+    ends = [*starts[3:], 1e9]
+    return all(reported([e for e in events if t < e["t"] < end and e.get("uid") == u], OUTAGE_DROP)
+               and not any(e["event"] == "s2a" and e.get("offer_config") and t < e["t"] < end for e in events)
+               for t, end, u in zip(starts[2:], ends, heard[2:]))
+
+
 def judge_slots(events: list[dict], files: list[str], starts: list[float], heard: list[str | None]) -> list[tuple[str, bool]]:
-    """check_slots' four starts (`starts`, on the wall clock (on_wall)): the UID each was heard with
-    first (`heard`), and the files under the default state directory's base (XDG_STATE_HOME) at
-    the end (files_under())."""
+    """check_slots' four starts in the default state directory (`starts`, on the wall clock
+    (on_wall)): the UID each was heard with first (`heard`), and the files under the default state
+    directory's base (XDG_STATE_HOME) at the end (files_under())."""
     u1, u2, u3, u4 = heard
     parts = [f.split("/") for f in files if f.startswith("opamp/")]
     service = sorted({p[1] for p in parts if len(p) > 2})
     slots = sorted({p[2] for p in parts if len(p) > 3}) if len(service) == 1 else []
     kept = all(any(p[2] == slot and p[3] != "lock" for p in parts if len(p) == 4) for slot in slots)
-    # The drop, as each restart's effective config: the state its slot kept, not a fresh start. (The
-    # server's answers carry no UID: the offers looked for are those until the next start, when the
-    # agent that runs on has long had the drop.)
-    ends = [*starts[3:], 1e9]
-    restarted = [(reported([e for e in events if t < e["t"] < end and e.get("uid") == u], OUTAGE_DROP),
-                  any(e["event"] == "s2a" and e.get("offer_config") and t < e["t"] < end for e in events))
-                 for t, end, u in zip(starts[2:], ends, heard[2:])]
     return [
         (f"two processes at once, each its own instance: two UIDs ({u1}, {u2})", None not in (u1, u2) and u1 != u2),
         (f"in the user's state directory: opamp/ holds one directory for the service ({service})",
@@ -1875,72 +1879,110 @@ def judge_slots(events: list[dict], files: list[str], starts: list[float], heard
         (f"the second restarted while the first runs takes its slot back: the same UID ({u3})", u3 == u2),
         (f"with both gone, the next start takes the first slot: the first's UID ({u4})", u4 == u1),
         ("each restart starts on the policy its slot kept (the drop, as its effective config, with no offer)",
-         all(kept and not offered for kept, offered in restarted)),
+         _restarts_kept(events, starts, heard)),
     ]
+
+
+def judge_named_slots(events: list[dict], files: list[str], starts: list[float],
+                      heard: list[str | None]) -> list[tuple[str, bool]]:
+    """check_slots' four starts on one directory named by OTEL_OPAMP_STATE_DIR, as judge_slots'
+    (docs/default-state-dir.md#a-directory-named): `files` are those under the named directory."""
+    u1, u2, u3, u4 = heard
+    parts = [f.split("/") for f in files]
+    own = sorted(p[0] for p in parts if len(p) == 1 and p[0] != "lock")
+    folders = sorted({p[0] for p in parts if len(p) > 1})
+    kept = bool(own) and all(any(p[0] == f and p[1] != "lock" for p in parts if len(p) == 2) for f in folders)
+    return [
+        (f"two processes sharing a named state directory, each its own instance: two UIDs ({u1}, {u2})",
+         None not in (u1, u2) and u1 != u2),
+        (f"the first keeps the directory itself ({own}), the second takes its folder 2 ({folders})",
+         folders == ["2"] and kept),
+        (f"the second restarted while the first runs takes its folder back: the same UID ({u3})", u3 == u2),
+        (f"with both gone, the next start takes the directory itself: the first's UID ({u4})", u4 == u1),
+        ("each restart starts on the policy its directory kept (the drop, as its effective config, with no offer)",
+         _restarts_kept(events, starts, heard)),
+    ]
+
+
+def _slots_round(launch: Launch, target_: Path, listen: str, seconds: float, env: dict[str, str], name: str,
+                 base: Path) -> tuple[list[dict], list[float], list[str | None]]:
+    """check_slots' four starts under `env`, against a server of their own: the events, when each
+    started, and the UID each was heard with first."""
+    origin = time.time()
+    with serving({"server": {"faults": [offer(1, OUTAGE_DROP)]}}, name, listen, target_) as (port, telemetry, log):
+        def events() -> list[dict]:
+            return on_wall(read_log(log), origin)
+
+        starts: list[float] = []
+        heard: list[str | None] = []
+
+        def start(n: int, running: tuple[str | None, ...] = ()) -> Callable[[], None]:
+            """Start `n`, while the agents with the UIDs `running` go on: the UID it is heard
+            with is the first other one that messages after it starts."""
+            t = time.time() - origin
+            stop = once(launch(port, telemetry, base, f"{name}-{n}", env))
+            starts.append(t)
+
+            def new() -> list[str]:
+                return [u for u in uids_heard(events(), t) if u not in running]
+            wait_for(lambda: bool(new()), seconds, 0)
+            heard.append(next(iter(new()), None))
+            applied = lambda: any(e["event"] == "a2s" and e.get("uid") == heard[-1] and e["t"] > t
+                                  and (e.get("remote_config_status") or {}).get("status", "").endswith("APPLIED")
+                                  for e in events())
+            wait_for(lambda: applied() or reported([e for e in events() if e.get("uid") == heard[-1]], OUTAGE_DROP),
+                     seconds, MARGIN)
+            return stop
+
+        first = start(1)
+        try:
+            second = start(2, (heard[0],))
+            try:
+                second()
+                time.sleep(1)
+                third = start(3, (heard[0],))
+                third()
+            finally:
+                second()
+        finally:
+            first()
+        time.sleep(1)
+        start(4)()
+        print(f"UIDs heard at each start {heard}")
+        return events(), starts, heard
 
 
 def check_slots(launch: Launch, target_: Path, listen: str = "127.0.0.1:0", seconds: float = 90,
                 env: dict[str, str] | None = None, name: str = "slots",
                 list_files: Callable[[Path], list[str]] = files_under) -> bool:
     """The default state directory (docs/default-state-dir.md), with several processes of one
-    program; every check printed, True when all pass. No state directory is named
-    (OTEL_OPAMP_STATE_DIR set but empty, which is unset) and the user's state directory is one of
-    the check's own (XDG_STATE_HOME). The server offers the drop (OUTAGE_DROP) to each new agent.
-    Two processes start, one after the other; the second stops and starts again while the first
-    runs; then both stop, and one starts (judge_slots). `launch` is given that directory as the
-    state directory too, for a container to mount: the variables naming it are rewritten there.
+    program; then the same with a directory named; every check printed, True when all pass. First
+    no state directory is named (OTEL_OPAMP_STATE_DIR set but empty, which is unset) and the user's
+    state directory is one of the check's own (XDG_STATE_HOME); then OTEL_OPAMP_STATE_DIR names one
+    for every process, as the workers a server starts inherit it. Each round, against a server
+    that offers the drop (OUTAGE_DROP) to each new agent: two processes start, one after the other;
+    the second stops and starts again while the first runs; then both stop, and one starts
+    (judge_slots, judge_named_slots). `launch` is given the check's directory as the state
+    directory too, for a container to mount: the variables naming it are rewritten there.
     `list_files` lists what is under it at the end: files_under(), or for an application in a
     container, which makes them as another user, readable by it alone, a listing from in one."""
     target_.mkdir(parents=True, exist_ok=True)
     base = Path(tempfile.mkdtemp(prefix=f"xdg-{name}-", dir=target_))
     base.chmod(0o777)
-    env = (env or {}) | {"XDG_STATE_HOME": str(base), "OTEL_OPAMP_STATE_DIR": ""}
-    origin = time.time()
+    env = (env or {}) | {"XDG_STATE_HOME": str(base)}
     ok = True
     try:
-        with serving({"server": {"faults": [offer(1, OUTAGE_DROP)]}}, name, listen, target_) as (port, telemetry, log):
-            def events() -> list[dict]:
-                return on_wall(read_log(log), origin)
-
-            starts: list[float] = []
-            heard: list[str | None] = []
-
-            def start(n: int, running: tuple[str | None, ...] = ()) -> Callable[[], None]:
-                """Start `n`, while the agents with the UIDs `running` go on: the UID it is heard
-                with is the first other one that messages after it starts."""
-                t = time.time() - origin
-                stop = once(launch(port, telemetry, base, f"{name}-{n}", env))
-                starts.append(t)
-
-                def new() -> list[str]:
-                    return [u for u in uids_heard(events(), t) if u not in running]
-                wait_for(lambda: bool(new()), seconds, 0)
-                heard.append(next(iter(new()), None))
-                applied = lambda: any(e["event"] == "a2s" and e.get("uid") == heard[-1] and e["t"] > t
-                                      and (e.get("remote_config_status") or {}).get("status", "").endswith("APPLIED")
-                                      for e in events())
-                wait_for(lambda: applied() or reported([e for e in events() if e.get("uid") == heard[-1]], OUTAGE_DROP),
-                         seconds, MARGIN)
-                return stop
-
-            first = start(1)
-            try:
-                second = start(2, (heard[0],))
-                try:
-                    second()
-                    time.sleep(1)
-                    third = start(3, (heard[0],))
-                    third()
-                finally:
-                    second()
-            finally:
-                first()
-            time.sleep(1)
-            start(4)()
-            print(f"UIDs heard at each start {heard}")
-            for what, cond in [*judge_slots(events(), list_files(base), starts, heard), *judge_transport(events())]:
-                ok &= cond
-                print(f"  {'ok  ' if cond else 'FAIL'} {what}")
+        events, starts, heard = _slots_round(launch, target_, listen, seconds, env | {"OTEL_OPAMP_STATE_DIR": ""},
+                                             name, base)
+        judged = [*judge_slots(events, list_files(base), starts, heard), *judge_transport(events)]
+        named = base / "named"
+        events, starts, heard = _slots_round(launch, target_, listen, seconds,
+                                             env | {"OTEL_OPAMP_STATE_DIR": str(named)}, f"{name}-named", base)
+        files = [f.removeprefix("named/") for f in list_files(base) if f.startswith("named/")]
+        judged += [*judge_named_slots(events, files, starts, heard), *judge_transport(events)]
+        for what, cond in judged:
+            ok &= cond
+            print(f"  {'ok  ' if cond else 'FAIL'} {what}")
     finally:
         shutil.rmtree(base, ignore_errors=True)
     return ok

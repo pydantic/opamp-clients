@@ -228,8 +228,8 @@ def test_calls_after_stop_do_nothing_from_any_thread_even_once_the_loop_is_close
         try:
             client.set_health(pb.ComponentHealth(healthy=True))
             client.set_description(pb.AgentDescription())
-            client.send_custom_message(pb.CustomMessage(capability="c", type="t", data=b"x"))
-            client.package_removed("p")
+            client.set_effective_config(pb.EffectiveConfig())
+            client.set_available_components(pb.AvailableComponents())
         except BaseException as e:  # noqa: BLE001
             errors.append(e)
 
@@ -266,7 +266,7 @@ def _run(coro) -> object:
 # A negative time or size is refused at start by the core, naming the field and the number meant,
 # as in every SDK (protobuf's range check refused it here before, in its own words).
 @pytest.mark.parametrize(("field", "value"), [("stop_timeout_ms", -5000), ("heartbeat_interval_ms", -1),
-                                              ("max_send_bytes", -1), ("download_timeout_ms", -(2 ** 63))])
+                                              ("max_send_bytes", -1), ("request_timeout_ms", -(2 ** 63))])
 def test_a_negative_time_or_size_is_refused_at_start(field: str, value: int) -> None:
     async def main() -> None:
         config = Config(endpoint="http://127.0.0.1:9/v1/opamp", instance_uid=UID, **{field: value})

@@ -91,14 +91,11 @@ import {
 import { RemoteConfigStatuses } from "@pydantic/logfire-fleet-client";
 import { SdkSettings, type Settings } from "@pydantic/logfire-fleet-client/sdk";
 
-import { config as policyConfig, type Overrides, policy } from "./policy.js";
+import { config as policyConfig, decide, type Overrides, policy } from "./policy.js";
 
 import { Agent, Controls, glob, hostFromEnv, MASK } from "../src/index.js";
 
 const LAYER = new SdkSettings();
-const text = (s: string) => new TextEncoder().encode(s);
-/** The policy with every control local: what the SDK starts with when nothing was kept. */
-const EMPTY = text(policy());
 /** 2026-10-14T12:00:00Z, the vectors' clock. */
 const NOW = 1_791_979_200_000;
 
@@ -775,7 +772,7 @@ async function run(mode: Mode, seed: number): Promise<Reached> {
     const freshLogging = new LoggerProvider({
       processors: [new BatchLogRecordProcessor({ exporter: fresh.logs(freshLogs as never), maxExportBatchSize: 5, scheduledDelayMillis: 1 })],
     });
-    const d = LAYER.decide(config(final), EMPTY, EMPTY, hostFromEnv(), BigInt(agent.wall));
+    const d = decide(LAYER, config(final), hostFromEnv(), BigInt(agent.wall));
     assert.equal(d.status?.status, RemoteConfigStatuses.RemoteConfigStatuses_APPLIED, d.status?.errorMessage);
     fresh.apply(d.apply);
 

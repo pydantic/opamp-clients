@@ -5,7 +5,7 @@ random runs of a Hypothesis state machine against the real core and a local serv
 step is one of: start (over HTTP or WebSocket, with a state file holding a saved remote config or
 a fresh one, the callback set to raise on its k-th call or not), an application call from outside
 (on the loop), from another thread or from inside the callback, stop from outside or requested
-from inside the callback, or the server offering a remote config, a custom message or a heartbeat
+from inside the callback, or the server offering a remote config or a heartbeat
 interval. After each step the notifications seen so far are checked against the model:
 
 - callbacks one at a time, none before `start` returned, none after `stopped`;
@@ -14,8 +14,8 @@ interval. After each step the notifications seen so far are checked against the 
 - a callback that raised stops the client: `stopped` comes, and `stop` raises that error every
   time it is called;
 - `stop` returns within its bound (from outside, or requested from inside the callback);
-- the order the model can predict: the saved remote config first, the server's custom messages
-  and remote configs in the order offered, the descriptions set in the order they were set.
+- the order the model can predict: the saved remote config first, the server's remote configs
+  in the order offered, the descriptions set in the order they were set.
 
 A call from another thread is made directly from that thread; the client carries it out on the
 loop. The separate test at the end does the same alone.
@@ -48,12 +48,11 @@ from hypothesis.stateful import RuleBasedStateMachine, invariant, precondition, 
 from logfire_fleet_client import Client, Config, Notification, Status, anyvalue_pb2, opamp_pb2 as pb
 
 UID = bytes([0x42] * 16)
-CAPABILITY = "io.example.model"
 CAPABILITIES = pb.AgentCapabilities_AcceptsRemoteConfig | pb.AgentCapabilities_ReportsRemoteConfig
 SAVED_HASH = b"saved"
 STOP_BOUND = 5 + 2  # the request timeout (the goodbye in flight), plus a margin
 SETTLE = 0.03  # how long the loop runs after each step
-METHODS = ["set_health", "set_description", "send_custom_message", "answer_config"]
+METHODS = ["set_health", "set_description", "answer_config"]
 MODES = ["platform", "core"]
 
 
@@ -75,7 +74,6 @@ class Server:
 
     def __init__(self) -> None:
         self.configs = 0
-        self.customs = 0
         self.pending: dict[str, object] = {}
         self.heartbeat = 0  # the last interval offered, seconds
         self.descriptions: list[int] = []
@@ -89,13 +87,6 @@ class Server:
             self.configs += 1
             hash_ = b"c%d" % self.configs
         self.pending["config"] = hash_
-        self._push()
-
-    def offer_custom(self) -> None:
-        self.customs += 1
-        self.pending.setdefault("customs", [])
-        # One custom message per answer: the rest wait for the next.
-        self.pending["customs"].append(self.customs)  # type: ignore[union-attr]
         self._push()
 
     def offer_heartbeat(self) -> None:
@@ -114,11 +105,6 @@ class Server:
         if (h := self.pending.pop("config", None)) is not None:
             r.remote_config.config_hash = h  # type: ignore[assignment]
             r.remote_config.config.config_map[""].body = h  # type: ignore[assignment]
-        if (customs := self.pending.get("customs")):
-            n = customs.pop(0)  # type: ignore[union-attr]
-            r.custom_message.CopyFrom(pb.CustomMessage(capability=CAPABILITY, type="n", data=str(n).encode()))
-            if not customs:
-                del self.pending["customs"]
         if (s := self.pending.pop("heartbeat", None)) is not None:
             r.connection_settings.opamp.heartbeat_interval_seconds = s  # type: ignore[assignment]
         return r
@@ -192,6 +178,7 @@ class Run:
         self.stops: list[asyncio.Future] = []  # stops requested from inside the callback
         self.stop_returned = False
         self.described = 0
+        self.answered: set[bytes] = set()  # the remote config hashes the application answered
 
     @property
     def stopped(self) -> list[Notification]:
@@ -227,8 +214,7 @@ class CallbackModel(RuleBasedStateMachine):
                       heartbeat_interval_ms=50, request_timeout_ms=5000, state_file=state_file)
 
     def _status(self) -> Status:
-        return Status(description=description(0),
-                      custom_capabilities=pb.CustomCapabilities(capabilities=[CAPABILITY]))
+        return Status(description=description(0))
 
     def _state_file(self, data: bytes | None) -> str:
         self.files += 1
@@ -262,11 +248,10 @@ class CallbackModel(RuleBasedStateMachine):
             self.descriptions += 1
             run.described = self.descriptions
             c.set_description(description(self.descriptions))
-        elif what == "send_custom_message":
-            c.send_custom_message(pb.CustomMessage(capability=CAPABILITY, type="t", data=b"x"))
         else:
             configs = [n for n in run.notes if n.kind == "remote_config"]
             h = configs[-1].remote_config.config_hash if configs else b"none"
+            run.answered.add(h)
             c.set_remote_config_status(pb.RemoteConfigStatus(
                 last_remote_config_hash=h, status=pb.RemoteConfigStatuses_APPLIED))
 
@@ -309,12 +294,22 @@ class CallbackModel(RuleBasedStateMachine):
                 run.problems.append(f"no stopped within 2 s of the callback raising {run.thrown!r}")
 
     async def _nudge(self, run: Run, until) -> None:
-        """Have the server send something (so the callback is called), until `until()`."""
+        """Have the server send something (so the callback is called), until `until()`: a remote
+        config. The core hands over the next config only once the application has answered the one
+        it holds, so one left unanswered is answered first, from the loop; unless the step waits for
+        an answer from inside a callback, when a heartbeat interval calls the callback instead."""
         for i in range(300):
             if until() or run.stopped:
                 return
             if i % 10 == 0:
-                self.server.offer_custom()
+                configs = [n.remote_config.config_hash for n in run.notes if n.kind == "remote_config"]
+                if configs and configs[-1] not in run.answered:
+                    if "answer_config" in run.inside:
+                        self.server.offer_heartbeat()
+                        await asyncio.sleep(0.01)
+                        continue
+                    self._call(run, "answer_config")
+                self.server.offer_config()
             await asyncio.sleep(0.01)
 
     async def _await_stop(self, run: Run, stop) -> None:
@@ -450,7 +445,7 @@ class CallbackModel(RuleBasedStateMachine):
         await self._await_stop(run, run.client.stop())  # type: ignore[union-attr]
 
     @precondition(lambda self: self.run is not None)
-    @rule(what=st.sampled_from(["config", "two_configs", "custom", "heartbeat"]))
+    @rule(what=st.sampled_from(["config", "two_configs", "heartbeat"]))
     def server_offers(self, what: str) -> None:
         run = self.run
 
@@ -501,8 +496,6 @@ class CallbackModel(RuleBasedStateMachine):
             first = run.notes[0]
             assert first.kind == "remote_config" and first.remote_config.config_hash == SAVED_HASH, (
                 f"the saved remote config first, not {first.kind}")
-        customs = [int(n.custom_message.data) for n in run.notes if n.kind == "custom_message"]
-        assert customs == sorted(set(customs)), f"custom messages in the order sent: {customs}"
         configs = [n.remote_config.config_hash for n in run.notes if n.kind == "remote_config"
                    and n.remote_config.config_hash != SAVED_HASH]
         numbers = [int(h[1:]) for h in configs]

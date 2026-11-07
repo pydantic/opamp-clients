@@ -10,7 +10,7 @@ namespace Logfire.Fleet.Client.Tests;
 
 /// <summary>
 /// An output that says stopped starts nothing (RULE-SHELL-07): no request, WebSocket connection,
-/// download, stream or name resolution, whatever else it carries; what it would start could only
+/// stream or name resolution, whatever else it carries; what it would start could only
 /// be given up on. The real core puts none there, so the test adds them to that output
 /// (<see cref="Seams.Stepped"/> runs before an output's effects are carried out) and watches the
 /// transport and the network for any of them.
@@ -38,7 +38,6 @@ public class StoppedOutputTests
                 Mode = mode,
                 DirectConnection = coreMode,
                 StateFile = Path.Combine(dir.FullName, "state"),
-                AcceptPackages = true,
             };
             using var transport = new Watching(coreMode ? ClientTransport.Create(null, null, direct: true) : ClientTransport.Create(options));
             var net = new WatchingNet();
@@ -73,7 +72,6 @@ public class StoppedOutputTests
     [
         new() { HttpRequest = new HttpRequest { Id = 900_001, Url = $"http://{Trap}/v1/opamp", TimeoutMs = 10_000, MaxResponseBytes = 1 << 20 } },
         new() { WsOpen = new WsOpen { Id = 900_002, Url = $"ws://{Trap}/v1/opamp", TimeoutMs = 10_000, MaxMessageBytes = 1 << 20 } },
-        new() { Download = new Download { Id = 900_003, Url = $"http://{Trap}/file", MaxBytes = 1 << 20, TimeoutMs = 10_000 } },
         new() { StreamOpen = new StreamOpen { Id = 900_004, Host = Trap, Port = 80 } },
         new() { StreamResolve = new StreamName { Id = 900_005, Host = Trap } },
     ];

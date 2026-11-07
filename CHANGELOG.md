@@ -21,6 +21,20 @@ and date. Tests, CI and docs alone don't need a line.
 
 ### Breaking
 
+- Python, Node.js, Java, .NET: the clients do only what every SDK uses. The server's packages
+  and downloads, custom messages, server commands and renewed auth headers are gone from them;
+  platform mode and connection settings stay (#129).
+- Go: `go/opamp` is the SDK client and does the same. What only the Supervisor and the Collector's
+  extension use moved to the new package `go/opamp/collector`: `AuthHeader`, `AcceptPackages`,
+  `MaxPackageBytes`, `DownloadTimeout`, `NoSpliceDownloads`, `Status.CustomCapabilities`,
+  `SetCustomCapabilities`, `SendCustomMessage`, `PackageInstalled`, `PackageRemoved`,
+  `FailedForNow`, `FailedLeavingUnknown`, and the kinds `Command`, `CustomMessage`,
+  `ServerCustomCapabilities`, `CustomMessageNotSent`, `InstallPackage`, `RemovePackage`. Its types
+  embed package `opamp`'s, so code that used them switches the import and the type names (#129).
+- Go, Python, Node.js, Java, .NET: the SDK settings an earlier release kept itself
+  (`sdk-settings.json` in the state directory) are no longer read at start. The settings to start
+  with are the config the client kept applied; a state directory with only the old file starts
+  with the SDK's own settings until the server sends a config (#129).
 - Go, Java, .NET: an HTTP client of the application's no longer switches the client to platform
   mode silently. Platform mode is an advanced option and must be named (`Mode: opamp.ModePlatform`,
   `mode(OpampClient.Mode.PLATFORM)`, `Mode = OpAmpMode.Platform`); an HTTP client without it is
@@ -47,6 +61,14 @@ and date. Tests, CI and docs alone don't need a line.
 
 ### Added
 
+- Python, Node.js: `logfire_fleet()` / `logfireFleet()` and `LogfireFleet`, what the Logfire
+  SDK's own `fleet` option calls (`logfire.configure(fleet=True)` with `logfire[fleet]`;
+  `configure({ fleet: true })` in `@pydantic/logfire-node` with this package beside it). The
+  Logfire SDK builds its own SDK and hands this package its head sampler, its resource and (in
+  Python) its export to Logfire at the points `configure_logfire()` uses, so nothing reads the
+  Logfire SDK's private modules and, unlike `manage()`, the sampling controls are carried out. A
+  versioned contract (`LOGFIRE_FLEET_CONTRACT`); a second `configure()` is governed under the same
+  client.
 - Supervisor installers and container image: the Collector runs with
   `--feature-gates=telemetry.newPipelineTelemetry`, so its own metrics count the items every
   receiver, processor (`batch` too) and exporter takes in and passes on. A Prometheus reader of
@@ -68,9 +90,13 @@ and date. Tests, CI and docs alone don't need a line.
 
 ### Changed
 
-- Go, Python, Node.js, Java, .NET, the Supervisor: on core 0.16.0, which the clients now pin. Core
-  0.15.0 decides which exporters the SDK policy governs and how each is named (#109); 0.16.0 names
-  the generated Java and .NET types after Logfire Fleet (#126).
+- Go, Python, Node.js, Java, .NET: every SDK runs the settings layer's agent flow, so what an
+  SDK does around a policy is the same in each language: when debug mode ends, when export health
+  is sent, and the lines it logs about reaching the server (#129).
+- Go, Python, Node.js, Java, .NET, the Supervisor: on core 0.17.0 (its prerelease 0.17.0-dev.1 until
+  it is released), which the clients now pin. Core 0.15.0 decides which exporters the SDK policy
+  governs and how each is named (#109); 0.16.0 names the generated Java and .NET types after
+  Logfire Fleet (#126); 0.17.0 carries only what every SDK uses (#129).
 - Go, Python, Node.js, Java, .NET: the name each exporter is listed under, where it sends, and the
   warning for each ungoverned one are decided by the core's new `Exporters` call, the same in every
   language. An OTLP exporter built from the variables now lists its signal's path under HTTP
@@ -91,6 +117,26 @@ and date. Tests, CI and docs alone don't need a line.
 
 ### Fixed
 
+- Python, Node.js: setting the SDK up again in one process (Python's `configure_logfire()` or
+  `manage()`, Node.js's `manage()`, called a second time) keeps the instance it joined the fleet
+  as. It used to start over: another instance UID (a second slot of the default state directory)
+  beside the client's, in Node.js a second client with the first never stopped, and the SDK's own
+  settings back in force, so a policy's redaction stopped applying until the server sent it again
+  (#138).
+- Python, Node.js: an argument of a Logfire SDK span that the policy drops, masks or scrubs is out
+  of the span's message (`logfire.msg`) too, which is exported as its template. The message kept
+  the argument's value as the application gave it (#138).
+- Python: a worker forked while a thread of its parent's held a lock of the gates, the sampler's
+  trace cap or the application settings no longer waits on it for ever; the worker's locks are
+  its own (#138).
+- Python, Node.js, .NET, Java, Go: processes sharing a state directory named by
+  `OTEL_OPAMP_STATE_DIR` (uvicorn or gunicorn workers, a multiprocessing pool, a Node.js cluster or
+  PM2, a child process) each keep their own instance. They used to join the fleet as one instance
+  UID, each reading and writing the other's state; in .NET all but the first ran unmanaged. The
+  directory is now locked as the default one is: the first process keeps it and its UID, as
+  before, and the others take numbered folders in it (`2` to `16`). A named directory that can't be
+  made or locked is now said as a warning, and each start is then a new instance; in .NET the SDK
+  used to run unmanaged. Python also lets the lock go when the SDK is shut down (#138).
 - Supervisor installers and container image: a remote config naming a component the Collector
   isn't built with (a receiver it doesn't have, say) is refused before it runs, FAILED with the
   Collector's reason, and the Collector keeps running the config it had. The configs turn on
