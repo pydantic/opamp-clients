@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -49,6 +50,7 @@ func TestContainerConfigs(t *testing.T) {
 		assert.True(t, cfg.Agent.ValidateConfig)
 		assert.True(t, cfg.Agent.AutomaticConfigRollback)
 		assert.Equal(t, 4, cfg.Agent.CollectorCrashLogSnippetKiB)
+		assert.Equal(t, 30*time.Second, cfg.Agent.BootstrapTimeout)
 	}
 	require.NoError(t, open.Agent.RemoteConfigPolicy.Check("", []byte(`exporters: {datadog: {api: {key: "${env:DD_API_KEY}"}}}`)))
 

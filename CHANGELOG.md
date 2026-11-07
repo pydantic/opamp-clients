@@ -156,8 +156,8 @@ and date. Tests, CI and docs alone don't need a line.
 
 ## Supervisor 0.10.3 (2026-11-07)
 
-`go/opampsupervisor/v0.10.3`: 0.10.2 and one packaging fix, cut from the 0.10.2 tag so it carries
-nothing else from main. Same Collector (otelcol-contrib v0.164.0) and core (0.14.0) as 0.10.0.
+`go/opampsupervisor/v0.10.3`: 0.10.2 and two packaging fixes, cut from the 0.10.2 tag so it
+carries nothing else from main. Same Collector (otelcol-contrib v0.164.0) and core (0.14.0) as 0.10.0.
 
 ### Fixed
 
@@ -167,6 +167,11 @@ nothing else from main. Same Collector (otelcol-contrib v0.164.0) and core (0.14
   and leave the Supervisor stopped. A failed stop, a failed check or the timeout now aborts the
   installation instead of replacing files under a service that may still be running. Fresh
   installs, Linux and Windows are unchanged (#142).
+- Supervisor installers and container image: the Collector has 30 seconds, not upstream's 3, to
+  start and connect back to the Supervisor (`agent.bootstrap_timeout: 30s` in the packaged
+  configs). The 420 MB Collector a virus scanner checks on its first launch, or one on a slow disk,
+  could miss 3 seconds, and the Supervisor then stopped and was restarted by the service manager.
+  An upgrade's refresh sets it on a config nobody edited (#141).
 
 ## Supervisor 0.10.2 (2026-11-07)
 
