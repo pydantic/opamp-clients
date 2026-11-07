@@ -455,6 +455,22 @@ test("redaction: a key both lists match is dropped; drop doesn't change dropped_
   assert.deepEqual([gated.getFinishedSpans()[0]!.attributes, gated.getFinishedSpans()[0]!.droppedAttributesCount], [{}, 0]);
 });
 
+test("redaction: an argument masked or scrubbed is out of a Logfire span's message too", () => {
+  // The Logfire SDK renders a span's arguments into logfire.msg: one the policy masks or scrubs
+  // takes the message to its template. It used to stay in the message as it was.
+  const c = new Controls();
+  c.apply(settings({ attribute_redaction: { mask: ["user.email"] }, scrubbing: { patterns: ["hunter*"] } }));
+  const { gated, tracer } = tracing(c);
+  const span = (template: string, message: string, args: Attributes) =>
+    tracer.startSpan(template, { attributes: { "logfire.msg_template": template, "logfire.msg": message, ...args } }).end();
+  span("the code is {code}", "the code is hunter2", { code: "hunter2" });
+  span("signed in {user.email}", "signed in a@example.com", { "user.email": "a@example.com" });
+  span("the order is {order}", "the order is o-1", { order: "o-1", "user.email": "b@example.com" });
+  const sent = gated.getFinishedSpans().map((s) => [s.attributes["logfire.msg"], s.attributes]);
+  assert.deepEqual(sent.map(([m]) => m), ["the code is {code}", "signed in {user.email}", "the order is o-1"]);
+  assert.doesNotMatch(JSON.stringify(sent), /hunter2|a@example\.com|b@example\.com/);
+});
+
 test("redaction is declared, and a host that doesn't declare it refuses it", () => {
   assert.ok(hostFromEnv().live!.includes("drop_attributes") && hostFromEnv().live!.includes("mask_attributes"));
   const host = { live: hostFromEnv().live!.filter((k) => k !== "drop_attributes" && k !== "mask_attributes") };

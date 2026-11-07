@@ -394,6 +394,25 @@ def test_the_policy_sits_where_configure_logfire_puts_it_in_the_logfire_sdks_exp
     assert gate < retry < redact, names
 
 
+def test_an_argument_redacted_or_scrubbed_is_out_of_the_logfire_message_too(tmp_path, servers, how):
+    """The Logfire SDK renders a span's and a log's arguments into its message (logfire.msg): one
+    the policy masks or scrubs is out of the message too, which becomes its template. It used to
+    stay in the message as it was. A span whose arguments the policy leaves alone keeps its message."""
+    server, ingest = servers
+    run = _run(server, ingest, tmp_path, policy(scrubbing={"patterns": ["hunter*"]},
+                                                attribute_redaction={"mask": ["user.email"]}), how=how,
+               after='logfire.info("the code is {code}", code="hunter2")\n'
+                     'with logfire.span("signed in {user.email}", **{"user.email": "a@example.com"}):\n    pass\n'
+                     'with logfire.span("the order is {order}", order="o-1"):\n    pass')
+    assert run.returncode == 0 and "Traceback" not in run.stderr, run.stderr
+    sent = {name: attrs for name, attrs in ingest.spans}
+    assert sent["the code is {code}"]["logfire.msg"] == "the code is {code}"
+    assert sent["the code is {code}"]["code"] == "[Scrubbed due to 'hunter*']"
+    assert sent["signed in {user.email}"]["logfire.msg"] == "signed in {user.email}"
+    assert sent["the order is {order}"]["logfire.msg"] == "the order is o-1"
+    assert "hunter2" not in str(ingest.spans) and "a@example.com" not in str(ingest.spans)
+
+
 def test_logfire_configured_again_keeps_its_new_exporters_under_the_policy(tmp_path, servers, how):
     """A second ``logfire.configure(fleet=...)`` (or ``configure_logfire()``) builds new providers:
     they are governed under the same client and instance, so the policy still holds on what

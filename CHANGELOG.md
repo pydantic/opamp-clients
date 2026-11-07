@@ -122,6 +122,9 @@ and date. Tests, CI and docs alone don't need a line.
   as. It used to start over: another instance UID (a second slot of the default state directory)
   beside the client's, in Node.js a second client with the first never stopped, and the SDK's own
   settings back in force, so a policy's redaction stopped applying until the server sent it again.
+- Python, Node.js: an argument of a Logfire SDK span that the policy drops, masks or scrubs is out
+  of the span's message (`logfire.msg`) too, which is exported as its template. The message kept
+  the argument's value as the application gave it.
 - Python: a worker forked while a thread of its parent's held a lock of the gates, the sampler's
   trace cap or the application settings no longer waits on it for ever; the worker's locks are
   its own.

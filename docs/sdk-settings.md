@@ -288,6 +288,10 @@ Here an attribute whose key or value looks secret to the Logfire SDK (`password`
   at any depth: `exception.message`, `db.statement`, `url.full`, `http.target`,
   `gen_ai.input.messages` and the rest of the Logfire SDK's list, each matched exactly, case and
   all.
+- The Logfire SDK renders a span's arguments into its message (`logfire.msg`, a safe key). Where
+  redaction or scrubbing changes an argument the message template (`logfire.msg_template`) names,
+  the message is exported as its template, which holds no value, as the Logfire SDK's own
+  scrubbing leaves it (Python and Node.js, where the Logfire SDK runs).
 - It runs after redaction, on what redaction keeps: a dropped attribute is gone and a masked one
   stays `[REDACTED]`. It reaches what redaction does (span, span event, span link and log record
   attributes) and **log bodies** too, a string body or a map body's members. The application's

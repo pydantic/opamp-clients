@@ -818,11 +818,48 @@ class _RedactedSpan(ReadableSpan):
         return self._original.dropped_links
 
 
+#: A Logfire span's message template, and its message: the template with the arguments' values in it.
+_LOGFIRE_TEMPLATE = "logfire.msg_template"
+_LOGFIRE_MESSAGE = "logfire.msg"
+
+
+def _template_fields(template: str) -> set[str] | None:
+    """The attributes a Logfire message template puts in its message: each field's name, and the
+    name before its first `.` or `[`; None if it can't be read (then it may hold any)."""
+    import re  # noqa: PLC0415
+    import string  # noqa: PLC0415
+
+    try:
+        names = [f for _, f, _, _ in string.Formatter().parse(template) if f]
+    except ValueError:
+        return None
+    return {n for f in names for n in (f, re.split(r"[.\[]", f, maxsplit=1)[0])}
+
+
+def _message_redacted(attributes, redacted: dict) -> dict:
+    """`redacted` (a Logfire span's attributes as redaction left them), its message held to the
+    same: the Logfire SDK renders the arguments' values into `logfire.msg`, so an argument the
+    policy dropped, masked or scrubbed is in it too. Such a message becomes its template, which
+    holds no value; the Logfire SDK's own scrubbing does the same to the values it scrubs."""
+    template, message = attributes.get(_LOGFIRE_TEMPLATE), redacted.get(_LOGFIRE_MESSAGE)
+    if not isinstance(template, str) or not isinstance(message, str) or message != attributes.get(_LOGFIRE_MESSAGE) \
+            or message == template:
+        return redacted
+    changed = {k for k, v in attributes.items() if k not in redacted or redacted[k] is not v}
+    fields = _template_fields(template)
+    if fields is None or changed & fields:
+        redacted = {**redacted, _LOGFIRE_MESSAGE: template}
+    return redacted
+
+
 def _redacted_span(span: ReadableSpan, redactor: Redactor) -> ReadableSpan:
     """The span with its attributes, its events' and its links' redacted and scrubbed; the span
-    itself when nothing in it changes. A new span, never the original changed."""
+    itself when nothing in it changes. A new span, never the original changed. A Logfire span's
+    message is held to what redaction did to the arguments in it (_message_redacted)."""
     events, links = span.events or (), span.links or ()
     own = redactor.apply(span.attributes)
+    if own is not None:
+        own = _message_redacted(span.attributes, own)
     of_events = [redactor.apply(e.attributes) for e in events]
     of_links = [redactor.apply(link.attributes) for link in links]
     if own is None and all(r is None for r in of_events) and all(r is None for r in of_links):

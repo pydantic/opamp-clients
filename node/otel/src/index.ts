@@ -867,7 +867,7 @@ export class Redaction {
    * are the span's own.
    */
   span(span: ReadableSpan): ReadableSpan {
-    const attributes = this.attributes(span.attributes);
+    const attributes = messageRedacted(span.attributes, this.attributes(span.attributes));
     let events: ReadableSpan["events"] = span.events;
     for (const [i, e] of span.events.entries()) {
       const a = this.attributes(e.attributes);
@@ -900,6 +900,41 @@ export class Redaction {
       body: { value: body, enumerable: true },
     }) as ReadableLogRecord;
   }
+}
+
+/** A Logfire span's message template, and its message: the template with the arguments' values in it. */
+const LOGFIRE_TEMPLATE = "logfire.msg_template";
+const LOGFIRE_MESSAGE = "logfire.msg";
+
+/**
+ * The attributes a Logfire message template puts in its message: each `{field}`'s name, and the
+ * name before its first `.` or `[`.
+ */
+function templateFields(template: string): Set<string> {
+  const out = new Set<string>();
+  for (const m of template.matchAll(/\{([^{}]+)\}/g)) {
+    const field = m[1]!.split(/[:!]/, 1)[0]!.trim();
+    out.add(field);
+    out.add(field.split(/[.[]/, 1)[0]!);
+  }
+  return out;
+}
+
+/**
+ * `redacted` (a Logfire span's attributes as redaction left them), its message held to the same:
+ * the Logfire SDK renders the arguments' values into `logfire.msg`, so an argument the policy
+ * dropped, masked or scrubbed is in it too. Such a message becomes its template, which holds no
+ * value; the Logfire SDK's own scrubbing does the same to the values it scrubs.
+ */
+function messageRedacted(attributes: Attributes, redacted: Attributes): Attributes {
+  if (redacted === attributes) return redacted;
+  const template = attributes[LOGFIRE_TEMPLATE];
+  const message = redacted[LOGFIRE_MESSAGE];
+  if (typeof template !== "string" || typeof message !== "string" || message !== attributes[LOGFIRE_MESSAGE]
+    || message === template) return redacted;
+  const fields = templateFields(template);
+  const changed = Object.keys(attributes).some((k) => fields.has(k) && (!(k in redacted) || redacted[k] !== attributes[k]));
+  return changed ? { ...redacted, [LOGFIRE_MESSAGE]: template } : redacted;
 }
 
 /** What a signal's gate counted since start (the layer's SignalCounts). */
