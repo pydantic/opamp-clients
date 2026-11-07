@@ -100,10 +100,6 @@ and date. Tests, CI and docs alone don't need a line.
 
 ### Fixed
 
-- Supervisor, Windows: a quiet install, upgrade or removal of the `.msi` no longer shuts down
-  other programs that have one of its files open (the Restart Manager did, with no word); such a
-  file is replaced at the next restart. `pydantic-opamp-uninstall.ps1` asks the same of a package
-  installed by an older release (#144).
 - Python, Node.js: setting the SDK up again in one process (Python's `configure_logfire()` or
   `manage()`, Node.js's `manage()`, called a second time) keeps the instance it joined the fleet
   as. It used to start over: another instance UID (a second slot of the default state directory)
@@ -157,6 +153,18 @@ and date. Tests, CI and docs alone don't need a line.
   (the Go example, the conformance server), aiohttp 3.14.5 and OpenTelemetry Python 1.45.1
   (Python), ip-address 10.7.4 (Node.js), jackson-databind 2.22.3 (Java tests). Every lockfile is
   now checked against OSV on every change and nightly (`scripts/deps_scan.py`).
+
+## Supervisor 0.10.4 (2026-11-07)
+
+`go/opampsupervisor/v0.10.4`: 0.10.3 and one Windows installer fix, cut from the 0.10.3 tag so it
+carries nothing else from main. Same Collector (otelcol-contrib v0.164.0) and core (0.14.0) as 0.10.0.
+
+### Fixed
+
+- Supervisor on Windows: a quiet install, upgrade or removal of the `.msi` no longer shuts down
+  other programs that have one of its files open (the Restart Manager did, with no word); such a
+  file is replaced at the next restart. `pydantic-opamp-uninstall.ps1` asks the same of a package
+  installed by an older release (#144).
 
 ## Supervisor 0.10.3 (2026-11-07)
 
