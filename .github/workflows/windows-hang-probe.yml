@@ -52,13 +52,18 @@ jobs:
           python -m pip install --quiet psutil==7.2.2
           $python = (Get-Command python).Source
           $script = "$PWD\go\opampsupervisor\packaging\windows\ci-probe.py"
-          # Start-Process joins ArgumentList with spaces and no quoting, so every value is quoted here.
-          $arguments = @("`"$script`"", '--repo', $env:GITHUB_REPOSITORY, '--sha', $env:GITHUB_SHA,
-            '--name', "`"Windows probe, $env:RUN`"", '--log', "`"$env:RUNNER_TEMP\install-test.log`"",
-            '--stop', "`"$env:RUNNER_TEMP\probe.stop`"", '--out', "`"$env:RUNNER_TEMP\probe.log`"")
-          Start-Process -WindowStyle Hidden -FilePath $python -ArgumentList ($arguments -join ' ') `
-            -RedirectStandardError "$env:RUNNER_TEMP\probe.err"
-          "started at $((Get-Date).ToUniversalTime().ToString('HH:mm:ss'))" | Out-File "$env:RUNNER_TEMP\install-test.log"
+          $temp = $env:RUNNER_TEMP
+          Set-Content -NoNewline -Path "$temp\probe.token" -Value $env:HEARTBEAT_TOKEN
+          # Created by WMI, not as a child of this step: the runner ends a step's processes with it.
+          $command = "cmd.exe /c `"`"$python`" `"$script`" --repo $env:GITHUB_REPOSITORY --sha $env:GITHUB_SHA " +
+            "--name `"Windows probe, $env:RUN`" --log `"$temp\install-test.log`" --stop `"$temp\probe.stop`" " +
+            "--out `"$temp\probe.log`" --token-file `"$temp\probe.token`" 2> `"$temp\probe.err`"`""
+          $r = Invoke-CimMethod -ClassName Win32_Process -MethodName Create -Arguments @{ CommandLine = $command }
+          "probe pid $($r.ProcessId), return $($r.ReturnValue)"
+          "started at $((Get-Date).ToUniversalTime().ToString('HH:mm:ss'))" | Out-File "$temp\install-test.log"
+          Start-Sleep -Seconds 15
+          Get-Content "$temp\probe.err" -ErrorAction SilentlyContinue
+          if (-not (Get-Process -Id $r.ProcessId -ErrorAction SilentlyContinue)) { throw 'the probe is not running' }
       - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: .opamp-core

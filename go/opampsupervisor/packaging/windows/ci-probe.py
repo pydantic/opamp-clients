@@ -11,7 +11,7 @@ one that can't open new connections, and shows the seconds before.
 
   python ci-probe.py --repo O/R --sha SHA --name NAME --log FILE --stop FILE [--dry-run]
 
-HEARTBEAT_TOKEN is the token that writes check runs.
+--token-file holds the token that writes check runs (HEARTBEAT_TOKEN otherwise).
 """
 
 from __future__ import annotations
@@ -266,9 +266,11 @@ def main():
     ap.add_argument('--out', help='also append every sample here')
     ap.add_argument('--minutes', type=float, default=40)
     ap.add_argument('--dry-run', action='store_true')
+    ap.add_argument('--token-file')
     a = ap.parse_args()
     boot = datetime.fromtimestamp(psutil.boot_time(), timezone.utc).isoformat()
-    rep = Reporter(a.repo, a.sha, a.name, os.environ.get('HEARTBEAT_TOKEN', ''), a.dry_run)
+    token = open(a.token_file).read().strip() if a.token_file else os.environ.get('HEARTBEAT_TOKEN', '')
+    rep = Reporter(a.repo, a.sha, a.name, token, a.dry_run)
     sampler = Sampler()
     ring: collections.deque[str] = collections.deque(maxlen=90)
     checks: collections.deque[str] = collections.deque(maxlen=40)
