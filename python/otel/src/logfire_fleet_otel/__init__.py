@@ -62,7 +62,7 @@ from opentelemetry.sdk.trace.sampling import (ALWAYS_ON, Decision, ParentBased, 
                                               TraceIdRatioBased)
 
 from . import app_settings
-from ._match import Bucket, Redactor, Scrubber, attribute_text, glob, level_keeps, rebucket, threshold
+from ._match import Bucket, Redactor, Scrubber, attribute_text, fork_safe, glob, level_keeps, rebucket, threshold
 from .app_settings import AppSettings
 
 __all__ = ["LOGFIRE_FLEET_CONTRACT", "Configurator", "Distro", "GatedMetricExporter", "LogfireFleet", "app_settings", "configure",
@@ -435,8 +435,12 @@ class Counts:
     FAILURE = "the exporter answered FAILURE (its own log says why)"
 
     def __init__(self) -> None:
-        self._lock = threading.Lock()
+        self._new_locks()
+        fork_safe(self)
         self._c = settings_pb2.SignalCounts()
+
+    def _new_locks(self) -> None:
+        self._lock = threading.Lock()
 
     def exported(self, items: int, result) -> None:
         """An export of `items` came back with `result`: failed when it is FAILURE."""
@@ -1226,7 +1230,16 @@ class Agent:
         """Before the SDK is built: name the instance, start the flow and put the settings it
         starts with in force (next-start ones through the instrumentation's own switch, which only
         opentelemetry-instrument reads: not `auto_instrumented`, they aren't carried out). `given`
-        is the server as the application gave it in code (Setup.from_env)."""
+        is the server as the application gave it in code (Setup.from_env).
+
+        Once on, it is on for the process: a second call (``configure_logfire()`` or ``manage()``
+        called again) keeps the instance, its state directory, its flow and the settings in force:
+        the server is set once per process. Starting over would take another slot of the default
+        state directory (another instance UID than the client's) and put the SDK's own settings
+        back in force under a client the server has already given its policy."""
+        if self.setup is not None:
+            _log.debug("OpAMP: set up again: the instance, its server and its settings stay as they are")
+            return
         self.setup = Setup.from_env(env, **given)
         if self.setup is None:
             return
@@ -1346,7 +1359,12 @@ class Agent:
     def start(self, resource: Resource, tracer_provider=None, meter_provider=None, logger_provider=None) -> None:
         """Once the SDK is built: join the fleet, on a thread of the client's own. The providers
         are the SDK's (the global ones where not given)."""
-        if self.setup is None or self.layer is None or self.uid is None or self._loop is not None:
+        if self.setup is None or self.layer is None or self.uid is None:
+            return
+        if self._loop is not None:
+            # Built again (configure_logfire() or manage() called again): the new providers'
+            # exporters get the gates under the same client.
+            self.rebuilt(tracer_provider, meter_provider, logger_provider)
             return
         # What was built is known now: the gates go in front of every exporter on its providers,
         # what can't be gated is reported (never refused), and the host is what this package can

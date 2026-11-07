@@ -757,6 +757,48 @@ def test_a_forked_worker_follows_the_live_settings_its_parent_is_given(server, t
     assert {m.instance_uid for m in server.got} == {agent.uid.bytes}
 
 
+def test_a_forked_worker_never_waits_on_a_lock_its_parent_held(tmp_path):
+    """A thread of the parent's that held a gate's or the sampler's lock as the parent forked (an
+    export, a capped sampling decision) isn't in the worker: the worker's locks are its own, and
+    the trace cap, the log cap, the counts and the application's settings go on working there.
+    They used to be the parent's, held for ever in the worker: its first capped span waited."""
+    if not hasattr(os, "fork"):
+        pytest.skip("no fork")
+    controls = Controls(clock=lambda: 0)
+    controls.apply(settings_pb2.Settings(sampling_traces_per_second=5, send_logs_per_second=5))
+    held = [controls.sampler._cap._lock, controls.logs_cap._lock, controls.traces._lock, controls.app._telling]
+    taken, release = threading.Event(), threading.Event()
+
+    def hold():
+        for lock in held:
+            lock.acquire()
+        taken.set()
+        release.wait()
+        for lock in reversed(held):
+            lock.release()
+
+    threading.Thread(target=hold, daemon=True).start()
+    taken.wait()
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", DeprecationWarning)  # forking with threads
+        pid = os.fork()
+    if pid == 0:
+        done = threading.Event()
+
+        def use():
+            controls.sampler._cap.take(1)
+            controls.logs_cap.admitted([object()], object())
+            controls.traces.exported(1, None)
+            controls.app.put({"flag": "on"})
+            done.set()
+
+        threading.Thread(target=use, daemon=True).start()
+        os._exit(0 if done.wait(5) else 1)
+    _, status = os.waitpid(pid, 0)
+    release.set()
+    assert os.waitstatus_to_exitcode(status) == 0
+
+
 def test_a_worker_keeps_its_settings_when_the_relay_is_gone(tmp_path):
     agent = Agent()
     relay = tmp_path / "live-settings.pb"
@@ -1437,6 +1479,21 @@ def test_by_default_an_instance_keeps_its_uid_across_restarts(tmp_path):
     elsewhere.prepare({**env, "OTEL_SERVICE_NAME": "billing"})
     assert elsewhere.uid != first.uid
     _released(elsewhere.setup)
+
+
+def test_set_up_again_in_one_process_is_the_same_instance(tmp_path):
+    # manage() before the SDK is set up, then again once it is (as its docs say), or
+    # configure_logfire() called twice: the second call keeps the first one's slot, UID and flow.
+    # It used to take the next slot of the default state directory, so another instance UID.
+    env = {"OTEL_OPAMP_ENDPOINT": "http://s/v1/opamp", "OTEL_SERVICE_NAME": "checkout", "XDG_STATE_HOME": str(tmp_path),
+           "HOME": str(tmp_path), "LOCALAPPDATA": str(tmp_path)}
+    agent = Agent()
+    agent.prepare(dict(env))
+    setup, uid, layer = agent.setup, agent.uid, agent.layer
+    agent.prepare(dict(env), endpoint="http://elsewhere/v1/opamp")
+    assert (agent.setup, agent.uid, agent.layer) == (setup, uid, layer)
+    assert sorted(p.name for p in setup.state_dir.parent.iterdir()) == [setup.state_dir.name]
+    _released(setup)
 
 
 def test_a_service_instance_id_that_isnt_a_uuid_keeps_the_default_state_directory(tmp_path):

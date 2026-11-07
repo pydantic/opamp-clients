@@ -394,18 +394,18 @@ def test_the_policy_sits_where_configure_logfire_puts_it_in_the_logfire_sdks_exp
     assert gate < retry < redact, names
 
 
-def test_logfire_configured_again_keeps_its_new_exporters_under_the_policy(tmp_path, servers):
-    """A second ``logfire.configure(fleet=...)`` builds new providers: they are governed under the
-    same client and instance, so the policy still holds on what reaches Logfire and on an exporter
-    only the second one has."""
-    if not _LOGFIRE_FLEET:
-        pytest.skip("the installed Logfire SDK has no fleet option")
+def test_logfire_configured_again_keeps_its_new_exporters_under_the_policy(tmp_path, servers, how):
+    """A second ``logfire.configure(fleet=...)`` (or ``configure_logfire()``) builds new providers:
+    they are governed under the same client and instance, so the policy still holds on what
+    reaches Logfire and on an exporter only the second one has. configure_logfire() used to set
+    the agent up again: another instance UID in the telemetry than the client's, and the SDK's own
+    settings back in force, the policy's redaction gone."""
     server, ingest = servers
-    again = _setup("fleet", server.endpoint, f'token="pylf_v1_us_test", advanced=logfire.AdvancedOptions('
+    again = _setup(how, server.endpoint, f'token="pylf_v1_us_test", advanced=logfire.AdvancedOptions('
                                              f'base_url={ingest.url!r}), service_name="rocket", console=False, '
                                              f'metrics=False, send_to_logfire=True, inspect_arguments=False, '
                                              f'additional_span_processors=[SimpleSpanProcessor(ConsoleSpanExporter())]')
-    run = _run(server, ingest, tmp_path, policy(attribute_redaction={"mask": ["user.email"]}), how="fleet",
+    run = _run(server, ingest, tmp_path, policy(attribute_redaction={"mask": ["user.email"]}), how=how,
                after="from opentelemetry.sdk.trace.export import ConsoleSpanExporter, SimpleSpanProcessor\n"
                      + again + "\n" + _AFTER)
     assert run.returncode == 0 and "Traceback" not in run.stderr, run.stderr

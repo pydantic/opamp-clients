@@ -117,6 +117,14 @@ and date. Tests, CI and docs alone don't need a line.
 
 ### Fixed
 
+- Python, Node.js: setting the SDK up again in one process (Python's `configure_logfire()` or
+  `manage()`, Node.js's `manage()`, called a second time) keeps the instance it joined the fleet
+  as. It used to start over: another instance UID (a second slot of the default state directory)
+  beside the client's, in Node.js a second client with the first never stopped, and the SDK's own
+  settings back in force, so a policy's redaction stopped applying until the server sent it again.
+- Python: a worker forked while a thread of its parent's held a lock of the gates, the sampler's
+  trace cap or the application settings no longer waits on it for ever; the worker's locks are
+  its own.
 - Node.js: the Logfire SDK's `configure({ fleet })` after its `shutdown()` joins Fleet again. The
   client stayed stopped, so the SDK looked managed with no client running (#135).
 - Supervisor: stopping the Collector no longer races a restart. When the Collector exited just

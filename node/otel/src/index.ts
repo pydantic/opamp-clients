@@ -1683,8 +1683,18 @@ export class Agent {
     return this.setup !== undefined;
   }
 
-  /** Before the SDK is built: name the instance, start the flow, put its settings in force. */
+  /**
+   * Before the SDK is built: name the instance, start the flow, put its settings in force. Once
+   * on, and until stopped, it is on for the process: a second call (manage() called again) keeps
+   * the instance, its state directory, its client and the settings in force. Starting over would
+   * take another slot of the default state directory (another instance UID), and leave the first
+   * client running, unstopped, as a second instance.
+   */
   prepare(env: NodeJS.ProcessEnv = process.env, options: Options = {}): void {
+    if (this.setup !== undefined && this.#stopping === undefined) {
+      diag.debug("OpAMP: set up again: the instance, its server and its settings stay as they are");
+      return;
+    }
     // A register after an earlier one's shutdown: that run's client stopped, this one's starts.
     this.#stopping = undefined;
     this.client = undefined;
@@ -1994,8 +2004,9 @@ export class Agent {
     const s = this.setup;
     const layer = this.layer;
     const uid = this.uid;
-    // Stopped first (a SIGTERM while the resource was being detected): don't start at all.
-    if (!s || !layer || !uid || this.#stopping) return;
+    // Stopped first (a SIGTERM while the resource was being detected): don't start at all. Started
+    // already (manage() called again): the client goes on; govern listed the exporters again.
+    if (!s || !layer || !uid || this.#stopping || this.client) return;
     const heartbeat = s.heartbeatMs;
     try {
       const availableComponents = this.components();

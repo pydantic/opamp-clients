@@ -38,6 +38,8 @@ import threading
 from collections.abc import Callable, Mapping
 from types import MappingProxyType
 
+from ._match import fork_safe
+
 __all__ = ["AppSettings", "get", "get_bool", "get_float", "get_int", "on_change", "snapshot"]
 
 _log = logging.getLogger("logfire_fleet_otel")
@@ -63,11 +65,15 @@ class AppSettings:
 
     def __init__(self) -> None:
         self._values: Mapping[str, str] = _EMPTY
+        self._new_locks()
+        fork_safe(self)
+        self._callbacks: list[Callback] = []
+
+    def _new_locks(self) -> None:
         #: Guards the callbacks list.
         self._lock = threading.Lock()
         #: Held while a change is put in force and told: changes are told one at a time, in order.
         self._telling = threading.RLock()
-        self._callbacks: list[Callback] = []
 
     def get(self, key: str, default: str | None = None) -> str | None:
         """The value of `key` in force, or `default` when there is none. Never raises."""
