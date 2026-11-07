@@ -295,9 +295,10 @@ The `.msi` installs the Supervisor, the collector and `pydantic-opamp-enroll.ps1
 runs as LocalSystem, logs to the Application event log, and stays stopped until enrolled. The
 enroll script sets the service so that a Supervisor that stops with an error (a start that failed)
 is started again after 5 seconds, then 5, then every 30, as systemd and launchd do on Linux and
-macOS. As an
-administrator (`/norestart` keeps a quiet install that finds a file in use from restarting
-Windows on the spot; msiexec exits 3010 to say a restart is due instead):
+macOS. The package never shuts down other programs that have one of its files open: such a file
+is replaced at the next restart. As an administrator (`/norestart` keeps a quiet install that finds
+a file in use from restarting Windows on the spot; msiexec exits 3010 to say a restart is due
+instead):
 
 ```powershell
 msiexec /i pydantic-opamp-supervisor-0.10.0-windows-amd64.msi /qn /norestart

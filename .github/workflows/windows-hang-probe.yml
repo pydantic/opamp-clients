@@ -9,7 +9,9 @@ name: Windows installer hang probe
 # getting through, the probe looks at the network locally, tries to bring it back, and failing that
 # restarts the machine to report after boot. Round 4: 3 of 8 dark, and none of them did any of that,
 # so the probe's own sampling (the Service Control Manager, process details) may have hung: it now
-# samples in a thread of its own and checks process start, the SCM and an fsync every 3 s. Remove before merging.
+# samples in a thread of its own and checks process start, the SCM and an fsync every 3 s. Round 5:
+# 3 of 8 dark, each within a second of msiexec's Restart Manager shutting down provjobd.exe; this
+# round runs with the fix (the package never shuts down other programs). Remove before merging.
 on:
   push:
     branches: [claude/project-thread-9rmm5t]
@@ -36,7 +38,7 @@ jobs:
       fail-fast: false
       matrix:
         kind: [test]
-        run: [1, 2, 3, 4, 5, 6, 7, 8]
+        run: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]
     defaults:
       run:
         shell: bash
