@@ -265,6 +265,7 @@ class AppSettingsExtensionTest {
     assertEquals(APPLIED, e.remoteConfig(config(every("app_settings", override("\"values\":{\"example.feature\":\"on\"}")))).getStatus());
     Kept.keepApplied(dir, every("app_settings", override("\"values\":{\"example.feature\":\"on\"}"))); // as the client does, before APPLIED goes out
 
+    ExtensionTest.ended(e);
     // The next start: in force at Load, before any config arrives, and told to whoever listened.
     App second = new App();
     Extension next = Extension.forTest(null, second.sink);

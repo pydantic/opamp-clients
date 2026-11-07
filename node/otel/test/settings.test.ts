@@ -31,7 +31,7 @@ import { SdkSettings, type Settings } from "@pydantic/logfire-fleet-client/sdk";
 
 import { keepApplied } from "./kept.js";
 import { config as policyConfig, decide, FILE, off, overridden, type Overrides, policy, reported } from "./policy.js";
-import { Agent, Controls, glob, hostFromEnv, MASK, Redaction, SEVERITY_OFF } from "../src/index.js";
+import { Agent, Controls, glob, hostFromEnv, MASK, Redaction, release, SEVERITY_OFF } from "../src/index.js";
 import { Scrubbing } from "../src/scrub.js";
 
 const LAYER = new SdkSettings();
@@ -918,6 +918,9 @@ class TestAgent extends Agent {
       clear: (t) => void ((t as { cleared: boolean }).cleared = true),
     };
     this.prepare({ OTEL_OPAMP_ENDPOINT: "http://server/v1/opamp", OTEL_OPAMP_STATE_DIR: dir ?? "none", ...env });
+    // Each agent is a start of its own process: its state directory's lock is let go at once, as
+    // that process ending would, so the next one is the restart that takes it back.
+    if (this.setup?.stateLock) release(this.setup.stateLock);
     // A client that keeps what it is handed: the effective config, and (below) health.
     this.client = {
       setEffectiveConfig: (e: never) => this.reported.push(overridden(e)),

@@ -427,27 +427,6 @@ internal sealed class SdkAgent
     }
 
     /// <summary>
-    /// One process per state directory. A child process the application starts inherits
-    /// OTEL_OPAMP_STATE_DIR; two processes under one UID, reading and writing one state, would be
-    /// one agent to the server that is neither. The lock is the operating system's, on a file in the
-    /// directory: held while the process runs, never inherited by a child, gone when the process
-    /// ends. A process that can't take it runs unmanaged, and says why.
-    /// </summary>
-    public static FileStream? Lock(string dir, AgentLog log)
-    {
-        try
-        {
-            return StateDirs.OpenLock(dir);
-        }
-        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
-        {
-            log.Warn($"the state directory {dir} can't be locked, another process has it (a child inherits " +
-                     $"OTEL_OPAMP_STATE_DIR) or it isn't writable: the SDK runs unmanaged. Give each process its own. {e.Message}");
-            return null;
-        }
-    }
-
-    /// <summary>
     /// Once the SDK is built: join the fleet, described by the SDK's resource, with
     /// <paramref name="health"/> (null: healthy) and the <paramref name="inventory"/> of what it
     /// built, reported as its available components (read again by <see cref="Recheck"/>). The client

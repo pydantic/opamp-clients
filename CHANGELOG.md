@@ -121,13 +121,22 @@ and date. Tests, CI and docs alone don't need a line.
   `manage()`, Node.js's `manage()`, called a second time) keeps the instance it joined the fleet
   as. It used to start over: another instance UID (a second slot of the default state directory)
   beside the client's, in Node.js a second client with the first never stopped, and the SDK's own
-  settings back in force, so a policy's redaction stopped applying until the server sent it again.
+  settings back in force, so a policy's redaction stopped applying until the server sent it again
+  (#138).
 - Python, Node.js: an argument of a Logfire SDK span that the policy drops, masks or scrubs is out
   of the span's message (`logfire.msg`) too, which is exported as its template. The message kept
-  the argument's value as the application gave it.
+  the argument's value as the application gave it (#138).
 - Python: a worker forked while a thread of its parent's held a lock of the gates, the sampler's
   trace cap or the application settings no longer waits on it for ever; the worker's locks are
-  its own.
+  its own (#138).
+- Python, Node.js, .NET, Java, Go: processes sharing a state directory named by
+  `OTEL_OPAMP_STATE_DIR` (uvicorn or gunicorn workers, a multiprocessing pool, a Node.js cluster or
+  PM2, a child process) each keep their own instance. They used to join the fleet as one instance
+  UID, each reading and writing the other's state; in .NET all but the first ran unmanaged. The
+  directory is now locked as the default one is: the first process keeps it and its UID, as
+  before, and the others take numbered folders in it (`2` to `16`). A named directory that can't be
+  made or locked is now said as a warning, and each start is then a new instance; in .NET the SDK
+  used to run unmanaged. Python also lets the lock go when the SDK is shut down (#138).
 - Node.js: the Logfire SDK's `configure({ fleet })` after its `shutdown()` joins Fleet again. The
   client stayed stopped, so the SDK looked managed with no client running (#135).
 - Supervisor: stopping the Collector no longer races a restart. When the Collector exited just

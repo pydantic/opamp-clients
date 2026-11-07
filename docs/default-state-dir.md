@@ -58,6 +58,21 @@ The program's name is the language's own:
 | Python | the script or module run (without `.py`), else `python` |
 | Java | the main class, or the jar run with `-jar` (without `.jar`), as the first word of the `sun.java.command` property; else `java` |
 
+## A directory named
+
+A directory named by `OTEL_OPAMP_STATE_DIR` (or in code) is locked the same way, so processes given
+the same one (the workers of `uvicorn --workers`, a multiprocessing pool, a Node.js cluster or PM2,
+a child process inheriting the variable) never join the fleet as one instance. Its slots are the
+directory itself, then its folders `2` to `16`:
+
+- The first process takes the directory itself: a single process keeps the directory, and the UID
+  already in it, exactly as before.
+- Another, running at once, takes the first numbered folder it can lock, and keeps an identity of
+  its own there; restarted, it takes back the lowest free one, as with the default directory.
+- All 16 taken: no state directory, each start a new instance, said at INFO.
+- One that can't be made or locked (not writable): no state directory, each start a new instance,
+  said as a warning (the default one's is said only at debug level).
+
 ## When it can't
 
 No base (no `HOME`), a base that can't be written, or all 16 slots taken: no state directory, and

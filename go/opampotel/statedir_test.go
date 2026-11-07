@@ -24,10 +24,20 @@ func TestMain(m *testing.M) {
 	for _, k := range []string{"XDG_STATE_HOME", "LOCALAPPDATA", "HOME"} {
 		os.Setenv(k, home)
 	}
+	root, err := os.MkdirTemp("", "state-named")
+	if err != nil {
+		panic(err)
+	}
+	checkoutDir, codeDir, envDir = filepath.Join(root, "checkout"), filepath.Join(root, "code"), filepath.Join(root, "env")
 	code := m.Run()
 	_ = os.RemoveAll(home)
+	_ = os.RemoveAll(root)
 	os.Exit(code)
 }
+
+// Named state directories the tests can make and lock (serverFromEnv does both, as a process
+// starting would), outside the default one's home.
+var checkoutDir, codeDir, envDir string
 
 // slots is how many processes of one program keep their own identity by default (the core's).
 const slots = 16
@@ -125,10 +135,12 @@ func TestTheDefaultStateDirectoryGivesWay(t *testing.T) {
 	if s := serverFromEnv(env(with(base, map[string]string{"OTEL_RESOURCE_ATTRIBUTES": chosen}))); s.stateDir != "" {
 		t.Fatal("a chosen service.instance.id: no default state directory")
 	}
-	// Named: that one, unlocked as before.
+	// Named: that one, locked as the default one is.
 	mine := filepath.Join(dir, "mine")
-	if s := serverFromEnv(env(with(base, map[string]string{"OTEL_OPAMP_STATE_DIR": mine}))); s.stateDir != mine || s.stateLock != nil {
+	if s := serverFromEnv(env(with(base, map[string]string{"OTEL_OPAMP_STATE_DIR": mine}))); s.stateDir != mine || s.stateLock == nil {
 		t.Fatalf("a named state directory: %+v", s)
+	} else {
+		released(s)
 	}
 	// Nowhere to keep it: none, and no error.
 	if s := serverFromEnv(env(map[string]string{"OTEL_OPAMP_ENDPOINT": "http://s"})); s.stateDir != "" {
@@ -155,6 +167,75 @@ func TestTheDefaultStateDirectoryGivesWay(t *testing.T) {
 	}
 	for _, s := range taken {
 		released(s)
+	}
+}
+
+// Processes sharing a named state directory (started with the same OTEL_OPAMP_STATE_DIR): the
+// first keeps the directory and the UID already in it; the others take numbered folders in it, each
+// its own UID, taken back at their next start. They used to join the fleet as one instance.
+func TestProcessesSharingANamedStateDirectoryEachKeepTheirOwnInstance(t *testing.T) {
+	named := filepath.Join(t.TempDir(), "mine")
+	vars := map[string]string{"OTEL_OPAMP_ENDPOINT": "http://s/v1/opamp", "OTEL_SERVICE_NAME": "checkout",
+		"OTEL_OPAMP_STATE_DIR": named}
+	start := func() *agent {
+		t.Helper()
+		a, err := newAgent(context.Background(), serverFromEnv(env(vars)), NewControls(), "")
+		if err != nil {
+			t.Fatal(err)
+		}
+		t.Cleanup(func() { _ = a.layer.Close(context.Background()) })
+		return a
+	}
+	before := start()
+	if before.server.stateDir != named {
+		t.Fatalf("the first process keeps the directory: %q", before.server.stateDir)
+	}
+	released(before.server)
+	running := []*agent{start(), start(), start()}
+	for i, want := range []string{named, filepath.Join(named, "2"), filepath.Join(named, "3")} {
+		if running[i].server.stateDir != want {
+			t.Fatalf("process %d: %q, want %q", i, running[i].server.stateDir, want)
+		}
+	}
+	if running[0].uid != before.uid || running[1].uid == running[0].uid || running[2].uid == running[0].uid ||
+		running[1].uid == running[2].uid {
+		t.Fatal("processes sharing a named directory share an identity, or the first lost its own")
+	}
+	released(running[1].server)
+	again := start()
+	if again.server.stateDir != filepath.Join(named, "2") || again.uid != running[1].uid {
+		t.Fatal("a restarted process takes back its folder, and its UID")
+	}
+	released(running[0].server)
+	released(running[2].server)
+	released(again.server)
+	// Every slot taken: a new instance each start, said once at INFO.
+	var taken []*server
+	for range slots {
+		taken = append(taken, serverFromEnv(env(vars)))
+	}
+	said := records(t)
+	if s := serverFromEnv(env(vars)); s.stateDir != "" {
+		t.Fatal("every slot taken: no state directory")
+	}
+	want := "INFO opamp: 16 processes already keep their identity in " + named + ": this one is a new instance each start"
+	if len(*said) != 1 || (*said)[0] != want {
+		t.Fatalf("said %q, want %q", *said, want)
+	}
+	for _, s := range taken {
+		released(s)
+	}
+	// One that can't be used: a warning (the default one's only at debug), a new instance each start.
+	file := filepath.Join(t.TempDir(), "file")
+	if err := os.WriteFile(file, nil, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	*said = nil
+	if s := serverFromEnv(env(with(vars, map[string]string{"OTEL_OPAMP_STATE_DIR": file}))); s.stateDir != "" {
+		t.Fatal("a named directory that can't be used: no state directory")
+	}
+	if len(*said) != 1 || (*said)[0] != "WARN opamp: the state directory "+file+" can't be used: each start is a new instance" {
+		t.Fatalf("said %q", *said)
 	}
 }
 

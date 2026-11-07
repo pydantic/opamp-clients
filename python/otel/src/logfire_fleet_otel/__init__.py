@@ -163,18 +163,35 @@ def _lock(fd: int) -> bool:
         return False
 
 
-def slot(slots, all_taken: str) -> tuple[Path, int] | None:
-    """The first of the default state directory's slots (docs/default-state-dir.md, as the core's
-    Setup names them) this process can make and lock, and its lock's descriptor, held until the
-    process ends; None where there's none to be had (not writable, every slot taken: all_taken is
-    the line to say then): each start is then a new instance. Never an error."""
+#: How many processes running at once keep their own identity in one state directory: the default
+#: one's slots, and a named one's (named_slots).
+SLOTS = 16
+
+
+def named_slots(directory: str) -> list[str]:
+    """A named state directory's slots (docs/default-state-dir.md): itself, then its folders 2 to
+    16. The first process keeps the directory and its UID, as before slots; one sharing it (a
+    spawned worker inherits OTEL_OPAMP_STATE_DIR) takes a folder of its own instead of its UID."""
+    return [directory] + [os.path.join(directory, str(n)) for n in range(2, SLOTS + 1)]
+
+
+def slot(slots, all_taken: str, named: str | None = None) -> tuple[Path, int] | None:
+    """The first of a state directory's slots (the default one's as the core's Setup names them,
+    or the one ``named``'s) this process can make and lock, and its lock's descriptor, held until
+    the process ends; None where there's none to be had (not writable, every slot taken: all_taken
+    is the line to say then): each start is then a new instance. Never an error; a directory named
+    that can't be used is said at WARNING, the default one's at DEBUG."""
     for name in slots:
         d = Path(name)
         try:
             d.mkdir(mode=0o700, parents=True, exist_ok=True)
             fd = os.open(d / setup.LOCK_FILE, os.O_RDWR | os.O_CREAT, 0o600)
         except OSError as e:
-            _log.debug("OpAMP: no state directory of its own (%s): each start is a new instance", e)
+            if named is not None:
+                _log.warning("OpAMP: the state directory %s can't be used (%s): each start is a new instance",
+                             named, e)
+            else:
+                _log.debug("OpAMP: no state directory of its own (%s): each start is a new instance", e)
             return None
         if _lock(fd):
             return d, fd
@@ -193,7 +210,7 @@ class Setup:
     headers: dict[str, str] = field(default_factory=dict)
     state_dir: Path | None = None
     heartbeat_ms: int = 0
-    #: The lock on the default state directory, held while the process runs.
+    #: The lock on the state directory, held while the process runs.
     state_lock: int | None = None
     #: The endpoint as it is safe to log.
     shown: str = ""
@@ -281,11 +298,14 @@ class Setup:
         out = Setup(started.endpoint, {h.name: h.value for h in started.headers},
                     heartbeat_ms=started.heartbeat_interval_ms, shown=started.shown_endpoint, hints=started.hints)
         if started.state_dir:
-            out.state_dir = Path(started.state_dir)
+            # Locked as the default one is, so processes sharing it never join as one instance.
+            claimed = slot(named_slots(started.state_dir),
+                           f"{SLOTS} processes already keep their identity in {started.state_dir}: "
+                           "this one is a new instance each start", named=started.state_dir)
         else:
             claimed = slot(started.default_slots, started.all_slots_taken)
-            if claimed is not None:
-                out.state_dir, out.state_lock = claimed
+        if claimed is not None:
+            out.state_dir, out.state_lock = claimed
         return out
 
 
@@ -1576,6 +1596,11 @@ class Agent:
         if self._relay is not None and self._relay_owner == os.getpid():
             shutil.rmtree(self._relay.parent, ignore_errors=True)
             self._relay = None
+        if self.setup is not None and self.setup.state_lock is not None:
+            # Done with the state directory: the next process to start takes it back, as Go and
+            # Node.js let it go. A forked process closes only its copy: its parent keeps the lock.
+            os.close(self.setup.state_lock)
+            self.setup.state_lock = None
 
     def _timer(self) -> None:
         """The timer's thread: wait for the flow's next wake, or a step that moves it."""

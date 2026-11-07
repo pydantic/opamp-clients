@@ -17,10 +17,11 @@ func TestServerFromEnv(t *testing.T) {
 	s := serverFromEnv(env(map[string]string{
 		"OTEL_OPAMP_ENDPOINT":           " https://opamp.example.com/v1/opamp ",
 		"OTEL_OPAMP_HEADERS":            "Authorization=Bearer%20k1, X-Tenant = acme ,broken",
-		"OTEL_OPAMP_STATE_DIR":          "/var/lib/checkout",
+		"OTEL_OPAMP_STATE_DIR":          checkoutDir,
 		"OTEL_OPAMP_HEARTBEAT_INTERVAL": "2m",
 	}))
-	if s.endpoint != "https://opamp.example.com/v1/opamp" || s.stateDir != "/var/lib/checkout" ||
+	defer released(s)
+	if s.endpoint != "https://opamp.example.com/v1/opamp" || s.stateDir != checkoutDir ||
 		s.heartbeat != 2*time.Minute || s.header.Get("Authorization") != "Bearer k1" || s.header.Get("X-Tenant") != "acme" ||
 		len(s.header) != 2 {
 		t.Fatalf("%+v", s)
@@ -73,9 +74,9 @@ func TestEachOptionWinsOverItsVariable(t *testing.T) {
 		{"headers", "OTEL_OPAMP_HEADERS", "Authorization=Bearer%20env,X-Env=1",
 			WithHeaders(map[string]string{"authorization": "Bearer code", "X-Tenant": "a%20b"}), WithHeaders(map[string]string{}),
 			"", "Authorization=Bearer env;X-Env=1", "Authorization=Bearer code;X-Tenant=a%20b"},
-		{"state dir", "OTEL_OPAMP_STATE_DIR", "/var/lib/env",
-			WithStateDir("/var/lib/code"), WithStateDir(" "),
-			"default", "/var/lib/env", "/var/lib/code"},
+		{"state dir", "OTEL_OPAMP_STATE_DIR", envDir,
+			WithStateDir(codeDir), WithStateDir(" "),
+			"default", envDir, codeDir},
 		{"heartbeat", "OTEL_OPAMP_HEARTBEAT_INTERVAL", "2m",
 			WithHeartbeatInterval(5 * time.Second), WithHeartbeatInterval(0),
 			"0s", "2m0s", "5s"},
@@ -130,25 +131,29 @@ func TestOptionsTogether(t *testing.T) {
 	vars := env(map[string]string{
 		"OTEL_OPAMP_ENDPOINT":           "https://env.example.com/v1/opamp",
 		"OTEL_OPAMP_HEADERS":            "Authorization=Bearer%20env,X-Env=1",
-		"OTEL_OPAMP_STATE_DIR":          "/var/lib/env",
+		"OTEL_OPAMP_STATE_DIR":          envDir,
 		"OTEL_OPAMP_HEARTBEAT_INTERVAL": "2m",
 	})
 	s := serverFromEnv(vars, WithEndpoint("wss://code.example.com/v1/opamp"),
-		WithHeaders(map[string]string{"authorization": "Bearer code"}), WithStateDir("/var/lib/code"),
+		WithHeaders(map[string]string{"authorization": "Bearer code"}), WithStateDir(codeDir),
 		WithHeartbeatInterval(5*time.Second))
-	if s.endpoint != "wss://code.example.com/v1/opamp" || s.stateDir != "/var/lib/code" || s.heartbeat != 5*time.Second ||
+	released(s)
+	if s.endpoint != "wss://code.example.com/v1/opamp" || s.stateDir != codeDir || s.heartbeat != 5*time.Second ||
 		s.header.Get("Authorization") != "Bearer code" || len(s.header) != 1 {
 		t.Fatalf("code wins, headers replaced: %+v", s)
 	}
 	if s := serverFromEnv(vars, WithHeartbeatInterval(time.Second)); s.endpoint != "https://env.example.com/v1/opamp" ||
-		s.stateDir != "/var/lib/env" || s.heartbeat != time.Second || s.header.Get("X-Env") != "1" {
+		s.stateDir != envDir || s.heartbeat != time.Second || s.header.Get("X-Env") != "1" {
 		t.Fatalf("the rest from the variables: %+v", s)
+	} else {
+		released(s)
 	}
 	s = serverFromEnv(vars, WithEndpoint("https://first.example.com"), WithEndpoint("https://second.example.com"), WithEndpoint(""),
 		WithHeartbeatInterval(time.Second), WithHeartbeatInterval(3*time.Second), WithHeartbeatInterval(0),
-		WithStateDir("/a"), WithStateDir("/b"), WithStateDir(""),
+		WithStateDir(codeDir), WithStateDir(envDir), WithStateDir(""),
 		WithHeaders(map[string]string{"X-A": "1"}), WithHeaders(map[string]string{"X-B": "2"}), WithHeaders(nil))
-	if s.endpoint != "https://second.example.com" || s.heartbeat != 3*time.Second || s.stateDir != "/b" ||
+	defer released(s)
+	if s.endpoint != "https://second.example.com" || s.heartbeat != 3*time.Second || s.stateDir != envDir ||
 		s.header.Get("X-B") != "2" || len(s.header) != 1 {
 		t.Fatalf("the last given counts: %+v", s)
 	}
@@ -164,17 +169,17 @@ func TestTheStateDirectoryInCodeOrNone(t *testing.T) {
 	}{
 		{"none in code", nil, []Option{WithStateDir("none")}, ""},
 		{"NONE in code, any case", nil, []Option{WithStateDir(" NONE ")}, ""},
-		{"none in code over a directory in the variable", map[string]string{"OTEL_OPAMP_STATE_DIR": "/var/lib/env"},
+		{"none in code over a directory in the variable", map[string]string{"OTEL_OPAMP_STATE_DIR": envDir},
 			[]Option{WithStateDir("none")}, ""},
 		{"a directory in code over none in the variable", map[string]string{"OTEL_OPAMP_STATE_DIR": "none"},
-			[]Option{WithStateDir("/var/lib/code")}, "/var/lib/code"},
+			[]Option{WithStateDir(codeDir)}, codeDir},
 		{"none in the variable", map[string]string{"OTEL_OPAMP_STATE_DIR": "None"}, nil, ""},
 		{"neither", nil, nil, "default"},
 		{"neither, but a service.instance.id the application chose", map[string]string{"OTEL_RESOURCE_ATTRIBUTES": chose}, nil, ""},
 		{"a service.instance.id the application chose, and a directory in code", map[string]string{"OTEL_RESOURCE_ATTRIBUTES": chose},
-			[]Option{WithStateDir("/var/lib/code")}, "/var/lib/code"},
+			[]Option{WithStateDir(codeDir)}, codeDir},
 		{"the endpoint and the directory in code", map[string]string{"OTEL_OPAMP_ENDPOINT": ""},
-			[]Option{WithEndpoint("https://code.example.com"), WithStateDir("/var/lib/code")}, "/var/lib/code"},
+			[]Option{WithEndpoint("https://code.example.com"), WithStateDir(codeDir)}, codeDir},
 	} {
 		t.Run(c.name, func(t *testing.T) {
 			home := t.TempDir()
@@ -187,8 +192,8 @@ func TestTheStateDirectoryInCodeOrNone(t *testing.T) {
 			if got := shown(s, "state dir", home); got != c.want {
 				t.Fatalf("state dir %q, want %q", got, c.want)
 			}
-			if c.want != "default" && s.stateLock != nil {
-				t.Fatal("no default directory, so no lock held")
+			if (c.want == "") != (s.stateLock == nil) {
+				t.Fatal("a lock held on the state directory, whichever it is, and none without one")
 			}
 		})
 	}

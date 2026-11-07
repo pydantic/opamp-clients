@@ -324,13 +324,26 @@ export function release(path: string): void {
   }
 }
 
+/** How many processes running at once keep their own identity in one state directory. */
+export const SLOTS = 16;
+
 /**
- * The first of the default state directory's slots (docs/default-state-dir.md, as the core names
- * them) this process can make and lock: the directory and its lock file, or undefined where
- * there's none to be had (not writable, every slot taken: `allTaken` is the line to say then):
- * then each start is a new instance. Never throws.
+ * A named state directory's slots (docs/default-state-dir.md): itself, then its folders 2 to 16.
+ * The first process keeps the directory and its UID, as before slots; one sharing it (a cluster
+ * worker inherits OTEL_OPAMP_STATE_DIR) takes a folder of its own instead of its UID.
  */
-function slot(slots: readonly string[], allTaken: string): { dir: string; lock: string } | undefined {
+export function namedSlots(dir: string): string[] {
+  return [dir, ...Array.from({ length: SLOTS - 1 }, (_, i) => join(dir, String(i + 2)))];
+}
+
+/**
+ * The first of a state directory's slots (the default one's as the core names them, or the one
+ * `named`'s) this process can make and lock: the directory and its lock file, or undefined where
+ * there's none to be had (not writable, every slot taken: `allTaken` is the line to say then):
+ * then each start is a new instance. Never throws; a directory named that can't be used is said
+ * as a warning, the default one's at debug.
+ */
+function slot(slots: readonly string[], allTaken: string, named?: string): { dir: string; lock: string } | undefined {
   if (slots.length === 0) return undefined;
   try {
     for (const dir of slots) {
@@ -339,7 +352,12 @@ function slot(slots: readonly string[], allTaken: string): { dir: string; lock: 
       if (lock(path)) return { dir, lock: path };
     }
   } catch (e) {
-    diag.debug(`OpAMP: no state directory of its own (${String(e)}): each start is a new instance`);
+    // A directory named that can't be used is the user's to hear of; the default one's isn't.
+    if (named !== undefined) {
+      say.warn(`OpAMP: the state directory ${named} can't be used (${String(e)}): each start is a new instance`);
+    } else {
+      diag.debug(`OpAMP: no state directory of its own (${String(e)}): each start is a new instance`);
+    }
     return undefined;
   }
   diag.info(`OpAMP: ${allTaken}`);
@@ -352,7 +370,7 @@ export interface Setup {
   headers: Record<string, string>;
   stateDir?: string;
   heartbeatMs: number;
-  /** The lock file on the default state directory, held while the process runs. */
+  /** The lock file on the state directory, held while the process runs. */
   stateLock?: string;
   /** The endpoint as it is safe to log, and what to check when the server can't be reached
    * (naming what gave the endpoint and the headers): the core's. */
@@ -505,14 +523,14 @@ export function setupFromEnv(env: NodeJS.ProcessEnv = process.env, code: Options
     shown: s.shownEndpoint,
     ...(s.hints ? { hints: s.hints } : {}),
   };
-  if (s.stateDir) {
-    setup.stateDir = s.stateDir;
-  } else {
-    const claimed = slot(s.defaultSlots, s.allSlotsTaken);
-    if (claimed) {
-      setup.stateDir = claimed.dir;
-      setup.stateLock = claimed.lock;
-    }
+  // A directory named is locked as the default one is, so processes sharing it never join as one instance.
+  const claimed = s.stateDir
+    ? slot(namedSlots(s.stateDir), `${SLOTS} processes already keep their identity in ${s.stateDir}: this one is a ` +
+      "new instance each start", s.stateDir)
+    : slot(s.defaultSlots, s.allSlotsTaken);
+  if (claimed) {
+    setup.stateDir = claimed.dir;
+    setup.stateLock = claimed.lock;
   }
   return setup;
 }

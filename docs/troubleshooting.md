@@ -90,9 +90,10 @@ Each instance is one process, named by its instance UID, which the state directo
 - **A new instance at every restart:** the state directory doesn't survive restarts (a
   container's own filesystem, an `emptyDir`), or is `none`. Mount a volume for it. Until then,
   disconnected instances pile up; delete them on the server.
-- **Two processes as one instance:** they share a state directory. Give each process its own.
-  Without `OTEL_OPAMP_STATE_DIR`, each integration already gives each running copy of a program
-  its own slot ([default-state-dir.md](default-state-dir.md)).
+- **Two processes as one instance:** they share a state directory. The Python, Node.js, .NET,
+  Java and Go integrations give each running copy of a program its own slot, in the default state
+  directory or in one named by `OTEL_OPAMP_STATE_DIR` ([default-state-dir.md](default-state-dir.md));
+  an older release of them shares a named one. Upgrade, or give each process its own.
 - **Hosts cloned from one image:** the image holds a Supervisor's state directory. Keep it out of
   images and enroll each host on first boot.
 

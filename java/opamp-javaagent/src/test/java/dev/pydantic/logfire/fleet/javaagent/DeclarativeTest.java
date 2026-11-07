@@ -163,10 +163,11 @@ class DeclarativeTest {
   }
 
   @Test
-  void theUidGoesIntoTheResourceAndIsKeptAcrossStarts(@TempDir Path dir) {
+  void theUidGoesIntoTheResourceAndIsKeptAcrossStarts(@TempDir Path dir) throws Exception {
     Extension first = Extension.forTest(null);
     String uid = attribute(Declarative.setUp(first, config(dir), model(FILE)), "service.instance.id");
     assertEquals(7, UUID.fromString(uid).version());
+    ExtensionTest.ended(first);
     Extension second = Extension.forTest(null);
     OpenTelemetryConfigurationModel m = Declarative.setUp(second, config(dir), model(FILE));
     assertEquals(uid, attribute(m, "service.instance.id"));
