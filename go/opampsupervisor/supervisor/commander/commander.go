@@ -6,7 +6,8 @@
 // kills a one-shot Collector that ignores the shutdown signal, and returns all of its output;
 // SetExecutable switches the executable, for an installed update; Stop's kill deadline signals the
 // process it was stopping, never one a later Start runs. The Collector doesn't inherit
-// the Supervisor's OTEL_EXPORTER_OTLP_* variables (collector_env.go).
+// the Supervisor's OTEL_EXPORTER_OTLP_* variables (collector_env.go). The Collector's log file is
+// held to a size, and the logs of the two runs before are kept (agent_log.go).
 
 package commander
 
@@ -183,6 +184,10 @@ func (c *Commander) startNormal() error {
 	// end-of-file, and external copytruncate-style log rotation (logrotate et
 	// al.) works correctly instead of the file's size reverting on the next
 	// write.
+	// Changed here: the last run's log is kept beside the new one (agent_log.go).
+	if err := keepPreviousAgentLog(c.logFilePath); err != nil {
+		c.logger.Warn("Could not keep the Collector's last log", zap.String("path", c.logFilePath), zap.Error(err))
+	}
 	stdoutFile, err := openAgentLogFile(c.logFilePath)
 	if err != nil {
 		return fmt.Errorf("cannot create %s: %w", c.logFilePath, err)
@@ -209,6 +214,8 @@ func (c *Commander) startNormal() error {
 		defer stdoutFile.Close()
 		c.watch(watchDone)
 	}()
+	// Changed here: the log is held to a size while the Collector runs (agent_log.go).
+	go capAgentLog(c.logger, c.logFilePath, agentLogMaxBytes, agentLogCheckInterval, watchDone)
 
 	return nil
 }

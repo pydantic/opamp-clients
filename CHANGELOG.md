@@ -100,6 +100,15 @@ and date. Tests, CI and docs alone don't need a line.
 
 ### Fixed
 
+- Supervisor: the Collector's log file, `agent.log` in the storage directory, is held to 10 MiB
+  while the Collector runs (past that it is copied to `agent.log.1` and emptied), and a Collector
+  start keeps the logs of the two runs before it as `agent.log.1` and `agent.log.2`. It grew
+  without limit, and each start emptied it, so the log of a Collector that failed was gone once
+  the next one started.
+- Supervisor on Windows: the service logs at its config's `telemetry::logs::level` (info unless
+  set). It wrote every debug line to the Application event log as an Information event, one each
+  heartbeat, which a config that collects that log then sent as telemetry. Its lines there no
+  longer begin with a time (the event has one).
 - Python, Node.js: setting the SDK up again in one process (Python's `configure_logfire()` or
   `manage()`, Node.js's `manage()`, called a second time) keeps the instance it joined the fleet
   as. It used to start over: another instance UID (a second slot of the default state directory)
