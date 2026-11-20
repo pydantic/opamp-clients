@@ -170,7 +170,9 @@ func TestMacEnrollRefuses(t *testing.T) {
 	}
 }
 
-// With --restricted, --host-logs lets the server read this Mac's unified logs, but not an archive from any path.
+// With --restricted, --host-logs lets the server read this Mac's unified logs, but not an archive from any
+// path, and the files under /var/log, with file_storage keeping its place in the Supervisor's own
+// directory, and nowhere else.
 func TestMacEnrollHostLogs(t *testing.T) {
 	enroll := func(args ...string) config.RemoteConfigPolicy {
 		root, tools := t.TempDir(), t.TempDir()
@@ -191,9 +193,35 @@ func TestMacEnrollHostLogs(t *testing.T) {
 		require.NoError(t, err)
 		return loaded.Agent.RemoteConfigPolicy
 	}
-	p := enroll("--host-logs")
+	p := enroll("--host-logs", "--log-path", "/srv/app/logs")
 	assertHostLogs(t, p, enroll(), hostLogsConfig(t, "macos"), `configures receiver "macos_unified_logging"`)
 	require.ErrorContains(t, p.Check("", []byte(`receivers: {macos_unified_logging: {archive_path: /tmp/x.logarchive}}`)), "sets archive_path")
+
+	// The log files: /var/log is a link to /private/var/log on macOS, and a config may name either.
+	assert.Equal(t, []string{"/srv/app/logs", "/var/log", "/private/var/log"}, p.AllowedLogPaths)
+	// The test's stand-in for /opt/pydantic-opamp/var, as enroll makes it.
+	require.Len(t, p.AllowedStorageDirectories, 1)
+	storage := p.AllowedStorageDirectories[0]
+	assert.Equal(t, "collector", filepath.Base(storage))
+	fileLogs := []byte(strings.NewReplacer("STORAGE", storage).Replace(`
+extensions:
+  file_storage/host_logs: {directory: STORAGE, create_directory: true}
+receivers:
+  file_log/system:
+    include: [/var/log/*.log, /private/var/log/install.log]
+    start_at: end
+    storage: file_storage/host_logs
+exporters:
+  otlp_http/logfire: {endpoint: https://logfire-us.pydantic.dev}
+service:
+  extensions: [file_storage/host_logs]
+  pipelines:
+    logs: {receivers: [file_log/system], exporters: [otlp_http/logfire]}
+`))
+	require.NoError(t, p.Check("", fileLogs))
+	require.ErrorContains(t, enroll().Check("", fileLogs), `configures extension "file_storage/host_logs"`)
+	require.ErrorContains(t, p.Check("", []byte(`extensions: {file_storage: {directory: /etc/cron.d}}`)), "allowed_storage_directories doesn't allow")
+	require.ErrorContains(t, p.Check("", []byte(`receivers: {filelog: {include: [/etc/master.passwd]}}`)), "allowed_log_paths doesn't allow")
 }
 
 // --refresh, which the .pkg's postinstall runs on an upgrade, writes the config again with the

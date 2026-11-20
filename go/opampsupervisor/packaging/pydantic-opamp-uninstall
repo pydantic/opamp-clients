@@ -163,6 +163,7 @@ if [ -n "$purge" ]; then
     echo "Removed the Collector service, the $package package and its data."
 else
     echo "Removed the Collector service and the $package package. Kept $config, $state and the state key for a reinstall."
-    echo "To delete them too, run: $recovery --purge"
+    # As root: the kept helper, like the kept data, is root's alone.
+    echo "To delete them too, run: sudo $recovery --purge"
 fi
 echo "The OpAMP server still lists this host until its credentials are revoked there."

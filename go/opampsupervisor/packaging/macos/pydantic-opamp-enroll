@@ -34,7 +34,9 @@ usage: pydantic-opamp-enroll --endpoint URL [--token-file PATH] [--ca-file PATH]
                            scheme://host[:port]; repeat it for more (default: the --endpoint's host)
   --log-path PATH          with --restricted, a file, or a directory, the server's configs may read
                            logs from; repeat it for more (default: none)
-  --host-logs              with --restricted, let the server's configs read this Mac's unified logs
+  --host-logs              with --restricted, let the server's configs read this Mac's system logs:
+                           its unified logs, and the files under /var/log, with read positions
+                           kept in /opt/pydantic-opamp/var/collector
   --accept-packages        install the collector the server offers, if this repository's release
                            workflow signed it (default: only the installed collector runs)
   --no-start               write the config and the token, but don't start the Supervisor
@@ -234,10 +236,18 @@ done
 IFS=$old_ifs
 set +f
 [ -n "$root" ] || [ "$(id -u)" = 0 ] || fail "run it as root"
-# --host-logs: the unified log receiver, which reads this Mac's own logs (never an archive).
+# --host-logs: the unified log receiver, which reads this Mac's own logs (never an archive), the
+# system log files (/var/log is a link to /private/var/log, and a config may name either), and the
+# file_storage extension that keeps where a receiver got to, in a directory of the Supervisor's own.
 receivers="[otlp, host_metrics, hostmetrics, file_log, filelog, nop]"
+extensions="[health_check]"
+storage_directories=
 if [ -n "$host_logs" ]; then
 	receivers="[otlp, host_metrics, hostmetrics, file_log, filelog, nop, macos_unified_logging]"
+	log_paths=$(append "$(append "$log_paths" /var/log)" /private/var/log)
+	extensions="[health_check, file_storage]"
+	storage_directories="$nl    # Where its file_storage extensions may keep files: these directories, and what is under them.
+    allowed_storage_directories: [\"/opt/pydantic-opamp/var/collector\"]"
 fi
 
 telemetry_token=
@@ -331,13 +341,13 @@ if [ -n "$restricted" ]; then
       receivers: $receivers
       processors: [batch, memory_limiter, resource, resource_detection, resourcedetection]
       exporters: [otlp_grpc, otlp, otlp_http, otlphttp, debug, nop]
-      extensions: [health_check]
+      extensions: $extensions
     # No arbitrary \${...}: only locally bound credential environment names are permitted.
     allowed_providers: []
     # Where its exporters, and the collector's own telemetry, may send.
     allowed_exporter_endpoints: $(yaml_list "$exporter_endpoints")
     # What its filelog receivers may read: these files, and what is under these directories.
-    allowed_log_paths: $(yaml_list "$log_paths")"
+    allowed_log_paths: $(yaml_list "$log_paths")$storage_directories"
 fi
 # --refresh keeps a config edited since it was written.
 edited=

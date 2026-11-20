@@ -421,8 +421,8 @@ collector keeps the config it had.
 | `allowed_components` | receivers `otlp`, `host_metrics`, `file_log`, `nop`; processors `batch`, `memory_limiter`, `resource`, `resource_detection`; exporters `otlp_grpc`, `otlp_http`, `debug`, `nop`; extension `health_check` (and the older names `hostmetrics`, `filelog`, `resourcedetection`, `otlp` and `otlphttp`) | an edit to the config |
 | `allowed_providers` | none, except environment names explicitly bound by `agent.connection_env`; no other `${env:...}` or `${file:...}` | an edit to the config (not recommended) |
 | `allowed_exporter_endpoints` | the OpAMP endpoint's host and port, over https (http with `--plaintext`) | `--exporter-endpoint` (`-ExporterEndpoint` on Windows) |
-| `allowed_log_paths` | none | `--log-path` (`-LogPath` on Windows); `--host-logs` adds `/var/log` on Linux |
-| `allowed_storage_directories` | none | `--host-logs` (`-HostLogs` on Windows) adds the Supervisor's `collector` directory: `/var/lib/pydantic-opamp/collector` on Linux, `ProgramData\pydantic-opamp\var\collector` on Windows |
+| `allowed_log_paths` | none | `--log-path` (`-LogPath` on Windows); `--host-logs` adds `/var/log` on Linux, and `/var/log` and `/private/var/log` (one directory) on macOS |
+| `allowed_storage_directories` | none | `--host-logs` (`-HostLogs` on Windows) adds the Supervisor's `collector` directory: `/var/lib/pydantic-opamp/collector` on Linux, `/opt/pydantic-opamp/var/collector` on macOS, `ProgramData\pydantic-opamp\var\collector` on Windows |
 
 What each rule checks in a remote config:
 - **Components.** Each receiver, processor, exporter, connector and extension must have a type
@@ -431,7 +431,7 @@ What each rule checks in a remote config:
   are not in the default list. They read the host's system logs and write files, so a server's
   config can turn them on only where the host's operator allowed it: `--host-logs` adds them
   where the system has them (`windows_event_log` and `file_storage` on Windows,
-  `macos_unified_logging` on macOS, `file_storage` on Linux).
+  `macos_unified_logging` and `file_storage` on macOS, `file_storage` on Linux).
 - **System logs.** A Windows event log receiver's `remote` (other hosts' logs, with their
   credentials) and a macOS unified logging receiver's `archive_path` (an archive read from any
   path) are refused: the local config can set them, the server can't.

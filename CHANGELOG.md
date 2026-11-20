@@ -109,6 +109,15 @@ and date. Tests, CI and docs alone don't need a line.
   set). It wrote every debug line to the Application event log as an Information event, one each
   heartbeat, which a config that collects that log then sent as telemetry. Its lines there no
   longer begin with a time (the event has one).
+- Supervisor on macOS: with `--restricted`, `pydantic-opamp-enroll --host-logs` also lets the
+  server's configs read the files under `/var/log` (`/private/var/log`), and keep read positions
+  with `file_storage` in `/opt/pydantic-opamp/var/collector`, as it does on Linux. It allowed the
+  unified log receiver only, so a config that reads log files was refused. Run the enroll script
+  again, or upgrade the package, to get the wider policy.
+- Supervisor on Windows: `pydantic-opamp-uninstall.ps1` says what it removed and what it kept, and
+  how to delete the kept data later, as the Linux and macOS script does. It printed nothing.
+- Supervisor on Linux and macOS: the command `pydantic-opamp-uninstall` prints for deleting the
+  kept data begins with `sudo`. As printed it failed with "Permission denied" for anyone but root.
 - Python, Node.js: setting the SDK up again in one process (Python's `configure_logfire()` or
   `manage()`, Node.js's `manage()`, called a second time) keeps the instance it joined the fleet
   as. It used to start over: another instance UID (a second slot of the default state directory)
