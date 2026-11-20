@@ -97,6 +97,8 @@ and date. Tests, CI and docs alone don't need a line.
   notification, which every integration and the collector extension log as a warning (#92).
 - Go: `go/opampotel` needs Go 1.26 or later (Go 1.25 is out of support), to take golang.org/x/net
   0.60.0.
+- Go: `go/opampotel` needs OpenTelemetry Go 1.47.0 or later (`otel/log` and `otel/sdk/log` 1.47.0,
+  up from 0.22.0), the first release with the fix for GHSA-q7gw-24fr-5p69 (#149).
 
 ### Fixed
 
