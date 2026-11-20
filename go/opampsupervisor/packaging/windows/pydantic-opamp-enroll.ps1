@@ -375,6 +375,11 @@ if ($NoStart) {
     $storage = Join-Path $root 'var'
     & $supervisor status --storage $storage --wait 30s --since $started
     if ($LASTEXITCODE -ne 0) {
+        # A service that isn't running never got to connect: say so, and where its log is, instead.
+        if ((Get-Service -Name $service -ErrorAction SilentlyContinue).Status -ne 'Running') {
+            Write-Error "the Supervisor service ($service) failed to start, so it never connected to $Endpoint. Its log says why: Get-WinEvent -FilterHashtable @{LogName='Application'; ProviderName='$service'} -MaxEvents 50 | Format-List TimeCreated, Message"
+            exit 1
+        }
         Write-Error "enrolled, but the Supervisor can't connect to $Endpoint yet; it keeps retrying. Fix what is above, then check with: & '$supervisor' status --storage '$storage'"
         exit 1
     }

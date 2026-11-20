@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"runtime"
 	"strings"
 	"testing"
@@ -19,14 +20,20 @@ import (
 )
 
 // macEnroll runs macos/pydantic-opamp-enroll under root, with a launchctl stand-in that logs its
-// arguments to tools/launchctl.log.
+// arguments to tools/launchctl.log. Its `print` says the daemon is running, unless tools/inactive
+// exists (as for one that failed to start).
 func macEnroll(t *testing.T, root, tools, stdin string, args ...string) (string, error) {
 	t.Helper()
 	if runtime.GOOS == "windows" {
 		t.Skip("the enroll script is for macOS")
 	}
 	launchctl := filepath.Join(tools, "launchctl")
-	require.NoError(t, os.WriteFile(launchctl, []byte("#!/bin/sh\necho \"$@\" >>\""+filepath.Join(tools, "launchctl.log")+"\"\n"), 0o755))
+	require.NoError(t, os.WriteFile(launchctl, []byte(`#!/bin/sh
+echo "$@" >>"`+filepath.Join(tools, "launchctl.log")+`"
+[ "$1" = print ] || exit 0
+[ -e "`+filepath.Join(tools, "inactive")+`" ] && { echo "	state = spawn scheduled"; exit 0; }
+echo "	state = running"
+`), 0o755))
 	cmd := exec.Command("./macos/pydantic-opamp-enroll", args...)
 	cmd.Env = append(os.Environ(), "OPAMP_ENROLL_ROOT="+root, "LAUNCHCTL="+launchctl, "OPAMP_SUPERVISOR="+fakeSupervisor(t, tools))
 	cmd.Stdin = strings.NewReader(stdin)
@@ -83,6 +90,33 @@ func TestMacEnroll(t *testing.T) {
 	// Without --restricted, any config the server sends runs.
 	assert.False(t, loaded.Agent.RemoteConfigPolicy.Enabled(), "a policy without --restricted")
 	require.NoError(t, loaded.Agent.RemoteConfigPolicy.Check("", hostLogsConfig(t, "macos")))
+}
+
+// Started, enrollment waits for the Supervisor to connect, as on Linux: one that can't fails the
+// install with what to check, and a daemon that failed to start says so and where its log is.
+func TestMacEnrollWaitsForTheConnection(t *testing.T) {
+	root, tools := t.TempDir(), t.TempDir()
+	out, err := macEnroll(t, root, tools, "t", "--endpoint", "wss://opamp.example.com/v1/opamp")
+	require.NoError(t, err, out)
+	assert.Contains(t, out, "The Supervisor is running and connected (dev.pydantic.opamp-supervisor)")
+	calls, err := os.ReadFile(filepath.Join(tools, "supervisor.log"))
+	require.NoError(t, err)
+	assert.Regexp(t, `^status --storage `+regexp.QuoteMeta(root)+`/opt/pydantic-opamp/var --wait 30s --since \d+\n$`, string(calls))
+
+	require.NoError(t, os.WriteFile(filepath.Join(tools, "status"), []byte("1"), 0o600))
+	out, err = macEnroll(t, root, tools, "t", "--endpoint", "wss://opamp.example.com/v1/opamp")
+	require.Error(t, err)
+	assert.Contains(t, out, "doesn't trust the server's certificate")
+	assert.Contains(t, out, "can't connect to wss://opamp.example.com/v1/opamp yet; it keeps retrying")
+	assert.NotContains(t, out, "failed to start")
+	assert.NotContains(t, out, "running and connected")
+
+	require.NoError(t, os.WriteFile(filepath.Join(tools, "inactive"), nil, 0o600))
+	out, err = macEnroll(t, root, tools, "t", "--endpoint", "wss://opamp.example.com/v1/opamp")
+	require.Error(t, err)
+	assert.Contains(t, out, "the Supervisor service (dev.pydantic.opamp-supervisor) failed to start")
+	assert.Contains(t, out, "sudo tail -n 50 "+root+"/opt/pydantic-opamp/var/log/supervisor.log")
+	assert.NotContains(t, out, "keeps retrying")
 }
 
 // A --restricted policy widened locally, as on Linux.

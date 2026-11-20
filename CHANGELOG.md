@@ -100,6 +100,9 @@ and date. Tests, CI and docs alone don't need a line.
 
 ### Fixed
 
+- Supervisor: `pydantic-opamp-enroll` (Linux, macOS, Windows) says when the Supervisor service
+  failed to start, and gives the command that shows its log. It used to say the Supervisor can't
+  connect yet and keeps retrying, as for a running service that can't reach its server (#147).
 - Python, Node.js: setting the SDK up again in one process (Python's `configure_logfire()` or
   `manage()`, Node.js's `manage()`, called a second time) keeps the instance it joined the fleet
   as. It used to start over: another instance UID (a second slot of the default state directory)

@@ -30,8 +30,11 @@ func fakeSystemd(t *testing.T, dir string) (creds, systemctl string) {
 { printf 'SEALED:%s:' "$2"; cat "$3"; } >"$4"
 `), 0o755))
 	systemctl = filepath.Join(dir, "systemctl")
+	// A dir/inactive file makes `is-active` say the service isn't running, as one that failed to start.
 	require.NoError(t, os.WriteFile(systemctl, []byte(`#!/bin/sh
 echo "$@" >>"`+filepath.Join(dir, "systemctl.log")+`"
+[ "$1" = is-active ] && [ -e "`+filepath.Join(dir, "inactive")+`" ] && exit 3
+exit 0
 `), 0o755))
 	return creds, systemctl
 }
@@ -460,6 +463,15 @@ func TestEnrollWaitsForTheConnection(t *testing.T) {
 	assert.Contains(t, out, "doesn't trust the server's certificate")
 	assert.Contains(t, out, "can't connect to wss://opamp.example.com/v1/opamp yet; it keeps retrying")
 	assert.NotContains(t, out, "running and connected")
+
+	// A service that failed to start (an unreadable credential, say) never tried to connect: the
+	// install says so and where its log is, not that it keeps retrying.
+	require.NoError(t, os.WriteFile(filepath.Join(e.tools, "inactive"), nil, 0o600))
+	out, err = e.run(t, "bootstrap-token", "--endpoint", "wss://opamp.example.com/v1/opamp")
+	require.Error(t, err)
+	assert.Contains(t, out, "the Supervisor service (pydantic-opamp-supervisor.service) failed to start")
+	assert.Contains(t, out, "sudo journalctl -u pydantic-opamp-supervisor.service -n 50 --no-pager")
+	assert.NotContains(t, out, "keeps retrying")
 }
 
 // --refresh, which a package upgrade runs, writes the config again from the last enrollment's
