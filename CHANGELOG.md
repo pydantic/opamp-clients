@@ -156,7 +156,7 @@ and date. Tests, CI and docs alone don't need a line.
 - Dependencies with known advisories updated: OpenTelemetry Go 1.47.0 (`go/opampotel` and the Go
   examples; `otel/sdk/log` 1.47.0 in the Supervisor and the Collector extension), for
   GHSA-q7gw-24fr-5p69, and OpenTelemetry Python 1.45.2 (`python/otel`'s lock, for its tests), for
-  GHSA-mf5v-w3w3-f6cg.
+  GHSA-mf5v-w3w3-f6cg (#149).
 
 ## Supervisor 0.10.4 (2026-11-07)
 
