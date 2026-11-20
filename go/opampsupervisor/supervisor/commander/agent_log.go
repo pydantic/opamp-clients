@@ -97,12 +97,8 @@ func rollAgentLog(path string, limit int64) (bool, error) {
 	return true, os.Truncate(path, 0)
 }
 
-// capAgentLog holds the log of a running Collector to limit bytes, measuring it every interval
-// until done is closed.
-func capAgentLog(logger *zap.Logger, path string, limit int64, interval time.Duration, done <-chan struct{}) {
-	agentLogCap{interval: interval}.run(logger, path, limit, done)
-}
-
+// run holds the log of a running Collector to limit bytes, measuring it every interval until
+// done is closed.
 func (a agentLogCap) run(logger *zap.Logger, path string, limit int64, done <-chan struct{}) {
 	interval, roll := a.interval, a.roll
 	if interval <= 0 {

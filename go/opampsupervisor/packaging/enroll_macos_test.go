@@ -27,12 +27,20 @@ func macEnroll(t *testing.T, root, tools, stdin string, args ...string) (string,
 	}
 	launchctl := filepath.Join(tools, "launchctl")
 	require.NoError(t, os.WriteFile(launchctl, []byte("#!/bin/sh\necho \"$@\" >>\""+filepath.Join(tools, "launchctl.log")+"\"\n"+
-		// print says whether the daemon is loaded: 113 is launchctl's "no such service". With
-		// LAUNCHCTL_STOPPING naming a file, it is loaded until that many prints have been made.
-		"if [ \"$1\" = print ]; then\n"+
+		// It keeps whether the daemon is loaded, as launchd does: bootstrap loads it, bootout
+		// unloads it, and print says which, with a state line when loaded and 113 (launchctl's
+		// "no such service") when not. With LAUNCHCTL_STOPPING naming a file, a daemon booted out
+		// stays loaded until that many prints have been made.
+		"loaded=\""+filepath.Join(tools, "launchctl.loaded")+"\"\n"+
+		"case $1 in\n"+
+		"bootstrap) touch \"$loaded\" ;;\n"+
+		"bootout) rm -f \"$loaded\" ;;\n"+
+		"print)\n"+
 		"  left=$(cat \"${LAUNCHCTL_STOPPING:-/dev/null}\" 2>/dev/null)\n"+
-		"  if [ \"${left:-0}\" -gt 0 ]; then echo $((left - 1)) >\"$LAUNCHCTL_STOPPING\"; exit 0; fi\n"+
-		"  exit 113\nfi\n"), 0o755))
+		"  if [ \"${left:-0}\" -gt 0 ]; then echo $((left - 1)) >\"$LAUNCHCTL_STOPPING\"; echo 'state = running'; exit 0; fi\n"+
+		"  [ -e \"$loaded\" ] || exit 113\n"+
+		"  echo 'state = running' ;;\n"+
+		"esac\n"), 0o755))
 	cmd := exec.Command("./macos/pydantic-opamp-enroll", args...)
 	cmd.Env = append(os.Environ(), "OPAMP_ENROLL_ROOT="+root, "LAUNCHCTL="+launchctl, "OPAMP_SUPERVISOR="+fakeSupervisor(t, tools))
 	cmd.Stdin = strings.NewReader(stdin)

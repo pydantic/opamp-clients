@@ -90,7 +90,7 @@ func TestCapAgentLog(t *testing.T) {
 	done, ended := make(chan struct{}), make(chan struct{})
 	go func() {
 		defer close(ended)
-		capAgentLog(zap.New(core), path, 32, 5*time.Millisecond, done)
+		agentLogCap{interval: 5 * time.Millisecond}.run(zap.New(core), path, 32, done)
 	}()
 	require.Eventually(t, func() bool {
 		return logs.FilterMessageSnippet("passed its size limit").Len() == 1
@@ -102,7 +102,7 @@ func TestCapAgentLog(t *testing.T) {
 	select {
 	case <-ended:
 	case <-time.After(5 * time.Second):
-		t.Fatal("capAgentLog went on after the run ended")
+		t.Fatal("the check went on after the run ended")
 	}
 }
 

@@ -17,6 +17,7 @@ import (
 	"syscall"
 
 	"go.opentelemetry.io/collector/featuregate"
+	"go.uber.org/zap"
 
 	"github.com/pydantic/opamp-clients/go/opampsupervisor/supervisor"
 	"github.com/pydantic/opamp-clients/go/opampsupervisor/supervisor/config"
@@ -58,6 +59,8 @@ func runInteractive() error {
 	signal.Notify(interrupt, os.Interrupt, syscall.SIGTERM)
 	stopped, err := startUnlessInterrupted(ctx, cancel, supervisor.Start, interrupt)
 	if stopped {
+		// Said in the Supervisor's own log: a service manager's quick stop is no silent exit.
+		logger.Info("Stopped while starting", zap.Error(err))
 		if err == nil {
 			supervisor.Shutdown()
 		}

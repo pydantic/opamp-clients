@@ -168,6 +168,8 @@ func (w windowsEventLogCore) Sync() error {
 }
 
 // TODO: If supervisor logging becomes configurable, update this function to respect that config
+// Changed here: that is done. The level is the config's (serviceLogLevel, in start above; Enabled
+// leaves it to the wrapped core), and the encoder is serviceLogEncoderConfig's (service_log.go).
 func withWindowsCore(elog *eventlog.Log) func(zapcore.Core) zapcore.Core {
 	return func(core zapcore.Core) zapcore.Core {
 		// Use the Windows Event Log
