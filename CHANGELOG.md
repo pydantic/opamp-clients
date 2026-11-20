@@ -153,6 +153,10 @@ and date. Tests, CI and docs alone don't need a line.
   (the Go example, the conformance server), aiohttp 3.14.5 and OpenTelemetry Python 1.45.1
   (Python), ip-address 10.7.4 (Node.js), jackson-databind 2.22.3 (Java tests). Every lockfile is
   now checked against OSV on every change and nightly (`scripts/deps_scan.py`).
+- Dependencies with known advisories updated: OpenTelemetry Go 1.47.0 (`go/opampotel` and the Go
+  examples; `otel/sdk/log` 1.47.0 in the Supervisor and the Collector extension), for
+  GHSA-q7gw-24fr-5p69, and OpenTelemetry Python 1.45.2 (`python/otel`'s lock, for its tests), for
+  GHSA-mf5v-w3w3-f6cg.
 
 ## Supervisor 0.10.4 (2026-11-07)
 
