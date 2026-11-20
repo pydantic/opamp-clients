@@ -267,7 +267,8 @@ The `.pkg` installs everything under `/opt/pydantic-opamp`:
 - `bin/` holds the Supervisor, the collector and `pydantic-opamp-enroll`;
 - `etc/` and `var/` hold the config, the token and the storage, all readable by root alone;
 - `/Library/LaunchDaemons/dev.pydantic.opamp-supervisor.plist` is the LaunchDaemon. It runs as
-  root and logs to `/opt/pydantic-opamp/var/log/supervisor.log`.
+  root and logs to `/opt/pydantic-opamp/var/log/supervisor.log`. launchd gives the Supervisor 25
+  seconds to stop (`ExitTimeOut`): it gives its Collector 10, then kills it.
 
 ```sh
 sudo installer -pkg pydantic-opamp-supervisor-0.10.0-darwin-arm64.pkg -target /
@@ -579,6 +580,8 @@ keeps its enrollment, its issued credentials and its instance UID, and needs no 
 - Before replacing files, the macOS package unloads the Supervisor and waits up to 30 seconds
   for launchd to remove the service. A stop error, an inspection error or a timeout aborts the
   installation rather than replacing files under a service that may still be running.
+- On macOS, the enroll script (`--refresh` too) unloads a running Supervisor and waits up to 30
+  seconds for launchd to remove the service before it loads it again.
 - The enroll script keeps the options it was last run with, never a token, in `enroll.options`
   beside the config, with the config's SHA-256 in `supervisor.yaml.sha256`.
 - After the upgrade, the package runs `pydantic-opamp-enroll --refresh` (`-Refresh` on Windows).

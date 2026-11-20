@@ -105,6 +105,14 @@ and date. Tests, CI and docs alone don't need a line.
   start keeps the logs of the two runs before it as `agent.log.1` and `agent.log.2`. It grew
   without limit, and each start emptied it, so the log of a Collector that failed was gone once
   the next one started.
+- Supervisor: one told to stop while it starts (a service stopped seconds after it was started,
+  say) stops the Collector it started. It ended at once and left that Collector running with no
+  parent, and the next start ran a second Collector beside it. On macOS, launchd also gives the
+  Supervisor 25 seconds to stop, where it killed it after 20.
+- Supervisor on macOS: `pydantic-opamp-enroll`, run on a Mac whose Supervisor runs (`--refresh`
+  too, which an upgrade runs), waits for launchd to finish unloading the service before it loads
+  it again. It could fail with "Bootstrap failed: 5: Input/output error" and leave the service
+  unloaded.
 - Supervisor on Windows: the service logs at its config's `telemetry::logs::level` (info unless
   set). It wrote every debug line to the Application event log as an Information event, one each
   heartbeat, which a config that collects that log then sent as telemetry. Its lines there no

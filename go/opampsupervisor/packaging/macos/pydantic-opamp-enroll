@@ -115,10 +115,23 @@ migrate_options() {
 keep_legacy() {
 	rm -f "$migrated" "$etc/supervisor.yaml.tmp" "$etc/settings.tmp"
 	echo "pydantic-opamp-enroll: $etc/supervisor.yaml was written by an older package with --restricted, or edited, and is kept; run pydantic-opamp-enroll again with its options to add this version's settings" >&2
-	"$launchctl" bootout "system/$label" 2>/dev/null || true
+	unload
 	"$launchctl" bootstrap system "$plist"
 	echo "restarted the Supervisor ($label)"
 	exit 0
+}
+
+# unload stops the daemon, if it is loaded, and waits for launchd to let go of it. bootout can
+# return while launchd still holds the label (the Supervisor is stopping its Collector), and a
+# bootstrap then fails with "Bootstrap failed: 5: Input/output error" and leaves it unloaded.
+unload() {
+	"$launchctl" bootout "system/$label" 2>/dev/null || true
+	remaining=30
+	while "$launchctl" print "system/$label" >/dev/null 2>&1; do
+		[ "$remaining" -gt 0 ] || fail "$label is still stopping after 30 seconds; once it has stopped, start it with: sudo launchctl bootstrap system $plist"
+		sleep 1
+		remaining=$((remaining - 1))
+	done
 }
 
 # settings prints a config's settings: its lines but comments and blank ones, sorted.
@@ -435,8 +448,8 @@ wait_connected() {
 done=Enrolled
 [ -z "$refresh" ] || done=Refreshed
 if [ -n "$start" ]; then
-	# Loaded already (enrolling again): unload it first, so it reads the new config.
-	"$launchctl" bootout "system/$label" 2>/dev/null || true
+	# Loaded already (enrolling again, or --refresh): unload it first, so it reads the new config.
+	unload
 	started=$(date +%s)
 	"$launchctl" bootstrap system "$plist"
 	wait_connected "$started"

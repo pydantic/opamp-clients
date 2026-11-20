@@ -26,7 +26,13 @@ func macEnroll(t *testing.T, root, tools, stdin string, args ...string) (string,
 		t.Skip("the enroll script is for macOS")
 	}
 	launchctl := filepath.Join(tools, "launchctl")
-	require.NoError(t, os.WriteFile(launchctl, []byte("#!/bin/sh\necho \"$@\" >>\""+filepath.Join(tools, "launchctl.log")+"\"\n"), 0o755))
+	require.NoError(t, os.WriteFile(launchctl, []byte("#!/bin/sh\necho \"$@\" >>\""+filepath.Join(tools, "launchctl.log")+"\"\n"+
+		// print says whether the daemon is loaded: 113 is launchctl's "no such service". With
+		// LAUNCHCTL_STOPPING naming a file, it is loaded until that many prints have been made.
+		"if [ \"$1\" = print ]; then\n"+
+		"  left=$(cat \"${LAUNCHCTL_STOPPING:-/dev/null}\" 2>/dev/null)\n"+
+		"  if [ \"${left:-0}\" -gt 0 ]; then echo $((left - 1)) >\"$LAUNCHCTL_STOPPING\"; exit 0; fi\n"+
+		"  exit 113\nfi\n"), 0o755))
 	cmd := exec.Command("./macos/pydantic-opamp-enroll", args...)
 	cmd.Env = append(os.Environ(), "OPAMP_ENROLL_ROOT="+root, "LAUNCHCTL="+launchctl, "OPAMP_SUPERVISOR="+fakeSupervisor(t, tools))
 	cmd.Stdin = strings.NewReader(stdin)
@@ -57,6 +63,7 @@ func TestMacEnroll(t *testing.T) {
 	log, err := os.ReadFile(filepath.Join(tools, "launchctl.log"))
 	require.NoError(t, err)
 	assert.Equal(t, "bootout system/dev.pydantic.opamp-supervisor\n"+
+		"print system/dev.pydantic.opamp-supervisor\n"+
 		"bootstrap system /Library/LaunchDaemons/dev.pydantic.opamp-supervisor.plist\n", string(log))
 
 	collector := filepath.Join(t.TempDir(), "otelcol")
@@ -170,6 +177,24 @@ func TestMacEnrollRefuses(t *testing.T) {
 	}
 }
 
+// Enrolling again (and --refresh, which an upgrade runs) on a Mac whose Supervisor runs waits for
+// launchd to finish unloading it before loading it again: bootout returns while the Supervisor
+// still stops its Collector, and a bootstrap then failed (5: Input/output error), leaving the
+// service unloaded.
+func TestMacEnrollWaitsForTheUnload(t *testing.T) {
+	root, tools := t.TempDir(), t.TempDir()
+	stopping := filepath.Join(tools, "stopping")
+	require.NoError(t, os.WriteFile(stopping, []byte("2\n"), 0o600))
+	t.Setenv("LAUNCHCTL_STOPPING", stopping)
+	out, err := macEnroll(t, root, tools, "t", "--endpoint", "wss://opamp.example.com/v1/opamp")
+	require.NoError(t, err, out)
+	log, err := os.ReadFile(filepath.Join(tools, "launchctl.log"))
+	require.NoError(t, err)
+	const print = "print system/dev.pydantic.opamp-supervisor\n"
+	assert.Equal(t, "bootout system/dev.pydantic.opamp-supervisor\n"+print+print+print+
+		"bootstrap system /Library/LaunchDaemons/dev.pydantic.opamp-supervisor.plist\n", string(log))
+}
+
 // With --restricted, --host-logs lets the server read this Mac's unified logs, but not an archive from any
 // path, and the files under /var/log, with file_storage keeping its place in the Supervisor's own
 // directory, and nowhere else.
@@ -267,6 +292,7 @@ func TestMacEnrollRefresh(t *testing.T) {
 			log, err := os.ReadFile(filepath.Join(tools, "launchctl.log"))
 			require.NoError(t, err)
 			assert.Equal(t, "bootout system/dev.pydantic.opamp-supervisor\n"+
+				"print system/dev.pydantic.opamp-supervisor\n"+
 				"bootstrap system /Library/LaunchDaemons/dev.pydantic.opamp-supervisor.plist\n", string(log))
 		})
 	}

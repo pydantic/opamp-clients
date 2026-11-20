@@ -743,6 +743,11 @@ func (s *Supervisor) getBootstrapInfo() (err error) {
 	}()
 
 	select {
+	// Changed here: a Supervisor told to stop while it starts (run_signals.go in the command)
+	// stops waiting, and the deferred Stop above ends the bootstrap Collector.
+	case <-s.runCtx.Done():
+		span.SetStatus(codes.Error, "stopped while starting")
+		return fmt.Errorf("stopped while waiting for the collector's description: %w", s.runCtx.Err())
 	case <-time.After(s.config.Agent.BootstrapTimeout):
 		if connected.Load() {
 			msg := "collector connected but never responded with an AgentDescription message"

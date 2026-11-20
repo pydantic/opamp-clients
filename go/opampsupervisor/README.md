@@ -212,6 +212,12 @@ agent:
   passes 10 MiB while the Collector runs is copied to `agent.log.1` and emptied, without
   restarting anything (`supervisor/commander/agent_log.go`). The few lines written between the
   copy and the emptying are lost.
+- **A Supervisor told to stop while it starts stops its Collector.** Upstream's takes SIGINT and
+  SIGTERM only once `Start` has returned. `Start` runs the Collector to ask what it is and waits
+  for it, for as long as `agent::bootstrap_timeout`; a signal in that time ended the Supervisor
+  at once and left that Collector running with no parent, and the next start ran a second one
+  beside it. Here the signals are taken first, and one that arrives while it starts ends the
+  wait and stops the Collector (`run_signals.go`, with a case in `getBootstrapInfo`'s wait).
 - **As a Windows service, the Supervisor logs at its config's level.** Upstream's service logger
   takes no notice of `telemetry::logs::level`: it writes every debug line to the Application
   event log as an Information event (one for each message from the Collector, so one each
@@ -228,7 +234,7 @@ header. These files are new, and are this repository's:
   `commander/agent_log.go` and `verifier/cosign.go`, and the tests
   beside them (with `supervisor/remote_config_refusal_test.go`, `restart_command_test.go` and
   `supervisor/config/core_test.go`, and the Cosign release fixture in `verifier/testdata/`);
-- `status_command.go`, and its test;
+- `status_command.go` and `run_signals.go`, and their tests;
 - `e2e_packages_test.go`, `e2e_policy_test.go` and `e2e_state_test.go`, and their configs in `testdata/`
   (`testdata/collector/manifest.yaml`, `testdata/supervisor/supervisor_auth_bearer_ws.yaml`,
   `supervisor_packages.yaml` and `supervisor_policy.yaml`);
