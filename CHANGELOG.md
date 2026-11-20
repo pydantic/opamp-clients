@@ -97,6 +97,8 @@ and date. Tests, CI and docs alone don't need a line.
   notification, which every integration and the collector extension log as a warning (#92).
 - Go: `go/opampotel` needs Go 1.26 or later (Go 1.25 is out of support), to take golang.org/x/net
   0.60.0.
+- Go: `go/opampotel` needs OpenTelemetry Go 1.47.0 or later (`otel/log` and `otel/sdk/log` 1.47.0,
+  up from 0.22.0), the first release with the fix for GHSA-q7gw-24fr-5p69 (#149).
 
 ### Fixed
 
@@ -153,6 +155,10 @@ and date. Tests, CI and docs alone don't need a line.
   (the Go example, the conformance server), aiohttp 3.14.5 and OpenTelemetry Python 1.45.1
   (Python), ip-address 10.7.4 (Node.js), jackson-databind 2.22.3 (Java tests). Every lockfile is
   now checked against OSV on every change and nightly (`scripts/deps_scan.py`).
+- Dependencies with known advisories updated: OpenTelemetry Go 1.47.0 (`go/opampotel` and the Go
+  examples; `otel/sdk/log` 1.47.0 in the Supervisor and the Collector extension), for
+  GHSA-q7gw-24fr-5p69, and OpenTelemetry Python 1.45.2 (`python/otel`'s lock, for its tests), for
+  GHSA-mf5v-w3w3-f6cg (#149).
 
 ## Supervisor 0.10.4 (2026-11-07)
 
