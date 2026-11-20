@@ -418,8 +418,13 @@ wait_connected() {
 	if "$supervisor" status --storage "$storage" --wait 30s --since "$1"; then
 		return 0
 	fi
-	# A service that isn't running never got to connect: say so, and where its log is, instead.
-	if ! "$launchctl" print "system/$label" 2>/dev/null | grep -q 'state = running'; then
+	# A daemon that isn't running, or that launchd has started more than once since the bootstrap
+	# (`runs`), never got to connect: say so, and where its log is, instead. The count catches one
+	# that crashes a few seconds in, which a single look can find briefly running.
+	info=$("$launchctl" print "system/$label" 2>/dev/null) || info=
+	runs=$(printf '%s\n' "$info" | awk '$1 == "runs" && $2 == "=" { print $3; exit }')
+	case $runs in '' | *[!0-9]*) runs=0 ;; esac
+	if ! printf '%s\n' "$info" | grep -q 'state = running' || [ "$runs" -gt 1 ]; then
 		echo "the Supervisor service ($label) failed to start, so it never connected to $endpoint. Its log says why: sudo tail -n 50 $storage/log/supervisor.log" >&2
 		exit 1
 	fi

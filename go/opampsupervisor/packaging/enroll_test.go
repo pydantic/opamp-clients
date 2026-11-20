@@ -30,10 +30,19 @@ func fakeSystemd(t *testing.T, dir string) (creds, systemctl string) {
 { printf 'SEALED:%s:' "$2"; cat "$3"; } >"$4"
 `), 0o755))
 	systemctl = filepath.Join(dir, "systemctl")
-	// A dir/inactive file makes `is-active` say the service isn't running, as one that failed to start.
+	// A dir/inactive file makes `is-active` say the service isn't running, as one that failed to
+	// start. `show -p NRestarts` prints dir/restarts (none: systemd before 235 prints nothing), and
+	// a restart adds dir/crashes to it, as for a service that crashed that often since.
 	require.NoError(t, os.WriteFile(systemctl, []byte(`#!/bin/sh
 echo "$@" >>"`+filepath.Join(dir, "systemctl.log")+`"
-[ "$1" = is-active ] && [ -e "`+filepath.Join(dir, "inactive")+`" ] && exit 3
+restarts="`+filepath.Join(dir, "restarts")+`"
+case $1 in
+is-active) [ -e "`+filepath.Join(dir, "inactive")+`" ] && exit 3 ;;
+show) cat "$restarts" 2>/dev/null ;;
+restart)
+	crashes=$(cat "`+filepath.Join(dir, "crashes")+`" 2>/dev/null) || exit 0
+	echo $(($(cat "$restarts" 2>/dev/null || echo 0) + crashes)) >"$restarts" ;;
+esac
 exit 0
 `), 0o755))
 	return creds, systemctl
@@ -112,7 +121,7 @@ func TestEnroll(t *testing.T) {
 	require.NoError(t, err)
 	// The unmanaged collector, which conflicts with the Supervisor, is turned off for good first.
 	assert.Equal(t, "disable --now pydantic-otelcol.service\nenable pydantic-opamp-supervisor.service\n"+
-		"restart pydantic-opamp-supervisor.service\n", string(log))
+		"show -p NRestarts --value pydantic-opamp-supervisor.service\nrestart pydantic-opamp-supervisor.service\n", string(log))
 
 	// What systemd gives the service: the decrypted token, and the collector at its path.
 	token := filepath.Join(t.TempDir(), "opamp-enroll-token")
@@ -472,6 +481,20 @@ func TestEnrollWaitsForTheConnection(t *testing.T) {
 	assert.Contains(t, out, "the Supervisor service (pydantic-opamp-supervisor.service) failed to start")
 	assert.Contains(t, out, "sudo journalctl -u pydantic-opamp-supervisor.service -n 50 --no-pager")
 	assert.NotContains(t, out, "keeps retrying")
+	require.NoError(t, os.Remove(filepath.Join(e.tools, "inactive")))
+
+	// One that crashes a few seconds in can be caught active: systemd's restart count since the
+	// start says it has been failing. A count from before the start (a restart doesn't reset it)
+	// doesn't: the service runs, and can't connect.
+	require.NoError(t, os.WriteFile(filepath.Join(e.tools, "restarts"), []byte("2\n"), 0o600))
+	out, err = e.run(t, "bootstrap-token", "--endpoint", "wss://opamp.example.com/v1/opamp")
+	require.Error(t, err)
+	assert.Contains(t, out, "can't connect to wss://opamp.example.com/v1/opamp yet; it keeps retrying")
+	require.NoError(t, os.WriteFile(filepath.Join(e.tools, "crashes"), []byte("1"), 0o600))
+	out, err = e.run(t, "bootstrap-token", "--endpoint", "wss://opamp.example.com/v1/opamp")
+	require.Error(t, err)
+	assert.Contains(t, out, "the Supervisor service (pydantic-opamp-supervisor.service) failed to start")
+	assert.NotContains(t, out, "keeps retrying")
 }
 
 // --refresh, which a package upgrade runs, writes the config again from the last enrollment's
@@ -504,7 +527,7 @@ func TestEnrollRefresh(t *testing.T) {
 	log, err := os.ReadFile(filepath.Join(e.tools, "systemctl.log"))
 	require.NoError(t, err)
 	assert.Equal(t, "disable --now pydantic-otelcol.service\nenable pydantic-opamp-supervisor.service\n"+
-		"restart pydantic-opamp-supervisor.service\n", string(log))
+		"show -p NRestarts --value pydantic-opamp-supervisor.service\nrestart pydantic-opamp-supervisor.service\n", string(log))
 }
 
 func sha256Hex(s string) string {
