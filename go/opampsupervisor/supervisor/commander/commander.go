@@ -53,7 +53,9 @@ type Commander struct {
 	// watchDone is closed when the last run's watch goroutine has announced the exit on
 	// exitCh and doneCh. Start waits for it, so a late token can't be taken for the new run's.
 	watchDone chan struct{}
-	running   *atomic.Int64
+	// Changed here: how the Collector's log is held to a size (agent_log.go).
+	logCap  agentLogCap
+	running *atomic.Int64
 	// stopMu serializes Stop calls. The process exiting is announced once on
 	// doneCh, so concurrent Stop calls would race to consume it and the loser
 	// would never return.
@@ -210,12 +212,9 @@ func (c *Commander) startNormal() error {
 
 	watchDone := make(chan struct{})
 	c.watchDone = watchDone
-	go func() {
-		defer stdoutFile.Close()
-		c.watch(watchDone)
-	}()
-	// Changed here: the log is held to a size while the Collector runs (agent_log.go).
-	go capAgentLog(c.logger, c.logFilePath, agentLogMaxBytes, agentLogCheckInterval, watchDone)
+	// Changed here: the log is held to a size while the Collector runs, and watchDone, which the
+	// next Start waits for, closes only once that has ended too (agent_log.go).
+	go c.watchAndCapLog(stdoutFile, watchDone, c.logCap)
 
 	return nil
 }

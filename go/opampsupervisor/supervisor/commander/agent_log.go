@@ -29,6 +29,13 @@ const agentLogMaxBytes = 10 << 20
 // agentLogCheckInterval is how often a running Collector's log is measured.
 const agentLogCheckInterval = time.Minute
 
+// agentLogCap is how a Commander holds its Collector's log to a size: the zero value is the
+// limit, the interval and the check above. Its tests set another interval and check.
+type agentLogCap struct {
+	interval time.Duration
+	roll     func(path string, limit int64) (bool, error)
+}
+
 // agentLogKept is how many earlier logs are kept beside the current one.
 const agentLogKept = 2
 
@@ -93,6 +100,17 @@ func rollAgentLog(path string, limit int64) (bool, error) {
 // capAgentLog holds the log of a running Collector to limit bytes, measuring it every interval
 // until done is closed.
 func capAgentLog(logger *zap.Logger, path string, limit int64, interval time.Duration, done <-chan struct{}) {
+	agentLogCap{interval: interval}.run(logger, path, limit, done)
+}
+
+func (a agentLogCap) run(logger *zap.Logger, path string, limit int64, done <-chan struct{}) {
+	interval, roll := a.interval, a.roll
+	if interval <= 0 {
+		interval = agentLogCheckInterval
+	}
+	if roll == nil {
+		roll = rollAgentLog
+	}
 	ticker := time.NewTicker(interval)
 	defer ticker.Stop()
 	failed := false
@@ -102,7 +120,7 @@ func capAgentLog(logger *zap.Logger, path string, limit int64, interval time.Dur
 			return
 		case <-ticker.C:
 		}
-		rolled, err := rollAgentLog(path, limit)
+		rolled, err := roll(path, limit)
 		switch {
 		case err != nil && !failed:
 			// Once: a disk that is full, say, would fail at every check.
@@ -113,4 +131,20 @@ func capAgentLog(logger *zap.Logger, path string, limit int64, interval time.Dur
 		}
 		failed = err != nil
 	}
+}
+
+// watchAndCapLog watches a started Collector to its exit, holding its log to its size meanwhile,
+// and closes watchDone when both have ended. Start waits for watchDone before it touches the log
+// files: a check still copying and emptying the last run's log as the Collector exited would
+// otherwise empty the next run's.
+func (c *Commander) watchAndCapLog(log *os.File, watchDone chan struct{}, logCap agentLogCap) {
+	defer close(watchDone)
+	defer log.Close()
+	exited, capped := make(chan struct{}), make(chan struct{})
+	go func() {
+		defer close(capped)
+		logCap.run(c.logger, c.logFilePath, agentLogMaxBytes, exited)
+	}()
+	c.watch(exited)
+	<-capped
 }

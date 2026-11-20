@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -131,4 +132,48 @@ func TestStartKeepsTheLastRunsLog(t *testing.T) {
 	}
 	assert.Contains(t, readLog(t, logPath+".1"), "after rotation", "the first run's log")
 	assert.NoFileExists(t, logPath+".2")
+}
+
+// A check that is still rolling the log when the Collector exits is waited for by the next Start:
+// its emptying of agent.log would otherwise land on the new run's log.
+func TestStartWaitsForALogCheckUnderWay(t *testing.T) {
+	rolling, release := make(chan struct{}), make(chan struct{})
+	var once sync.Once
+	roll := func(string, int64) (bool, error) {
+		once.Do(func() { close(rolling) })
+		<-release
+		return false, nil
+	}
+
+	logPath := filepath.Join(t.TempDir(), "agent.log")
+	continueFile := filepath.Join(t.TempDir(), "continue")
+	cmdr, err := NewCommander(zap.NewNop(), logPath, config.Agent{
+		Executable: os.Args[0],
+		Env: map[string]string{
+			passthroughTestModeEnv:   "log-append-after-truncate",
+			logAppendContinueFileEnv: continueFile,
+		},
+	})
+	require.NoError(t, err)
+	cmdr.logCap = agentLogCap{interval: 5 * time.Millisecond, roll: roll}
+	require.NoError(t, cmdr.Start(t.Context()))
+	<-rolling
+	// The Collector exits while the check is under way.
+	require.NoError(t, os.WriteFile(continueFile, nil, 0o600))
+	select {
+	case <-cmdr.Exited():
+	case <-time.After(10 * time.Second):
+		t.Fatal("timed out waiting for the child to exit")
+	}
+	select {
+	case <-cmdr.watchDone:
+		t.Fatal("the run was done with a log check still under way")
+	case <-time.After(100 * time.Millisecond):
+	}
+	close(release)
+	select {
+	case <-cmdr.watchDone:
+	case <-time.After(10 * time.Second):
+		t.Fatal("the run never ended after the check did")
+	}
 }
