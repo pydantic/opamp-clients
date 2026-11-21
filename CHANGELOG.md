@@ -62,8 +62,9 @@ and date. Tests, CI and docs alone don't need a line.
 ### Added
 
 - Supervisor: the agent description reports `pydantic.fleet.host_key`, a UUID derived from the
-  host's machine ID by HMAC-SHA256 with a constant of this package (the machine ID itself isn't
-  reported), the same for as long as the host keeps its machine ID, so a server can tie a host
+  host's machine ID as systemd derives an application-specific one (on Linux,
+  `systemd-id128 machine-id --app-specific=c8fe2a9e-5d40-4615-8f88-fd606391a0ca --uuid`; the
+  machine ID itself isn't reported), the same for as long as the host keeps its machine ID, so a server can tie a host
   enrolled again to the one it replaces. Upgraded hosts report it once the new Supervisor runs (#151).
 - Supervisor installers and container image: the Collector runs with
   `--feature-gates=telemetry.newPipelineTelemetry`, so its own metrics count the items every

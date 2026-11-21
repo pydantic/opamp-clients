@@ -28,8 +28,9 @@ func nonIdentifying(ad *protobufs.AgentDescription) map[string]string {
 	return m
 }
 
-// The host key is derived from the machine ID alone, the same way on every system: a fixed
-// value per machine ID, a version 4 UUID, none of the machine ID in it, and none without one.
+// The host key is derived from the machine ID alone, the same way on every system and as systemd
+// derives an application-specific machine ID: a fixed value per machine ID, a version 4 UUID, none
+// of the machine ID in it, and none without one.
 func TestTheHostKeyIsDerivedFromTheMachineID(t *testing.T) {
 	ids := []string{"2f65b672a3c448a88da7f5e695eb9659", "50DCC3EF-6AD8-5EAA-AC56-451AD340113C", "dd216d7e-6521-42dd-9df2-dd1e2e938473"}
 	seen := map[string]bool{}
@@ -45,9 +46,12 @@ func TestTheHostKeyIsDerivedFromTheMachineID(t *testing.T) {
 		assert.False(t, seen[key])
 		seen[key] = true
 	}
-	// Fixed: the same machine ID gives the same key in every build (checked against an independent
-	// HMAC-SHA256 computation).
-	assert.Equal(t, "eda36ca0-708d-41c1-9bf2-9a0a4eb2d05c", hostKeyFrom("2f65b672a3c448a88da7f5e695eb9659"))
+	// Fixed, and systemd's: what `systemd-id128 machine-id --app-specific=c8fe2a9e-5d40-4615-8f88-fd606391a0ca --uuid`
+	// printed on the Linux host whose machine ID this is (systemd 255).
+	assert.Equal(t, "4805ee72-bc31-42c6-8529-affc6d73868e", hostKeyFrom("2f65b672a3c448a88da7f5e695eb9659"))
+	// A machine ID that isn't 16 bytes keys the HMAC as its text, and still gives a key.
+	_, err := uuid.Parse(hostKeyFrom("a1b2c3"))
+	assert.NoError(t, err)
 	assert.Empty(t, hostKeyFrom(""))
 	assert.Empty(t, hostKeyFrom(" \n"))
 	assert.Empty(t, hostKeyFrom("<unknown>"), "the SDK's word for a system it can't read")

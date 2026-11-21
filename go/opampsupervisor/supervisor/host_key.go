@@ -7,6 +7,7 @@ import (
 	"context"
 	"crypto/hmac"
 	"crypto/sha256"
+	"encoding/hex"
 	"strings"
 	"sync"
 	"time"
@@ -21,21 +22,29 @@ import (
 // removed or enrolled on it, so a server can tie a host enrolled again to the one it replaces.
 const hostKeyAttribute = "pydantic.fleet.host_key"
 
-// hostKeyApp is the fixed key the host key is derived with. It makes the key this application's
-// alone: the same machine gives another value to any other use of its machine ID.
+// hostKeyApp is the fixed application ID the host key is derived for. It makes the key this
+// application's alone: the same machine gives another value to any other use of its machine ID.
 var hostKeyApp = uuid.MustParse("c8fe2a9e-5d40-4615-8f88-fd606391a0ca")
 
-// hostKeyFrom derives the host key from a machine ID: HMAC-SHA256 keyed with hostKeyApp, its
-// first 16 bytes as a version 4 UUID (as systemd derives an application-specific machine ID). It
-// reveals nothing about the machine ID. "" for no machine ID: no key is made up.
+// hostKeyFrom derives the host key from a machine ID the way systemd derives an
+// application-specific machine ID (sd_id128_get_machine_app_specific): HMAC-SHA256 keyed with the
+// machine ID's 16 bytes over hostKeyApp's, its first 16 bytes as a version 4 UUID. On Linux the
+// key is then what `systemd-id128 machine-id --app-specific=<hostKeyApp>` prints. Every system's
+// machine ID is 16 bytes written as hex or as a UUID (Linux machine-id, macOS IOPlatformUUID,
+// Windows MachineGuid); one that isn't keys the HMAC as its text. It reveals nothing about the
+// machine ID. "" for no machine ID: no key is made up.
 func hostKeyFrom(machineID string) string {
 	machineID = strings.TrimSpace(machineID)
 	// The SDK says "<unknown>" on a system it can't read one from: no machine's own.
 	if machineID == "" || machineID == "<unknown>" {
 		return ""
 	}
-	mac := hmac.New(sha256.New, hostKeyApp[:])
-	mac.Write([]byte(machineID))
+	key := []byte(machineID)
+	if b, err := hex.DecodeString(strings.ReplaceAll(machineID, "-", "")); err == nil && len(b) == 16 {
+		key = b
+	}
+	mac := hmac.New(sha256.New, key)
+	mac.Write(hostKeyApp[:])
 	var id uuid.UUID
 	copy(id[:], mac.Sum(nil))
 	id[6] = id[6]&0x0f | 0x40 // version 4

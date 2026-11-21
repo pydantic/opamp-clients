@@ -199,7 +199,10 @@ agent:
 - **The agent description carries a host key.** The Supervisor adds `pydantic.fleet.host_key` to
   the non-identifying attributes it reports: a UUID derived from the OS's machine ID (Linux
   `/etc/machine-id`, macOS `IOPlatformUUID`, Windows `MachineGuid`, as the OpenTelemetry Go SDK
-  reads it) by HMAC-SHA256 keyed with a constant of this package, the same way on every system. It
+  reads it) the way systemd derives an application-specific machine ID: HMAC-SHA256 keyed with the
+  machine ID's 16 bytes over this package's application ID `c8fe2a9e-5d40-4615-8f88-fd606391a0ca`,
+  the same way on every system, so on Linux it is what
+  `systemd-id128 machine-id --app-specific=c8fe2a9e-5d40-4615-8f88-fd606391a0ca --uuid` prints. It
   stays the same while the host keeps its machine ID (an uninstall, a purge and reinstall, a
   reboot, a new key), so a server can tie a host enrolled again to the one it replaces; it reveals
   nothing about the machine ID, which isn't reported. It is not `host.id`, which is the raw machine
