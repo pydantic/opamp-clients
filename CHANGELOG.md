@@ -102,6 +102,9 @@ and date. Tests, CI and docs alone don't need a line.
 
 ### Fixed
 
+- Supervisor: `pydantic-opamp-enroll` (Linux, macOS, Windows) says when the Supervisor service
+  failed to start, and gives the command that shows its log. It used to say the Supervisor can't
+  connect yet and keeps retrying, as for a running service that can't reach its server (#147).
 - Supervisor: the Collector's log file, `agent.log` in the storage directory, is held to 10 MiB
   while the Collector runs (past that it is copied to `agent.log.1` and emptied), and a Collector
   start keeps the logs of the two runs before it as `agent.log.1` and `agent.log.2`. It grew

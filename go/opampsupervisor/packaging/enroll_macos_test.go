@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"runtime"
 	"strings"
 	"testing"
@@ -19,28 +20,38 @@ import (
 )
 
 // macEnroll runs macos/pydantic-opamp-enroll under root, with a launchctl stand-in that logs its
-// arguments to tools/launchctl.log.
+// arguments to tools/launchctl.log. Its `print` fails while the daemon isn't loaded (after
+// bootout, before bootstrap); loaded, it says the daemon is running and has run once, unless
+// tools/inactive exists (waiting to be started again, as one that fails to start) or
+// tools/crashing does (running, but started three times).
 func macEnroll(t *testing.T, root, tools, stdin string, args ...string) (string, error) {
 	t.Helper()
 	if runtime.GOOS == "windows" {
 		t.Skip("the enroll script is for macOS")
 	}
 	launchctl := filepath.Join(tools, "launchctl")
-	require.NoError(t, os.WriteFile(launchctl, []byte("#!/bin/sh\necho \"$@\" >>\""+filepath.Join(tools, "launchctl.log")+"\"\n"+
-		// It keeps whether the daemon is loaded, as launchd does: bootstrap loads it, bootout
-		// unloads it, and print says which, with a state line when loaded and 113 (launchctl's
-		// "no such service") when not. With LAUNCHCTL_STOPPING naming a file, a daemon booted out
-		// stays loaded until that many prints have been made.
-		"loaded=\""+filepath.Join(tools, "launchctl.loaded")+"\"\n"+
-		"case $1 in\n"+
-		"bootstrap) touch \"$loaded\" ;;\n"+
-		"bootout) rm -f \"$loaded\" ;;\n"+
-		"print)\n"+
-		"  left=$(cat \"${LAUNCHCTL_STOPPING:-/dev/null}\" 2>/dev/null)\n"+
-		"  if [ \"${left:-0}\" -gt 0 ]; then echo $((left - 1)) >\"$LAUNCHCTL_STOPPING\"; echo 'state = running'; exit 0; fi\n"+
-		"  [ -e \"$loaded\" ] || exit 113\n"+
-		"  echo 'state = running' ;;\n"+
-		"esac\n"), 0o755))
+	require.NoError(t, os.WriteFile(launchctl, []byte(`#!/bin/sh
+echo "$@" >>"`+filepath.Join(tools, "launchctl.log")+`"
+loaded="`+filepath.Join(tools, "loaded")+`"
+case $1 in
+bootout) rm -f "$loaded" ;;
+bootstrap) : >"$loaded" ;;
+print)
+	# With LAUNCHCTL_STOPPING naming a file, launchd still holds the label (stopping) for that many prints.
+	left=$(cat "${LAUNCHCTL_STOPPING:-/dev/null}" 2>/dev/null)
+	if [ "${left:-0}" -gt 0 ]; then echo $((left - 1)) >"$LAUNCHCTL_STOPPING"; exit 0; fi
+	# 113 is launchctl's "no such service": the daemon isn't loaded.
+	[ -e "$loaded" ] || exit 113
+	if [ -e "`+filepath.Join(tools, "inactive")+`" ]; then
+		printf '\tstate = spawn scheduled\n\truns = 4\n'
+	elif [ -e "`+filepath.Join(tools, "crashing")+`" ]; then
+		printf '\tstate = running\n\truns = 3\n'
+	else
+		printf '\tstate = running\n\truns = 1\n'
+	fi
+	;;
+esac
+`), 0o755))
 	cmd := exec.Command("./macos/pydantic-opamp-enroll", args...)
 	cmd.Env = append(os.Environ(), "OPAMP_ENROLL_ROOT="+root, "LAUNCHCTL="+launchctl, "OPAMP_SUPERVISOR="+fakeSupervisor(t, tools))
 	cmd.Stdin = strings.NewReader(stdin)
@@ -98,6 +109,37 @@ func TestMacEnroll(t *testing.T) {
 	// Without --restricted, any config the server sends runs.
 	assert.False(t, loaded.Agent.RemoteConfigPolicy.Enabled(), "a policy without --restricted")
 	require.NoError(t, loaded.Agent.RemoteConfigPolicy.Check("", hostLogsConfig(t, "macos")))
+}
+
+// Started, enrollment waits for the Supervisor to connect, as on Linux: one that can't fails the
+// install with what to check, and a daemon that failed to start says so and where its log is.
+func TestMacEnrollWaitsForTheConnection(t *testing.T) {
+	root, tools := t.TempDir(), t.TempDir()
+	out, err := macEnroll(t, root, tools, "t", "--endpoint", "wss://opamp.example.com/v1/opamp")
+	require.NoError(t, err, out)
+	assert.Contains(t, out, "The Supervisor is running and connected (dev.pydantic.opamp-supervisor)")
+	calls, err := os.ReadFile(filepath.Join(tools, "supervisor.log"))
+	require.NoError(t, err)
+	assert.Regexp(t, `^status --storage `+regexp.QuoteMeta(root)+`/opt/pydantic-opamp/var --wait 30s --since \d+\n$`, string(calls))
+
+	require.NoError(t, os.WriteFile(filepath.Join(tools, "status"), []byte("1"), 0o600))
+	out, err = macEnroll(t, root, tools, "t", "--endpoint", "wss://opamp.example.com/v1/opamp")
+	require.Error(t, err)
+	assert.Contains(t, out, "doesn't trust the server's certificate")
+	assert.Contains(t, out, "can't connect to wss://opamp.example.com/v1/opamp yet; it keeps retrying")
+	assert.NotContains(t, out, "failed to start")
+	assert.NotContains(t, out, "running and connected")
+
+	// Not running, or running but started again since the bootstrap (caught between crashes).
+	for _, state := range []string{"inactive", "crashing"} {
+		require.NoError(t, os.WriteFile(filepath.Join(tools, state), nil, 0o600))
+		out, err = macEnroll(t, root, tools, "t", "--endpoint", "wss://opamp.example.com/v1/opamp")
+		require.Error(t, err, state)
+		assert.Contains(t, out, "the Supervisor service (dev.pydantic.opamp-supervisor) failed to start", state)
+		assert.Contains(t, out, "sudo tail -n 50 "+root+"/opt/pydantic-opamp/var/log/supervisor.log", state)
+		assert.NotContains(t, out, "keeps retrying", state)
+		require.NoError(t, os.Remove(filepath.Join(tools, state)))
+	}
 }
 
 // A --restricted policy widened locally, as on Linux.

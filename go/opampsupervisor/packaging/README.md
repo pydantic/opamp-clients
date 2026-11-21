@@ -83,7 +83,9 @@ echo "$ENROLLMENT_TOKEN" | sudo pydantic-opamp-enroll --endpoint wss://opamp.exa
   `pydantic-opamp-supervisor.service`, then waits up to 30 seconds for the Supervisor to connect
   (`opampsupervisor status --wait`). If it can't, for example because the host doesn't trust the
   server's certificate (pass `--ca-file`), the command prints the Supervisor's status with what to
-  check and exits 1. The service keeps retrying. Pass `--no-start` to skip this step.
+  check and exits 1. The service keeps retrying. A service that failed to start (it isn't running
+  when the wait ends, or systemd has restarted it since the start) never got to connect: the
+  command says so instead, with the `journalctl` line that shows why. Pass `--no-start` to skip this step.
 
 With `--accept-packages`, the config also lets the server update the collector (see
 [Collector updates from the server](#collector-updates-from-the-server)).

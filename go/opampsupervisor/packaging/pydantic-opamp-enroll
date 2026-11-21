@@ -446,12 +446,30 @@ if getent group pydantic-opamp >/dev/null 2>&1 && [ "$(id -u)" = 0 ]; then
 	[ ! -e "$etc/ca.pem" ] || chgrp pydantic-opamp "$etc/ca.pem"
 fi
 
-# wait_connected waits up to 30 seconds for the Supervisor started at $1 (Unix seconds) to connect.
+# restart_count prints how many times systemd has started the unit again after a failure (0 when
+# systemd doesn't say: before 235, or a stand-in).
+restart_count() {
+	n=$("$systemctl" show -p NRestarts --value "$unit" 2>/dev/null) || n=
+	case $n in '' | *[!0-9]*) n=0 ;; esac
+	echo "$n"
+}
+
+# wait_connected waits up to 30 seconds for the Supervisor started at $1 (Unix seconds), with $2
+# restarts counted before, to connect.
 # An install that can't reach its server (an untrusted certificate, a refused key) fails here,
 # with what to check, instead of reporting success; the service keeps retrying.
 wait_connected() {
 	if "$supervisor" status --storage "$storage" --wait 30s --since "$1"; then
 		return 0
+	fi
+	# A service that isn't running, or that systemd has started again since $2 (its restart count
+	# before the start), never got to connect: say so, and where its log is, instead. The count
+	# catches one that crashes a few seconds in, which a single look can find briefly active; an
+	# explicit restart doesn't reset it, so it is compared with the count before.
+	restarts=$(restart_count)
+	if ! "$systemctl" is-active --quiet "$unit" || { [ "$restarts" -ne "$2" ] && [ "$restarts" -gt 0 ]; }; then
+		echo "the Supervisor service ($unit) failed to start, so it never connected to $endpoint. Its log says why: sudo journalctl -u $unit -n 50 --no-pager" >&2
+		exit 1
 	fi
 	echo "enrolled, but the Supervisor can't connect to $endpoint yet; it keeps retrying. Fix what is above, then check with: sudo $supervisor status --storage $storage" >&2
 	exit 1
@@ -463,9 +481,10 @@ if [ -n "$start" ]; then
 	# The unmanaged collector conflicts with the Supervisor: disabled, it doesn't come back at boot.
 	"$systemctl" disable --now pydantic-otelcol.service
 	"$systemctl" enable "$unit"
+	restarts=$(restart_count)
 	started=$(date +%s)
 	"$systemctl" restart "$unit"
-	wait_connected "$started"
+	wait_connected "$started" "$restarts"
 	echo "$done with $endpoint. The Supervisor is running and connected ($unit)."
 else
 	echo "$done with $endpoint. Start the Supervisor with: systemctl enable --now $unit"
