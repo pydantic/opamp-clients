@@ -5,6 +5,8 @@
 
 package main
 
-// transientRead is whether a read of the status file failed because the Supervisor was replacing
-// it: never on Unix, where a rename gives a reader the old file or the new one.
-func transientRead(error) bool { return false }
+import "time"
+
+// transientRead is how long to try a failed read of the status file again: never on Unix, where
+// a rename gives a reader the old file or the new one.
+func transientRead(error) time.Duration { return 0 }

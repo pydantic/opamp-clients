@@ -6,6 +6,8 @@ package supervisor
 import (
 	"bytes"
 	"errors"
+	"fmt"
+	"os"
 	"path/filepath"
 	"testing"
 	"time"
@@ -32,7 +34,7 @@ func TestOwnTelemetryRefusalIsInTheStatusAndLoggedOnce(t *testing.T) {
 	s := &Supervisor{opampClient: c}
 	s.telemetrySettings.Logger = zap.New(core)
 
-	refused := errors.New(`the collector's own telemetry sends to "https://other.example.com/v1/logs", which agent::remote_config_policy::allowed_exporter_endpoints doesn't allow`)
+	refused := ownTelemetryPolicyError{errors.New(`the collector's own telemetry sends to "https://user:s3cret@other.example.com/v1/logs?api_key=k3y", which agent::remote_config_policy::allowed_exporter_endpoints doesn't allow`)}
 	for range 3 {
 		s.refuseOwnTelemetry(refused)
 		s.noteOwnTelemetry(refused)
@@ -50,6 +52,26 @@ func TestOwnTelemetryRefusalIsInTheStatusAndLoggedOnce(t *testing.T) {
 	st.Print(&out, clock)
 	assert.Contains(t, out.String(), "Own telemetry  REFUSED since")
 	assert.Contains(t, out.String(), "allowed_exporter_endpoints")
+	assert.Contains(t, out.String(), `"https://other.example.com/v1/logs"`, "the endpoint, without its credentials")
+	b, err := os.ReadFile(filepath.Join(dir, StatusFile))
+	require.NoError(t, err)
+	for _, secret := range []string{"s3cret", "k3y"} {
+		assert.NotContains(t, string(b), secret, "no credentials in the status file")
+		assert.NotContains(t, out.String(), secret)
+		for _, e := range logs.All() {
+			assert.NotContains(t, fmt.Sprint(e.ContextMap()), secret, "nor in the log")
+		}
+	}
+
+	// Another reason, then the first again: each is said at error once.
+	other := errors.New("could not compose the collector's config")
+	s.refuseOwnTelemetry(other)
+	s.refuseOwnTelemetry(refused)
+	assert.Equal(t, 2, logs.FilterMessage("Refusing the own telemetry settings").FilterLevelExact(zapcore.ErrorLevel).Len())
+	s.noteOwnTelemetry(other)
+	st, err = ReadStatus(dir)
+	require.NoError(t, err)
+	assert.Equal(t, "FAILED", st.OwnTelemetry.Status, "not the policy's")
 
 	s.noteOwnTelemetry(nil)
 	st, err = ReadStatus(dir)
@@ -59,7 +81,7 @@ func TestOwnTelemetryRefusalIsInTheStatusAndLoggedOnce(t *testing.T) {
 
 	// Refused again after it applied: said at error again.
 	s.refuseOwnTelemetry(refused)
-	assert.Equal(t, 2, logs.FilterMessage("Refusing the own telemetry settings").FilterLevelExact(zapcore.ErrorLevel).Len())
+	assert.Equal(t, 3, logs.FilterMessage("Refusing the own telemetry settings").FilterLevelExact(zapcore.ErrorLevel).Len())
 }
 
 // statusCapture is an OpAMP client that keeps the connection settings status it is given.

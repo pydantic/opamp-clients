@@ -1785,7 +1785,8 @@ func (s *Supervisor) loadLastReceivedOwnTelemetryConfig() {
 		if err != nil {
 			s.telemetrySettings.Logger.Error("Cannot parse last received own telemetry config", zap.Error(err))
 		} else {
-			_, _ = s.setupOwnTelemetry(s.runCtx, set)
+			_, err := s.setupOwnTelemetry(s.runCtx, set)
+			s.noteOwnTelemetry(err) // Changed here: the status says it (own_telemetry_status.go).
 		}
 	}
 }
@@ -3070,14 +3071,15 @@ func (s *Supervisor) processAgentIdentificationMessage(msg *protobufs.AgentIdent
 	s.telemetrySettings.Logger.Debug("Agent identity is changing",
 		zap.String("old_id", s.persistentState.InstanceID.String()),
 		zap.String("new_id", newInstanceID.String()))
-	// Changed here: the change is said once, and the collector's messages with the replaced UID
-	// are expected until it starts again (instance_uid_change.go).
-	s.notePreviousInstanceID(s.persistentState.instanceID(), newInstanceID)
+	previous := s.persistentState.instanceID() // Changed here: for notePreviousInstanceID below.
 
 	err = s.persistentState.SetInstanceID(newInstanceID)
 	if err != nil {
 		s.telemetrySettings.Logger.Error("Failed to persist new instance ID, instance ID will revert on restart.", zap.String("new_id", newInstanceID.String()), zap.Error(err))
 	}
+	// Changed here: the change is said once, and the collector's messages with the replaced UID
+	// are expected until it starts again (instance_uid_change.go).
+	s.notePreviousInstanceID(previous, newInstanceID)
 
 	err = s.opampClient.SetAgentDescription(s.agentDescription.Load().(*protobufs.AgentDescription))
 	if err != nil {

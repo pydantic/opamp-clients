@@ -203,8 +203,10 @@ agent:
   `--wait` wait for it; without the flag, `--wait` still returns 0 on the connection, after giving
   the server up to 10 seconds to answer so that what it prints says whether it did.
   The status also says what became of the server's own telemetry settings (`own_telemetry`:
-  APPLIED, or REFUSED and why: an endpoint `agent::remote_config_policy` doesn't allow, say). A
-  server offers them again at each connection; their refusal is logged at error once for each
+  APPLIED, REFUSED by `agent::remote_config_policy` (an endpoint it doesn't allow, say) or FAILED,
+  and why, its URLs without user info, query or fragment), from the server or, at a start, from
+  the settings saved. It doesn't make the status unwell: the Collector runs without them. A
+  server may offer them again at each connection; a refusal is logged at error once for each
   reason, then at debug.
   The command is taken in a file of its own (`status_command.go`) before `main` runs, so
   upstream's `main.go` is unchanged.

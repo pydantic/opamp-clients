@@ -241,15 +241,20 @@ func readsFailingFirst(t *testing.T, n int) *atomic.Int32 {
 		}
 		return supervisor.ReadStatus(dir)
 	}
-	isTransientRead = func(err error) bool { return errors.Is(err, errReplacing) }
+	isTransientRead = func(err error) time.Duration {
+		if errors.Is(err, errReplacing) {
+			return forever
+		}
+		return 0
+	}
 	t.Cleanup(func() { readStatus, isTransientRead = supervisor.ReadStatus, transientRead })
 	return &calls
 }
 
-// A read that meets the Supervisor's replacing of the status file (Windows) doesn't end the wait:
-// a host that connects is reported connected, exit 0 (DW5: one install in twelve said it couldn't
-// connect). The plain command tries such a read again too. Any other read error still fails at
-// once.
+// A read that meets the Supervisor's replacing of the status file (Windows) doesn't end the wait,
+// however long the run of such reads: a host that connects is reported connected, exit 0 (one
+// install in twelve on a Windows host said it couldn't connect). The plain command tries such a
+// read again too. Any other read error still fails at once.
 func TestStatusCommandRetriesAReadThatMeetsAReplace(t *testing.T) {
 	dir := t.TempDir()
 	now := time.Now()
@@ -264,11 +269,11 @@ func TestStatusCommandRetriesAReadThatMeetsAReplace(t *testing.T) {
 		return code, out.String(), errOut.String()
 	}
 
-	calls := readsFailingFirst(t, 20) // 20 × 50 ms: a second of failed reads
+	calls := readsFailingFirst(t, 60) // 60 × 50 ms: three seconds of failed reads, past any short retry
 	code, out, errOut := run("--wait", "30s", "--since", fmt.Sprint(now.Unix()), "--require-accepted")
 	assert.Equal(t, 0, code, errOut)
 	assert.Contains(t, out, "connected since")
-	assert.Greater(t, calls.Load(), int32(20))
+	assert.Greater(t, calls.Load(), int32(60))
 
 	readsFailingFirst(t, 5)
 	code, out, errOut = run()

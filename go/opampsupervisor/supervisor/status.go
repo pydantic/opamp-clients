@@ -51,8 +51,10 @@ type Status struct {
 }
 
 // OwnTelemetryState is the outcome of the server's last own telemetry settings (where the
-// collector sends its own metrics and logs): Status "APPLIED", or "REFUSED" with why (one the
-// remote config policy doesn't allow, say), since Since.
+// collector sends its own metrics and logs), since Since: "APPLIED" (in the collector's config;
+// whether it runs is the collector's health), "REFUSED" by agent::remote_config_policy, or
+// "FAILED" otherwise, with why (its URLs without user info, query or fragment). It doesn't make
+// the status unwell: the collector runs, without those settings.
 type OwnTelemetryState struct {
 	Status string    `json:"status"`
 	Since  time.Time `json:"since"`
@@ -204,9 +206,9 @@ func (r *statusReport) accepted(logger *zap.Logger) {
 // applied. The time is that of the first of a run of the same outcome.
 func (r *statusReport) ownTelemetry(logger *zap.Logger, err error) {
 	r.update(logger, func(st *Status, now time.Time) {
-		ot := &OwnTelemetryState{Status: "APPLIED", Since: now}
+		ot := &OwnTelemetryState{Status: ownTelemetryOutcome(err), Since: now}
 		if err != nil {
-			ot.Status, ot.Error = "REFUSED", err.Error()
+			ot.Error = shownURLs(err.Error())
 		}
 		if old := st.OwnTelemetry; old != nil && old.Status == ot.Status && old.Error == ot.Error {
 			return

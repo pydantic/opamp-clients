@@ -13,6 +13,10 @@ import (
 	"github.com/pydantic/opamp-clients/go/opampsupervisor/supervisor/config"
 )
 
+// Upstream's tests compare whole merged configs, on macOS too: they run without the default.
+// TestTheCollectorLogIsSampledByDefaultOnMacOS names the system it tests.
+func init() { logSamplingGOOS = "" }
+
 func logSampling(t *testing.T, s *Supervisor) map[string]any {
 	t.Helper()
 	conf, err := config.NewConfFromYAML([]byte(s.cfgState.Load().(*configState).mergedConfig))
@@ -21,9 +25,9 @@ func logSampling(t *testing.T, s *Supervisor) map[string]any {
 	return m
 }
 
-// On macOS the collector's own log is sampled by default (MA6: upstream's unified log receiver
-// logs a line at each poll, about one a second); a remote config's own sampling wins; other
-// systems get no default.
+// On macOS the collector's own log is sampled by default (upstream's unified log receiver logs a
+// line at each poll, about one a second); a remote config's own sampling wins; other systems get
+// no default.
 func TestTheCollectorLogIsSampledByDefaultOnMacOS(t *testing.T) {
 	withRemoteSampling := &protobufs.AgentRemoteConfig{Config: &protobufs.AgentConfigMap{ConfigMap: map[string]*protobufs.AgentConfigObject{
 		"": {Body: []byte("receivers:\n  nop: {}\nexporters:\n  nop: {}\nservice:\n  telemetry:\n    logs:\n      sampling:\n        enabled: false\n  pipelines:\n    logs:\n      receivers: [nop]\n      exporters: [nop]\n")},
