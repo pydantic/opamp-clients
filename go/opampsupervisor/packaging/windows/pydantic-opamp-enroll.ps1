@@ -88,10 +88,17 @@ function Set-Recovery {
     if ($LASTEXITCODE -ne 0) { Fail "could not set the $service service to start again after a failure (sc.exe failureflag: $LASTEXITCODE)" }
 }
 
+# Fail-Start says the Supervisor service failed to start, and where its log is.
+function Fail-Start {
+    Fail "the Supervisor service ($service) failed to start, so it never connected to $Endpoint. Its log says why: Get-WinEvent -FilterHashtable @{LogName='Application'; ProviderName='$service'} -MaxEvents 50 | Format-List TimeCreated, Message"
+}
+
 function Restart-Supervisor {
     Set-Recovery
     Set-Service -Name $service -StartupType Automatic
-    Restart-Service -Name $service
+    # A service that stops at once (a config it can't load, say) makes Restart-Service fail with
+    # its own words ("Failed to start service"): said as a start that failed, with its log.
+    try { Restart-Service -Name $service -ErrorAction Stop } catch { Fail-Start }
 }
 
 # Keep a config an older package wrote, and start the Supervisor again with it.
@@ -369,19 +376,23 @@ if ($NoStart) {
 } else {
     $started = [DateTimeOffset]::UtcNow.ToUnixTimeSeconds()
     Restart-Supervisor
-    # An install that can't reach its server (an untrusted certificate, a refused key) fails here,
-    # with what to check, instead of reporting success; the service keeps retrying.
+    # An install that can't reach its server (an untrusted certificate) or whose token the server
+    # refuses fails here, with what to check, instead of reporting success; the service keeps
+    # retrying.
     $supervisor = if ($env:OPAMP_SUPERVISOR) { $env:OPAMP_SUPERVISOR } else { Join-Path $programs 'opampsupervisor.exe' }
     $storage = Join-Path $root 'var'
-    & $supervisor status --storage $storage --wait 30s --since $started
+    # --require-accepted: connected is not enough; the server must have answered (a server that
+    # takes the connection but not the credentials closes it unanswered).
+    & $supervisor status --storage $storage --wait 30s --since $started --require-accepted
     if ($LASTEXITCODE -ne 0) {
         # A service that isn't running never got to connect: say so, and where its log is, instead.
-        if ((Get-Service -Name $service -ErrorAction SilentlyContinue).Status -ne 'Running') {
-            Write-Error "the Supervisor service ($service) failed to start, so it never connected to $Endpoint. Its log says why: Get-WinEvent -FilterHashtable @{LogName='Application'; ProviderName='$service'} -MaxEvents 50 | Format-List TimeCreated, Message"
-            exit 1
+        if ((Get-Service -Name $service -ErrorAction SilentlyContinue).Status -ne 'Running') { Fail-Start }
+        $st = $null
+        try { $st = (& $supervisor status --storage $storage --json 2>$null | Out-String) | ConvertFrom-Json } catch { }
+        if ($st -and $st.server -and $st.server.connected -and -not $st.accepted) {
+            Fail "enrolled, but the server at $Endpoint took the connection and not the enrollment token: it may be used up, expired or revoked. Enroll again with a new token; check with: & '$supervisor' status --storage '$storage'"
         }
-        Write-Error "enrolled, but the Supervisor can't connect to $Endpoint yet; it keeps retrying. Fix what is above, then check with: & '$supervisor' status --storage '$storage'"
-        exit 1
+        Fail "enrolled, but the Supervisor can't connect to $Endpoint yet; it keeps retrying. Fix what is above, then check with: & '$supervisor' status --storage '$storage'"
     }
     Write-Output "$done with $Endpoint. The Supervisor is running and connected ($service)."
 }

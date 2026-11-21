@@ -49,18 +49,28 @@ exit 0
 }
 
 // fakeSupervisor stands in for `opampsupervisor status`: it logs its arguments to
-// dir/supervisor.log, and prints and exits as dir/status says ("0" when it is missing).
+// dir/supervisor.log, and prints and exits as dir/status says ("0" when it is missing). With
+// --json it prints dir/json (a status that is connected and not accepted: a refused token), or
+// one that isn't connected.
 func fakeSupervisor(t *testing.T, dir string) string {
 	t.Helper()
 	supervisor := filepath.Join(dir, "opampsupervisor")
 	require.NoError(t, os.WriteFile(supervisor, []byte(`#!/bin/sh
-echo "$@" >>"`+filepath.Join(dir, "supervisor.log")+`"
 code=$(cat "`+filepath.Join(dir, "status")+`" 2>/dev/null || echo 0)
+case " $* " in *" --json "*)
+	cat "`+filepath.Join(dir, "json")+`" 2>/dev/null || printf '{\n  "server": {\n    "connected": false\n  }\n}\n'
+	exit "$code" ;;
+esac
+echo "$@" >>"`+filepath.Join(dir, "supervisor.log")+`"
 [ "$code" = 0 ] || echo "OpAMP server   can't reach it: this host doesn't trust the server's certificate"
 exit "$code"
 `), 0o755))
 	return supervisor
 }
+
+// refusedJSON is `status --json` for a Supervisor the server took the connection of and never
+// answered: a refused token.
+const refusedJSON = "{\n  \"server\": {\n    \"connected\": true,\n    \"since\": \"2026-11-21T12:00:00Z\"\n  }\n}\n"
 
 type enrollment struct {
 	root, tools string
@@ -464,7 +474,7 @@ func TestEnrollWaitsForTheConnection(t *testing.T) {
 	assert.Contains(t, out, "The Supervisor is running and connected")
 	calls, err := os.ReadFile(filepath.Join(e.tools, "supervisor.log"))
 	require.NoError(t, err)
-	assert.Regexp(t, `^status --storage `+regexp.QuoteMeta(e.root)+`/var/lib/pydantic-opamp --wait 30s --since \d+\n$`, string(calls))
+	assert.Regexp(t, `^status --storage `+regexp.QuoteMeta(e.root)+`/var/lib/pydantic-opamp --wait 30s --since \d+ --require-accepted\n$`, string(calls))
 
 	require.NoError(t, os.WriteFile(filepath.Join(e.tools, "status"), []byte("1"), 0o600))
 	out, err = e.run(t, "bootstrap-token", "--endpoint", "wss://opamp.example.com/v1/opamp")
@@ -472,6 +482,14 @@ func TestEnrollWaitsForTheConnection(t *testing.T) {
 	assert.Contains(t, out, "doesn't trust the server's certificate")
 	assert.Contains(t, out, "can't connect to wss://opamp.example.com/v1/opamp yet; it keeps retrying")
 	assert.NotContains(t, out, "running and connected")
+
+	// Connected, and the server never answered: the token was refused (used up, expired, revoked).
+	require.NoError(t, os.WriteFile(filepath.Join(e.tools, "json"), []byte(refusedJSON), 0o600))
+	out, err = e.run(t, "bootstrap-token", "--endpoint", "wss://opamp.example.com/v1/opamp")
+	require.Error(t, err)
+	assert.Contains(t, out, "took the connection and not the enrollment token: it may be used up, expired or revoked")
+	assert.NotContains(t, out, "keeps retrying")
+	require.NoError(t, os.Remove(filepath.Join(e.tools, "json")))
 
 	// A service that failed to start (an unreadable credential, say) never tried to connect: the
 	// install says so and where its log is, not that it keeps retrying.

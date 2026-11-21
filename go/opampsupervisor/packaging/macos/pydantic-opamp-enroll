@@ -434,11 +434,23 @@ if [ -z "$edited" ]; then
 	printf '%s' "$saved" >"$options"
 fi
 
-# wait_connected waits up to 30 seconds for the Supervisor started at $1 (Unix seconds) to connect.
+# not_accepted fails the install when the Supervisor is connected but the server never answered
+# it: a server that takes the connection but not the credentials (a used-up, expired or revoked
+# enrollment token) closes it unanswered.
+not_accepted() {
+	st=$("$supervisor" status --storage "$storage" --json 2>/dev/null) || :
+	if printf '%s\n' "$st" | grep -q '"connected": true' && ! printf '%s\n' "$st" | grep -q '"accepted": {'; then
+		echo "enrolled, but the server at $endpoint took the connection and not the enrollment token: it may be used up, expired or revoked. Enroll again with a new token; check with: sudo $supervisor status --storage $storage" >&2
+		exit 1
+	fi
+}
+
+# wait_connected waits up to 30 seconds for the Supervisor started at $1 (Unix seconds) to connect
+# and the server to answer it (--require-accepted).
 # An install that can't reach its server (an untrusted certificate, a refused key) fails here,
 # with what to check, instead of reporting success; the service keeps retrying.
 wait_connected() {
-	if "$supervisor" status --storage "$storage" --wait 30s --since "$1"; then
+	if "$supervisor" status --storage "$storage" --wait 30s --since "$1" --require-accepted; then
 		return 0
 	fi
 	# A daemon that isn't running, or that launchd has started more than once since the bootstrap
@@ -451,6 +463,7 @@ wait_connected() {
 		echo "the Supervisor service ($label) failed to start, so it never connected to $endpoint. Its log says why: sudo tail -n 50 $storage/log/supervisor.log" >&2
 		exit 1
 	fi
+	not_accepted
 	echo "enrolled, but the Supervisor can't connect to $endpoint yet; it keeps retrying. Fix what is above, then check with: sudo $supervisor status --storage $storage" >&2
 	exit 1
 }

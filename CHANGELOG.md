@@ -116,6 +116,11 @@ and date. Tests, CI and docs alone don't need a line.
 
 ### Fixed
 
+- Supervisor installers: `pydantic-opamp-enroll` (Linux, macOS, Windows) fails an install whose
+  enrollment token the server refuses (used up, expired, revoked), saying so, where it reported
+  "running and connected" and exited 0: it waits with `opampsupervisor status --require-accepted`.
+  On Windows a service that fails at once (a config it can't load) gives the "failed to start"
+  message and its log, where `Restart-Service` failed with its own error (#150).
 - Supervisor on Windows: `opampsupervisor status --wait`, which the enrollment helper runs, ended
   with "can't connect" (exit 1) when it read the status file just as the Supervisor replaced it (a
   sharing violation), though the host connected a second later. Such a read is now tried again

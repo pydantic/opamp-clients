@@ -120,7 +120,7 @@ func TestMacEnrollWaitsForTheConnection(t *testing.T) {
 	assert.Contains(t, out, "The Supervisor is running and connected (dev.pydantic.opamp-supervisor)")
 	calls, err := os.ReadFile(filepath.Join(tools, "supervisor.log"))
 	require.NoError(t, err)
-	assert.Regexp(t, `^status --storage `+regexp.QuoteMeta(root)+`/opt/pydantic-opamp/var --wait 30s --since \d+\n$`, string(calls))
+	assert.Regexp(t, `^status --storage `+regexp.QuoteMeta(root)+`/opt/pydantic-opamp/var --wait 30s --since \d+ --require-accepted\n$`, string(calls))
 
 	require.NoError(t, os.WriteFile(filepath.Join(tools, "status"), []byte("1"), 0o600))
 	out, err = macEnroll(t, root, tools, "t", "--endpoint", "wss://opamp.example.com/v1/opamp")
@@ -129,6 +129,14 @@ func TestMacEnrollWaitsForTheConnection(t *testing.T) {
 	assert.Contains(t, out, "can't connect to wss://opamp.example.com/v1/opamp yet; it keeps retrying")
 	assert.NotContains(t, out, "failed to start")
 	assert.NotContains(t, out, "running and connected")
+
+	// Connected, and the server never answered: the token was refused.
+	require.NoError(t, os.WriteFile(filepath.Join(tools, "json"), []byte(refusedJSON), 0o600))
+	out, err = macEnroll(t, root, tools, "t", "--endpoint", "wss://opamp.example.com/v1/opamp")
+	require.Error(t, err)
+	assert.Contains(t, out, "took the connection and not the enrollment token: it may be used up, expired or revoked")
+	assert.NotContains(t, out, "keeps retrying")
+	require.NoError(t, os.Remove(filepath.Join(tools, "json")))
 
 	// Not running, or running but started again since the bootstrap (caught between crashes).
 	for _, state := range []string{"inactive", "crashing"} {
