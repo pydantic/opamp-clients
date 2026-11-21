@@ -120,6 +120,10 @@ and date. Tests, CI and docs alone don't need a line.
   with "can't connect" (exit 1) when it read the status file just as the Supervisor replaced it (a
   sharing violation), though the host connected a second later. Such a read is now tried again
   until the wait is up, and for 2 seconds by the plain `status` (#150).
+- Supervisor on macOS: the Collector's own log is sampled by default (in each minute the first 5
+  lines with the same level and message, then one in 500), as upstream's unified log receiver logs
+  "Running log command" at info for each poll, about once a second on a busy Mac. A remote config
+  that sets `service::telemetry::logs::sampling` keeps its own (#150).
 - Supervisor: a reinstall with a new enrollment key over kept data logged a warning ("Ignoring a
   message to the local OpAMP server with another instance UID") for each message of the
   Collector still running with the previous instance UID. The server's new UID is now said once at

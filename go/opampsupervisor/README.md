@@ -208,6 +208,13 @@ agent:
   reason, then at debug.
   The command is taken in a file of its own (`status_command.go`) before `main` runs, so
   upstream's `main.go` is unchanged.
+- **On macOS the Collector's own log is sampled by default.** Upstream's macOS unified log
+  receiver logs "Running log command" at info for each poll, and polls again 100 ms after any poll
+  that found logs: about one line a second on a busy Mac, into `agent.log` and the Collector's own
+  telemetry. The Supervisor's own telemetry section on macOS sets
+  `service::telemetry::logs::sampling` (in each minute the first 5 lines with the same level and
+  message, then one in 500). A remote config that sets its own sampling keeps it; Linux and
+  Windows get no default.
 - **A new instance UID from the server is said once.** When the server gives the host a new
   instance UID (an enrollment with a new key over kept state, where the client starts with the UID
   it kept), the Supervisor logs it at info with the previous one. The collector started before it
@@ -246,7 +253,7 @@ Every file from upstream keeps its license header (Apache-2.0, [LICENSE](LICENSE
 paths were rewritten to this module's. The files changed beyond that say what changed in their
 header. These files are new, and are this repository's:
 
-- `supervisor/coreclient.go`, `agent_update.go`, `apply_step.go`, `client_state.go`, `startup.go`, `sealed_storage.go`, `telemetry_env.go`, `idle_telemetry.go`, `reachability.go`, `status.go`, `own_telemetry_status.go`, `instance_uid_change.go`,
+- `supervisor/coreclient.go`, `agent_update.go`, `apply_step.go`, `client_state.go`, `startup.go`, `sealed_storage.go`, `telemetry_env.go`, `idle_telemetry.go`, `reachability.go`, `status.go`, `own_telemetry_status.go`, `instance_uid_change.go`, `log_sampling.go`,
   `localserver.go`, `service_log.go`, `config/remote_config_policy.go`, `commander/collector_env.go`,
   `commander/agent_log.go` and `verifier/cosign.go`, and the tests
   beside them (with `supervisor/remote_config_refusal_test.go`, `restart_command_test.go` and

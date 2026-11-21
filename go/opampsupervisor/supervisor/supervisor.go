@@ -29,7 +29,8 @@
 // is in the status, and their refusal is logged at error once per reason
 // (own_telemetry_status.go). A new instance UID from the server is said once, and the
 // collector's messages with the replaced one are expected until it starts again
-// (instance_uid_change.go).
+// (instance_uid_change.go). On macOS the collector's own log is sampled by default
+// (log_sampling.go).
 
 package supervisor
 
@@ -1493,7 +1494,8 @@ func (s *Supervisor) composeAgentConfigFiles(incomingConfig *protobufs.AgentRemo
 	conf := confmap.New()
 
 	specialConfigComposers := map[config.SpecialConfigFile][]configComposer{
-		config.SpecialConfigFileOwnTelemetry:   {s.composeOwnTelemetryConfig, s.composeExtraTelemetryConfig},
+		// Changed here: on macOS, a default for the collector's log sampling (log_sampling.go).
+		config.SpecialConfigFileOwnTelemetry:   {s.composeOwnTelemetryConfig, s.composeExtraTelemetryConfig, s.composeLogSamplingDefault},
 		config.SpecialConfigFileOpAMPExtension: {s.composeOpAMPExtensionConfig},
 		config.SpecialConfigFileRemoteConfig:   s.createRemoteConfigComposers(incomingConfig),
 	}
