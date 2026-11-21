@@ -130,6 +130,18 @@ func TestMacEnrollWaitsForTheConnection(t *testing.T) {
 	assert.NotContains(t, out, "failed to start")
 	assert.NotContains(t, out, "running and connected")
 
+	// Enrolled again with the same token after the server revoked the host's own credentials: the
+	// saved state goes, and the daemon starts again from the token, once.
+	state := filepath.Join(root, "opt/pydantic-opamp/var/opamp-state")
+	require.NoError(t, os.MkdirAll(filepath.Dir(state), 0o700))
+	require.NoError(t, os.WriteFile(state, []byte("sealed"), 0o600))
+	require.NoError(t, os.WriteFile(filepath.Join(tools, "json"), []byte(revokedJSON), 0o600))
+	out, err = macEnroll(t, root, tools, "t", "--endpoint", "wss://opamp.example.com/v1/opamp")
+	require.Error(t, err, "the fake status still fails after the second start")
+	assert.Equal(t, 1, strings.Count(out, "the server refused this host's saved credentials"))
+	assert.NoFileExists(t, state)
+	require.NoError(t, os.Remove(filepath.Join(tools, "json")))
+
 	// Connected, and the server never answered: the token was refused.
 	require.NoError(t, os.WriteFile(filepath.Join(tools, "json"), []byte(refusedJSON), 0o600))
 	out, err = macEnroll(t, root, tools, "t", "--endpoint", "wss://opamp.example.com/v1/opamp")

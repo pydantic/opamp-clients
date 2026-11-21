@@ -134,6 +134,7 @@ restricted=
 start=yes
 telemetry_stdin=
 refresh=
+restarted_fresh=
 saved=
 if [ "${1:-}" = --refresh ]; then
 	[ $# -eq 1 ] || fail "--refresh takes no other options: it uses the last enrollment's"
@@ -469,8 +470,32 @@ not_accepted() {
 	fi
 }
 
+# refused_saved is whether the server refused the credentials the Supervisor connects with (HTTP
+# 401 or 403), with the client's saved state there: the host's own issued credentials, which the
+# client keeps while the configured token is the same, and which the server revoked (it deleted
+# the host, say). The client never falls back from them to the token.
+refused_saved() {
+	[ -z "$refresh" ] && [ -z "$restarted_fresh" ] && [ -e "$storage/opamp-state" ] || return 1
+	"$supervisor" status --storage "$storage" --json 2>/dev/null | grep -qE '"http_status": 40[13]'
+}
+
 wait_connected() {
 	if "$supervisor" status --storage "$storage" --wait 30s --since "$1" --require-accepted; then
+		return 0
+	fi
+	# Enrolling (not --refresh) with the token this host enrolled with before, after the server
+	# revoked its own credentials: those are forgotten, with the instance UID kept with them, and
+	# the Supervisor starts again from the token, once. A healthy host enrolled again is never
+	# refused, and keeps its identity.
+	if refused_saved; then
+		restarted_fresh=1
+		echo "the server refused this host's saved credentials (it was deleted on the server, say): enrolling it again with the token, as a new host" >&2
+		"$systemctl" stop "$unit"
+		rm -f "$storage/opamp-state"
+		restarts=$(restart_count)
+		started=$(date +%s)
+		"$systemctl" start "$unit"
+		wait_connected "$started" "$restarts"
 		return 0
 	fi
 	# A service that isn't running, or that systemd has started again since $2 (its restart count

@@ -42,6 +42,7 @@ show) cat "$restarts" 2>/dev/null ;;
 restart)
 	crashes=$(cat "`+filepath.Join(dir, "crashes")+`" 2>/dev/null) || exit 0
 	echo $(($(cat "$restarts" 2>/dev/null || echo 0) + crashes)) >"$restarts" ;;
+start) [ -e "`+filepath.Join(dir, "heal")+`" ] && rm -f "`+filepath.Join(dir, "status")+`" "`+filepath.Join(dir, "json")+`" ;;
 esac
 exit 0
 `), 0o755))
@@ -67,6 +68,9 @@ exit "$code"
 `), 0o755))
 	return supervisor
 }
+
+// revokedJSON is `status --json` for a Supervisor whose saved credentials the server refuses.
+const revokedJSON = "{\n  \"server\": {\n    \"connected\": false,\n    \"since\": \"2026-11-21T12:00:00Z\",\n    \"http_status\": 401\n  }\n}\n"
 
 // refusedJSON is `status --json` for a Supervisor the server took the connection of and never
 // answered: a refused token.
@@ -490,6 +494,34 @@ func TestEnrollWaitsForTheConnection(t *testing.T) {
 	assert.Contains(t, out, "took the connection and not the enrollment token: it may be used up, expired or revoked")
 	assert.NotContains(t, out, "keeps retrying")
 	require.NoError(t, os.Remove(filepath.Join(e.tools, "json")))
+
+	// Enrolled again with the same token after the server revoked the host's own credentials (it
+	// deleted the host): the saved state goes, and the Supervisor starts again from the token, once.
+	state := filepath.Join(e.root, "var/lib/pydantic-opamp/opamp-state")
+	require.NoError(t, os.MkdirAll(filepath.Dir(state), 0o700))
+	require.NoError(t, os.WriteFile(state, []byte("sealed"), 0o600))
+	require.NoError(t, os.WriteFile(filepath.Join(e.tools, "json"), []byte(revokedJSON), 0o600))
+	require.NoError(t, os.WriteFile(filepath.Join(e.tools, "heal"), nil, 0o600))
+	require.NoError(t, os.Remove(filepath.Join(e.tools, "systemctl.log")))
+	out, err = e.run(t, "bootstrap-token", "--endpoint", "wss://opamp.example.com/v1/opamp")
+	require.NoError(t, err, out)
+	assert.Contains(t, out, "the server refused this host's saved credentials")
+	assert.Contains(t, out, "The Supervisor is running and connected")
+	assert.NoFileExists(t, state)
+	systemctlLog, err := os.ReadFile(filepath.Join(e.tools, "systemctl.log"))
+	require.NoError(t, err)
+	assert.Contains(t, string(systemctlLog), "stop pydantic-opamp-supervisor.service\n")
+	// Refused again after that: no second try, and what to check.
+	require.NoError(t, os.Remove(filepath.Join(e.tools, "heal")))
+	require.NoError(t, os.WriteFile(state, []byte("sealed"), 0o600))
+	require.NoError(t, os.WriteFile(filepath.Join(e.tools, "json"), []byte(revokedJSON), 0o600))
+	require.NoError(t, os.WriteFile(filepath.Join(e.tools, "status"), []byte("1"), 0o600))
+	out, err = e.run(t, "bootstrap-token", "--endpoint", "wss://opamp.example.com/v1/opamp")
+	require.Error(t, err)
+	assert.Contains(t, out, "the server refused this host's saved credentials")
+	assert.Equal(t, 1, strings.Count(out, "the server refused this host's saved credentials"))
+	require.NoError(t, os.Remove(filepath.Join(e.tools, "json")))
+	require.NoError(t, os.WriteFile(filepath.Join(e.tools, "status"), []byte("1"), 0o600))
 
 	// A service that failed to start (an unreadable credential, say) never tried to connect: the
 	// install says so and where its log is, not that it keeps retrying.

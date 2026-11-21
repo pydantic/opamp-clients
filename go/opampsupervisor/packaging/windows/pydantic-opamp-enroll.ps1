@@ -384,6 +384,24 @@ if ($NoStart) {
     # --require-accepted: connected is not enough; the server must have answered (a server that
     # takes the connection but not the credentials closes it unanswered).
     & $supervisor status --storage $storage --wait 30s --since $started --require-accepted
+    # Enrolling (not -Refresh) with the token this host enrolled with before, after the server
+    # revoked its own credentials (it deleted the host, say): the client keeps them while the
+    # token is the same and never falls back to it, so they are forgotten, with the instance UID
+    # kept with them, and the Supervisor starts again from the token, once. A healthy host enrolled
+    # again is never refused, and keeps its identity.
+    $state = Join-Path $storage 'opamp-state'
+    if ($LASTEXITCODE -ne 0 -and -not $Refresh -and (Test-Path -LiteralPath $state)) {
+        $st = $null
+        try { $st = (& $supervisor status --storage $storage --json 2>$null | Out-String) | ConvertFrom-Json } catch { }
+        if ($st -and $st.server -and ($st.server.http_status -eq 401 -or $st.server.http_status -eq 403)) {
+            Note "the server refused this host's saved credentials (it was deleted on the server, say): enrolling it again with the token, as a new host"
+            Stop-Service -Name $service -Force -ErrorAction SilentlyContinue
+            Remove-Item -LiteralPath $state -Force
+            $started = [DateTimeOffset]::UtcNow.ToUnixTimeSeconds()
+            Restart-Supervisor
+            & $supervisor status --storage $storage --wait 30s --since $started --require-accepted
+        }
+    }
     if ($LASTEXITCODE -ne 0) {
         # A service that isn't running never got to connect: say so, and where its log is, instead.
         if ((Get-Service -Name $service -ErrorAction SilentlyContinue).Status -ne 'Running') { Fail-Start }
