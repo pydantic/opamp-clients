@@ -67,7 +67,13 @@ func statusCommand(args []string, stdout, stderr io.Writer) int {
 	if *wait > 0 {
 		return waitConnected(dir, *wait, time.Unix(*since, 0), *requireAccepted, *jsonOut, stdout, stderr)
 	}
-	st, err := supervisor.ReadStatus(dir)
+	st, err := readStatus(dir)
+	// A read that meets the Supervisor's replacing of the file (Windows) is tried again for a
+	// moment.
+	for start := time.Now(); err != nil && isTransientRead(err) && time.Since(start) < transientReadFor; {
+		time.Sleep(50 * time.Millisecond)
+		st, err = readStatus(dir)
+	}
 	if err != nil {
 		return readFailed(dir, err, stderr)
 	}
@@ -79,6 +85,16 @@ func statusCommand(args []string, stdout, stderr io.Writer) int {
 	}
 	return 0
 }
+
+// readStatus reads the status file; a variable for the tests.
+var readStatus = supervisor.ReadStatus
+
+// isTransientRead is whether a read of the status file failed only because it met the
+// Supervisor's replacing of it (transientRead); a variable for the tests.
+var isTransientRead = transientRead
+
+// transientReadFor is how long the plain command tries such a read again.
+const transientReadFor = 2 * time.Second
 
 // readFailed says why the status in dir can't be read, and returns the exit code for it (2).
 func readFailed(dir string, err error, stderr io.Writer) int {
@@ -111,26 +127,21 @@ func printStatus(st *supervisor.Status, jsonOut bool, stdout, stderr io.Writer) 
 
 // waitConnected polls the status file until a Supervisor started at or after since is connected
 // and taken by the server, or, without accepted, connected for supervisor.AcceptGrace (or until
-// wait is up, connected); or wait is up; it then prints the status as the plain command does. A status file that exists
-// but can't be read (permissions, say) fails after a second, since waiting won't change it.
+// wait is up, connected); or wait is up; it then prints the status as the plain command does. A
+// read that meets the Supervisor's replacing of the file (a sharing violation on Windows) is
+// tried again until wait is up; a status file that can't be read otherwise (permissions, say)
+// fails at once, since waiting won't change it.
 func waitConnected(dir string, wait time.Duration, since time.Time, accepted, jsonOut bool, stdout, stderr io.Writer) int {
 	deadline := time.Now().Add(wait)
-	var unreadable time.Time
 	for {
-		st, err := supervisor.ReadStatus(dir)
+		st, err := readStatus(dir)
 		if err != nil && !errors.Is(err, fs.ErrNotExist) {
-			// On Windows a read can meet the Supervisor's replacing of the file (access denied):
-			// tried again for a moment before it counts.
-			if unreadable.IsZero() {
-				unreadable = time.Now()
-			}
-			if time.Since(unreadable) < time.Second {
+			if isTransientRead(err) && time.Now().Before(deadline) {
 				time.Sleep(50 * time.Millisecond)
 				continue
 			}
 			return readFailed(dir, err, stderr)
 		}
-		unreadable = time.Time{}
 		current := err == nil && !st.Started.Before(since) && st.Running()
 		connected := current && st.Server != nil && st.Server.Connected
 		late := time.Now().After(deadline)

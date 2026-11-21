@@ -6,9 +6,12 @@ package main
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -222,4 +225,67 @@ func TestStatusCommandWaitGivesTheServerItsGrace(t *testing.T) {
 	code := statusCommand([]string{"--storage", dir, "--wait", "300ms", "--since", fmt.Sprint(now.Unix())}, &out, &bytes.Buffer{})
 	assert.Equal(t, 0, code)
 	assert.Contains(t, out.String(), "Accepted       not yet")
+}
+
+// errReplacing stands for the error Windows gives a read that meets the Supervisor's replacing of
+// the status file (a sharing violation).
+var errReplacing = errors.New("The process cannot access the file because it is being used by another process.")
+
+// readsFailingFirst makes the status command's first n reads fail as Windows does while the
+// Supervisor replaces the file, the reads after that reading it as it is.
+func readsFailingFirst(t *testing.T, n int) *atomic.Int32 {
+	var calls atomic.Int32
+	readStatus = func(dir string) (*supervisor.Status, error) {
+		if calls.Add(1) <= int32(n) {
+			return nil, &fs.PathError{Op: "open", Path: filepath.Join(dir, supervisor.StatusFile), Err: errReplacing}
+		}
+		return supervisor.ReadStatus(dir)
+	}
+	isTransientRead = func(err error) bool { return errors.Is(err, errReplacing) }
+	t.Cleanup(func() { readStatus, isTransientRead = supervisor.ReadStatus, transientRead })
+	return &calls
+}
+
+// A read that meets the Supervisor's replacing of the status file (Windows) doesn't end the wait:
+// a host that connects is reported connected, exit 0 (DW5: one install in twelve said it couldn't
+// connect). The plain command tries such a read again too. Any other read error still fails at
+// once.
+func TestStatusCommandRetriesAReadThatMeetsAReplace(t *testing.T) {
+	dir := t.TempDir()
+	now := time.Now()
+	st := supervisor.Status{PID: os.Getpid(), Started: now, Updated: now, Endpoint: "wss://opamp.example.com/v1/opamp",
+		Server:    &supervisor.ServerStatus{Connected: true, Since: now.Add(-time.Minute)},
+		Collector: &supervisor.CollectorStatus{Healthy: true, Since: now},
+		Accepted:  &supervisor.AcceptedState{Since: now}}
+	writeStatusFile(t, dir, st)
+	run := func(args ...string) (int, string, string) {
+		var out, errOut bytes.Buffer
+		code := statusCommand(append([]string{"--storage", dir}, args...), &out, &errOut)
+		return code, out.String(), errOut.String()
+	}
+
+	calls := readsFailingFirst(t, 20) // 20 × 50 ms: a second of failed reads
+	code, out, errOut := run("--wait", "30s", "--since", fmt.Sprint(now.Unix()), "--require-accepted")
+	assert.Equal(t, 0, code, errOut)
+	assert.Contains(t, out, "connected since")
+	assert.Greater(t, calls.Load(), int32(20))
+
+	readsFailingFirst(t, 5)
+	code, out, errOut = run()
+	assert.Equal(t, 0, code, errOut)
+	assert.Contains(t, out, "connected since")
+
+	// Failing on to the end of the wait: then it says why, exit 2.
+	readsFailingFirst(t, 1<<30)
+	code, _, errOut = run("--wait", "300ms", "--since", fmt.Sprint(now.Unix()))
+	assert.Equal(t, 2, code)
+	assert.Contains(t, errOut, "being used by another process")
+
+	// Another error isn't retried.
+	readStatus, isTransientRead = supervisor.ReadStatus, transientRead
+	require.NoError(t, os.WriteFile(filepath.Join(dir, supervisor.StatusFile), []byte("{"), 0o600))
+	started := time.Now()
+	code, _, _ = run("--wait", "5s", "--since", fmt.Sprint(now.Unix()))
+	assert.Equal(t, 2, code)
+	assert.Less(t, time.Since(started), time.Second)
 }

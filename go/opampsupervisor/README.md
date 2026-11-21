@@ -242,7 +242,7 @@ header. These files are new, and are this repository's:
   `commander/agent_log.go` and `verifier/cosign.go`, and the tests
   beside them (with `supervisor/remote_config_refusal_test.go`, `restart_command_test.go` and
   `supervisor/config/core_test.go`, and the Cosign release fixture in `verifier/testdata/`);
-- `status_command.go` and `run_signals.go`, and their tests;
+- `status_command.go`, `status_read_*.go` and `run_signals.go`, and their tests;
 - `e2e_packages_test.go`, `e2e_policy_test.go` and `e2e_state_test.go`, and their configs in `testdata/`
   (`testdata/collector/manifest.yaml`, `testdata/supervisor/supervisor_auth_bearer_ws.yaml`,
   `supervisor_packages.yaml` and `supervisor_policy.yaml`);
