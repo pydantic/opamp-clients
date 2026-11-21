@@ -384,6 +384,8 @@ if ($NoStart) {
     # --require-accepted: connected is not enough; the server must have answered (a server that
     # takes the connection but not the credentials closes it unanswered).
     & $supervisor status --storage $storage --wait 30s --since $started --require-accepted
+    # The wait's outcome, kept: the status reads below set $LASTEXITCODE too.
+    $waited = $LASTEXITCODE
     # Enrolling (not -Refresh) with the token this host enrolled with before, after the server
     # revoked its own credentials (it deleted the host, say): the client keeps them while the
     # token is the same and never falls back to it, so they are forgotten, with the instance UID
@@ -391,7 +393,7 @@ if ($NoStart) {
     # refuses too fails as below. A healthy host enrolled again is never refused, and keeps its
     # identity.
     $state = Join-Path $storage 'opamp-state'
-    if ($LASTEXITCODE -ne 0 -and -not $Refresh -and (Test-Path -LiteralPath $state)) {
+    if ($waited -ne 0 -and -not $Refresh -and (Test-Path -LiteralPath $state)) {
         $st = $null
         try { $st = (& $supervisor status --storage $storage --json 2>$null | Out-String) | ConvertFrom-Json } catch { }
         # 401: not valid. A 403 can mean a missing permission instead, and is left alone.
@@ -402,9 +404,10 @@ if ($NoStart) {
             $started = [DateTimeOffset]::UtcNow.ToUnixTimeSeconds()
             Restart-Supervisor
             & $supervisor status --storage $storage --wait 30s --since $started --require-accepted
+            $waited = $LASTEXITCODE
         }
     }
-    if ($LASTEXITCODE -ne 0) {
+    if ($waited -ne 0) {
         # A service that isn't running never got to connect: say so, and where its log is, instead.
         if ((Get-Service -Name $service -ErrorAction SilentlyContinue).Status -ne 'Running') { Fail-Start }
         $st = $null
