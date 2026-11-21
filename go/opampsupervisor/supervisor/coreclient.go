@@ -76,6 +76,8 @@ type coreClient struct {
 	reach *reachability
 	// report keeps the status file `opampsupervisor status` reads (set in newCoreClient).
 	report *statusReport
+	// quit is closed by Stop: the wait for the server's first answer ends.
+	quit chan struct{}
 }
 
 var _ client.OpAMPClient = (*coreClient)(nil)
@@ -229,6 +231,17 @@ func (c *coreClient) Start(ctx context.Context, settings types.StartSettings) er
 		return err
 	}
 	c.client = started
+	// The status says once the server has answered (it took this Supervisor), until Stop.
+	c.quit = make(chan struct{})
+	if answered := started.Answered(); answered != nil {
+		go func(quit <-chan struct{}) {
+			select {
+			case <-answered:
+				c.report.accepted(c.logger)
+			case <-quit:
+			}
+		}(c.quit)
+	}
 	return nil
 }
 
@@ -237,6 +250,10 @@ func (c *coreClient) Stop(ctx context.Context) error {
 	c.mu.Lock()
 	started, opened := c.client, c.opened
 	c.client, c.stopped = nil, true
+	if c.quit != nil {
+		close(c.quit)
+		c.quit = nil
+	}
 	c.mu.Unlock()
 	if started == nil {
 		if opened != nil {

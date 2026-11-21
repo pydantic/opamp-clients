@@ -26,6 +26,9 @@ import (
 	"unicode/utf8"
 
 	"github.com/gorilla/websocket"
+	"github.com/open-telemetry/opamp-go/protobufs"
+	"google.golang.org/protobuf/encoding/protowire"
+	"google.golang.org/protobuf/proto"
 
 	"github.com/pydantic/opamp-clients/go/opamp/internal/corepb"
 )
@@ -56,6 +59,40 @@ type executor struct {
 	// used is the URL of the OpAMP request or connection whose outcome came last (platform mode only:
 	// in core mode the core makes them itself).
 	used atomic.Pointer[string]
+	// answered is closed when the first answer from the server arrives (heard; platform mode
+	// only, as used).
+	answered   chan struct{}
+	answerOnce sync.Once
+}
+
+// heard records that an answer from the server arrived.
+func (x *executor) heard() { x.answerOnce.Do(func() { close(x.answered) }) }
+
+// isAnswer is whether msg (a ServerToAgent's encoding) is an answer from an OpAMP server that
+// took the agent: it decodes, and it isn't an error response. A server's error (a refusal, or
+// "unavailable, try later") is not taking the agent.
+func isAnswer(msg []byte) bool {
+	m := &protobufs.ServerToAgent{}
+	return proto.Unmarshal(msg, m) == nil && m.ErrorResponse == nil
+}
+
+// isOpAMPBody is whether an HTTP response is such an answer: a success, with the protobuf content
+// type the spec has the server send (or none), and a body that is one. A page that something on
+// the way serves (a proxy's, a portal's) isn't.
+func isOpAMPBody(resp *http.Response, body []byte) bool {
+	if resp.StatusCode/100 != 2 || len(body) == 0 {
+		return false
+	}
+	ct, _, _ := strings.Cut(resp.Header.Get("Content-Type"), ";")
+	ct = strings.TrimSpace(ct)
+	return (ct == "" || strings.EqualFold(ct, "application/x-protobuf")) && isAnswer(body)
+}
+
+// isWSAnswer is whether a binary WebSocket message is such an answer: OpAMP's header (a varint,
+// 0), then a ServerToAgent.
+func isWSAnswer(data []byte) bool {
+	header, n := protowire.ConsumeVarint(data)
+	return n > 0 && header == 0 && isAnswer(data[n:])
 }
 
 // tried records url as the one the latest request or connection went to, before its outcome
@@ -68,7 +105,7 @@ func newExecutor(conn *connection) *executor {
 	b := make([]byte, 8)
 	_, _ = rand.Read(b)
 	return &executor{conn: conn, out: make(chan report, 16), done: make(chan struct{}), fl: newInFlight(),
-		instance: hex.EncodeToString(b), fs: osFS{}}
+		instance: hex.EncodeToString(b), fs: osFS{}, answered: make(chan struct{})}
 }
 
 func (x *executor) reports() <-chan report { return x.out }
@@ -532,6 +569,9 @@ func (x *executor) post(ctx context.Context, r *corepb.HttpRequest) *corepb.Inpu
 	if uint64(len(body)) > r.MaxResponseBytes {
 		return fail(fmt.Errorf("response over %d bytes", r.MaxResponseBytes))
 	}
+	if isOpAMPBody(resp, body) {
+		x.heard()
+	}
 	return &corepb.Input{Kind: &corepb.Input_HttpResponse{HttpResponse: &corepb.HttpResponse{
 		Id: r.Id, Status: uint32(resp.StatusCode), Headers: fromHTTP(resp.Header), Body: body, UnixMs: unixMs()}}}
 }
@@ -610,6 +650,9 @@ func (x *executor) drive(e *effect, conn *websocket.Conn, maxMessage uint64) {
 			return
 		case r := <-reads:
 			if r.err == nil {
+				if isWSAnswer(r.data) {
+					x.heard()
+				}
 				x.emit(report{e: e, in: &corepb.Input{Kind: &corepb.Input_WsMessage{WsMessage: &corepb.WsMessage{Id: id, Data: r.data}}}, last: false})
 				continue
 			}

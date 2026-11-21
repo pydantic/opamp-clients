@@ -108,7 +108,8 @@ func TestStatusCommandWaitsForTheConnection(t *testing.T) {
 	go func() {
 		time.Sleep(200 * time.Millisecond)
 		connected := untrusted
-		connected.Server = &supervisor.ServerStatus{Connected: true, Since: time.Now()}
+		// Connected for longer than the server's grace to take it: connected is enough.
+		connected.Server = &supervisor.ServerStatus{Connected: true, Since: time.Now().Add(-supervisor.AcceptGrace)}
 		writeStatusFile(t, dir, connected)
 	}()
 	code, out, _ = run("--wait", "5s", "--since", since)
@@ -129,4 +130,96 @@ func TestStatusCommandWaitsForTheConnection(t *testing.T) {
 	assert.Equal(t, 2, code)
 	assert.Contains(t, errOut, "can't read the status")
 	assert.Less(t, time.Since(started), 2*time.Second)
+}
+
+// A server that takes the connection but not the credentials reads as connected: with
+// --require-accepted `status` exits 1 until the server has taken this Supervisor, and --wait
+// waits for that, not for the connection alone.
+func TestStatusCommandRequireAccepted(t *testing.T) {
+	dir := t.TempDir()
+	run := func(args ...string) (int, string, string) {
+		var out, errOut bytes.Buffer
+		code := statusCommand(append([]string{"--storage", dir}, args...), &out, &errOut)
+		return code, out.String(), errOut.String()
+	}
+	now := time.Now()
+	since := fmt.Sprint(now.Unix())
+	refused := supervisor.Status{PID: os.Getpid(), Started: now, Updated: now, Endpoint: "wss://opamp.example.com/v1/opamp",
+		Server:    &supervisor.ServerStatus{Connected: true, Since: now.Add(-time.Minute)},
+		Collector: &supervisor.CollectorStatus{Healthy: true, Since: now}}
+	writeStatusFile(t, dir, refused)
+
+	code, out, _ := run()
+	assert.Equal(t, 0, code, "unchanged without the flag: a server may send a host nothing")
+	assert.Contains(t, out, "Accepted       not yet")
+	assert.Contains(t, out, "enrollment key")
+	code, _, _ = run("--require-accepted")
+	assert.Equal(t, 1, code)
+	code, out, _ = run("--require-accepted", "--json")
+	assert.Equal(t, 1, code)
+	assert.NotContains(t, out, `"accepted"`)
+
+	code, out, _ = run("--wait", "300ms", "--since", since, "--require-accepted")
+	assert.Equal(t, 1, code, "connected is not enough")
+	assert.Contains(t, out, "not yet")
+
+	go func() {
+		time.Sleep(200 * time.Millisecond)
+		taken := refused
+		taken.Accepted = &supervisor.AcceptedState{Since: time.Now()}
+		writeStatusFile(t, dir, taken)
+	}()
+	code, out, _ = run("--wait", "5s", "--since", since, "--require-accepted")
+	assert.Equal(t, 0, code, out)
+	assert.Contains(t, out, "the server answered this host")
+	code, out, _ = run("--require-accepted", "--json")
+	assert.Equal(t, 0, code, out)
+	var st supervisor.Status
+	require.NoError(t, json.Unmarshal([]byte(out), &st))
+	require.NotNil(t, st.Accepted)
+
+	// Accepted doesn't make an unwell Supervisor well.
+	unwell := refused
+	unwell.Accepted = &supervisor.AcceptedState{Since: now}
+	unwell.Server = &supervisor.ServerStatus{Since: now, HTTPStatus: 401}
+	writeStatusFile(t, dir, unwell)
+	code, out, _ = run("--require-accepted")
+	assert.Equal(t, 1, code)
+	assert.Contains(t, out, "can't reach it")
+}
+
+// Once connected, `status --wait` gives the server its grace to take the Supervisor before it
+// prints, so an enrollment helper's output says "Accepted yes" for a host the server takes a
+// moment after the connection; it still exits 0 on the connection alone, without
+// --require-accepted.
+func TestStatusCommandWaitGivesTheServerItsGrace(t *testing.T) {
+	dir := t.TempDir()
+	now := time.Now()
+	st := supervisor.Status{PID: os.Getpid(), Started: now, Updated: now, Endpoint: "wss://opamp.example.com/v1/opamp",
+		Server:    &supervisor.ServerStatus{Connected: true, Since: now},
+		Collector: &supervisor.CollectorStatus{Healthy: true, Since: now}}
+	writeStatusFile(t, dir, st)
+	var out bytes.Buffer
+	statusPrinted := make(chan int)
+	go func() {
+		statusPrinted <- statusCommand([]string{"--storage", dir, "--wait", "20s", "--since", fmt.Sprint(now.Unix())}, &out, &bytes.Buffer{})
+	}()
+	time.Sleep(500 * time.Millisecond)
+	st.Accepted = &supervisor.AcceptedState{Since: time.Now()}
+	writeStatusFile(t, dir, st)
+	select {
+	case code := <-statusPrinted:
+		assert.Equal(t, 0, code)
+		assert.Contains(t, out.String(), "Accepted       yes")
+	case <-time.After(5 * time.Second):
+		t.Fatal("--wait didn't return once the server took the Supervisor")
+	}
+
+	// Taken by no one: printed once the grace is up (here, with the wait), saying so, and 0.
+	st.Accepted = nil
+	writeStatusFile(t, dir, st)
+	out.Reset()
+	code := statusCommand([]string{"--storage", dir, "--wait", "300ms", "--since", fmt.Sprint(now.Unix())}, &out, &bytes.Buffer{})
+	assert.Equal(t, 0, code)
+	assert.Contains(t, out.String(), "Accepted       not yet")
 }

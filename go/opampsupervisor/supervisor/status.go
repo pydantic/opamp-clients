@@ -40,6 +40,22 @@ type Status struct {
 	Collector *CollectorStatus `json:"collector,omitempty"`
 	// RemoteConfig is the last one's status: nil before the server sent one.
 	RemoteConfig *RemoteConfigState `json:"remote_config,omitempty"`
+	// Accepted is when the server first answered this Supervisor in this run: nil while it hasn't.
+	// A server that takes the connection and then closes it unanswered, as one does for
+	// credentials it refuses (an enrollment key used up or revoked, say), leaves it nil while the
+	// connection reads connected.
+	Accepted *AcceptedState `json:"accepted,omitempty"`
+}
+
+// AcceptedState is when the server first answered the Supervisor in this run: the first
+// ServerToAgent from it, not an error response, to reach the client (go/opamp's
+// Client.Answered). A server answers at once a host whose credentials it takes; one that takes
+// the connection and closes it unanswered doesn't. A server that over WebSocket sends nothing
+// until it has something to say leaves it nil too. It is the Supervisor's own run: a restart
+// starts without it, whatever was saved, and it isn't taken back in the run (credentials refused
+// at a later connection with an HTTP error make the connection fail, which Server says).
+type AcceptedState struct {
+	Since time.Time `json:"since"`
 }
 
 type ServerStatus struct {
@@ -93,7 +109,14 @@ func (r *statusReport) update(logger *zap.Logger, change func(*Status, time.Time
 	now := r.now()
 	change(&r.st, now)
 	r.st.Updated = now
-	if err := writeStatus(r.path, &r.st); err != nil && logger != nil {
+	err := writeStatus(r.path, &r.st)
+	// On Windows the file can't be replaced while a reader (`status --wait`) has it open: tried
+	// again for a moment, since a change such as the server's first answer is written once.
+	for i := 0; err != nil && runtime.GOOS == "windows" && i < 10; i++ {
+		time.Sleep(20 * time.Millisecond)
+		err = writeStatus(r.path, &r.st)
+	}
+	if err != nil && logger != nil {
 		logger.Debug("The status file wasn't written", zap.String("path", r.path), zap.Error(err))
 	}
 }
@@ -144,6 +167,24 @@ func (r *statusReport) remoteConfig(logger *zap.Logger, s *protobufs.RemoteConfi
 			return
 		}
 		st.RemoteConfig = rc
+	})
+}
+
+// accepted records the server's first answer of the run.
+func (r *statusReport) accepted(logger *zap.Logger) {
+	if r == nil {
+		return
+	}
+	r.mu.Lock()
+	done := r.st.Accepted != nil
+	r.mu.Unlock()
+	if done {
+		return
+	}
+	r.update(logger, func(st *Status, now time.Time) {
+		if st.Accepted == nil {
+			st.Accepted = &AcceptedState{Since: now}
+		}
 	})
 }
 
@@ -211,6 +252,13 @@ func ReadStatus(dir string) (*Status, error) {
 	return &st, nil
 }
 
+// AcceptGrace is how long after connecting a server is given to answer before the status reads
+// it as not having taken the Supervisor: a server answers an agent's first message at once.
+const AcceptGrace = 10 * time.Second
+
+// IsAccepted is whether the server has taken this Supervisor, as Accepted says.
+func (st *Status) IsAccepted() bool { return st.Accepted != nil }
+
 // Running is whether the Supervisor that wrote the status still runs: it didn't stop, and its
 // process is there (as this machine sees it; another PID namespace, a container's say, can't).
 func (st *Status) Running() bool {
@@ -270,6 +318,17 @@ func (st *Status) Print(w io.Writer, now time.Time) {
 		line("Collector", "unhealthy since %s", ago(c.Since))
 	default:
 		line("Collector", "unhealthy since %s: %s", ago(c.Since), c.Error)
+	}
+	switch a := st.Accepted; {
+	case a != nil:
+		line("Accepted", "yes: the server answered this host at %s", ago(a.Since))
+	case st.Server != nil && st.Server.Connected && now.Sub(st.Server.Since) < AcceptGrace:
+		line("Accepted", "not yet: waiting for the server's first answer since it connected")
+	default:
+		line("Accepted", "not yet: the server hasn't answered this host since it started")
+		if st.Server != nil && st.Server.Connected {
+			line("", "A server that takes the connection but not the credentials (a used-up or revoked enrollment key, say) looks like this: check the host in the server's UI, and the key")
+		}
 	}
 	switch rc := st.RemoteConfig; {
 	case rc == nil:

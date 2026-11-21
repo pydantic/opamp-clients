@@ -568,3 +568,178 @@ func TestUndeclaredStatusNeverReachesTheServer(t *testing.T) {
 		assert.Nil(t, m.GetAvailableComponents(), "message %d", i)
 	}
 }
+
+// The status says the server took this Supervisor once the server answers it, with nothing to
+// say (an empty ServerToAgent), or its credentials and a config. A server that takes the
+// WebSocket and closes it unanswered, as one does for credentials it refuses, leaves it
+// unaccepted though connected; so it does after a restart on a state the server sent before
+// (a config, issued credentials): what was saved is not an answer.
+func TestTheStatusSaysWhetherTheServerTookTheSupervisor(t *testing.T) {
+	ts := newCoreTestServer(t)
+	refuser := newClosingServer(t)
+	for name, endpoint := range ts.endpoints() {
+		t.Run(name, func(t *testing.T) {
+			ts.forget()
+			ts.setRespond(func(auth string, m *protobufs.AgentToServer) *protobufs.ServerToAgent {
+				switch auth {
+				case "Bearer enroll":
+					return &protobufs.ServerToAgent{ConnectionSettings: &protobufs.ConnectionSettingsOffers{
+						Hash: []byte("issued-" + name),
+						Opamp: &protobufs.OpAMPConnectionSettings{DestinationEndpoint: endpoint, Headers: &protobufs.Headers{
+							Headers: []*protobufs.Header{{Key: "Authorization", Value: "Bearer issued"}},
+						}},
+					}}
+				case "Bearer issued":
+					if m.RemoteConfigStatus == nil {
+						return &protobufs.ServerToAgent{RemoteConfig: remoteConfig("receivers: {}")}
+					}
+				}
+				return nil
+			})
+			defer ts.setRespond(nil)
+			dir := t.TempDir()
+			start := func(endpoint, auth string) *coreClient {
+				t.Helper()
+				c := newCoreClient(zaptest.NewLogger(t), filepath.Join(dir, coreClientStateFile), nil)
+				require.NoError(t, c.Start(t.Context(), types.StartSettings{
+					OpAMPServerURL: endpoint,
+					Header:         http.Header{"Authorization": {auth}},
+					InstanceUid:    types.InstanceUid(uuid.MustParse("018fee23-4a51-7303-a441-73faed7d9deb")),
+					Capabilities: protobufs.AgentCapabilities_AgentCapabilities_AcceptsOpAMPConnectionSettings |
+						protobufs.AgentCapabilities_AgentCapabilities_AcceptsRemoteConfig |
+						protobufs.AgentCapabilities_AgentCapabilities_ReportsRemoteConfig,
+					Callbacks: types.Callbacks{OnMessage: func(_ context.Context, m *types.MessageData) {
+						if m.RemoteConfig != nil {
+							assert.NoError(t, c.SetRemoteConfigStatus(&protobufs.RemoteConfigStatus{
+								LastRemoteConfigHash: m.RemoteConfig.ConfigHash,
+								Status:               protobufs.RemoteConfigStatuses_RemoteConfigStatuses_APPLIED,
+							}))
+						}
+					}},
+				}))
+				return c
+			}
+			status := func() *Status {
+				st, err := ReadStatus(dir)
+				require.NoError(t, err)
+				return st
+			}
+			waitFor := func(what string, ok func(*Status) bool) *Status {
+				t.Helper()
+				var st *Status
+				require.Eventually(t, func() bool { st = status(); return ok(st) }, 10*time.Second, 20*time.Millisecond, what)
+				return st
+			}
+			accepted := func(st *Status) bool { return st.Accepted != nil }
+
+			// A server with nothing to say answers all the same.
+			c := start(endpoint, "Bearer quiet")
+			waitFor("accepted on an empty answer", accepted)
+			require.NoError(t, c.Stop(t.Context()))
+
+			// Issued credentials (the client takes them itself) and a config, saved.
+			c = start(endpoint, "Bearer enroll")
+			waitFor("accepted", accepted)
+			ts.waitMsg("the config reported applied", func(m *protobufs.AgentToServer) bool {
+				return m.RemoteConfigStatus.GetStatus() == protobufs.RemoteConfigStatuses_RemoteConfigStatuses_APPLIED
+			})
+			assert.Contains(t, ts.seenAuths(), "Bearer issued")
+			require.NoError(t, c.Stop(t.Context()))
+
+			// A restart on that state answered: accepted again.
+			c = start(endpoint, "Bearer enroll")
+			waitFor("accepted after a restart", accepted)
+			require.NoError(t, c.Stop(t.Context()))
+		})
+	}
+
+	// A WebSocket server that takes the connection and closes it unanswered: connected, never
+	// accepted, on a fresh state and on one a server sent before.
+	for _, saved := range []bool{false, true} {
+		t.Run(fmt.Sprintf("closing/saved=%v", saved), func(t *testing.T) {
+			dir := t.TempDir()
+			start := func(endpoint string) *coreClient {
+				c := newCoreClient(zaptest.NewLogger(t), filepath.Join(dir, coreClientStateFile), nil)
+				require.NoError(t, c.Start(t.Context(), types.StartSettings{
+					OpAMPServerURL: endpoint,
+					Header:         http.Header{"Authorization": {"Bearer enroll"}},
+					InstanceUid:    types.InstanceUid(uuid.MustParse("018fee23-4a51-7303-a441-73faed7d9deb")),
+					Capabilities: protobufs.AgentCapabilities_AgentCapabilities_AcceptsRemoteConfig |
+						protobufs.AgentCapabilities_AgentCapabilities_ReportsRemoteConfig,
+				}))
+				return c
+			}
+			if saved {
+				// The same endpoint answered before (a config, saved); now it closes unanswered.
+				refuser.answer(true)
+				c := start(refuser.ws)
+				require.Eventually(t, func() bool { st, err := ReadStatus(dir); return err == nil && st.Accepted != nil }, 10*time.Second, 20*time.Millisecond)
+				require.NoError(t, c.Stop(t.Context()))
+				refuser.answer(false)
+			}
+			c := start(refuser.ws)
+			defer func() { assert.NoError(t, c.Stop(t.Context())) }()
+			require.Eventually(t, func() bool {
+				st, err := ReadStatus(dir)
+				return err == nil && st.Server != nil && st.Server.Connected
+			}, 10*time.Second, 20*time.Millisecond, "connected")
+			opened := refuser.opened()
+			require.Eventually(t, func() bool { return refuser.opened() >= opened+2 }, 30*time.Second, 50*time.Millisecond, "connected again, and closed again")
+			st, err := ReadStatus(dir)
+			require.NoError(t, err)
+			assert.Nil(t, st.Accepted, "the server never answered")
+		})
+	}
+}
+
+// closingServer takes every WebSocket and closes it on the agent's first message, unanswered;
+// with answer(true) it answers that message with a config first, as a server that took the
+// agent would.
+type closingServer struct {
+	ws      string
+	mu      sync.Mutex
+	answers bool
+	count   int
+}
+
+func newClosingServer(t *testing.T) *closingServer {
+	cs := &closingServer{}
+	handler, connContext, err := server.New(nil).Attach(server.Settings{Callbacks: serverTypes.Callbacks{
+		OnConnecting: func(*http.Request) serverTypes.ConnectionResponse {
+			cs.mu.Lock()
+			cs.count++
+			cs.mu.Unlock()
+			return serverTypes.ConnectionResponse{Accept: true, ConnectionCallbacks: serverTypes.ConnectionCallbacks{
+				OnMessage: func(_ context.Context, conn serverTypes.Connection, msg *protobufs.AgentToServer) *protobufs.ServerToAgent {
+					cs.mu.Lock()
+					answers := cs.answers
+					cs.mu.Unlock()
+					if answers {
+						return &protobufs.ServerToAgent{InstanceUid: msg.InstanceUid, RemoteConfig: remoteConfig("receivers: {}")}
+					}
+					_ = conn.Disconnect()
+					return nil
+				},
+			}}
+		},
+	}})
+	require.NoError(t, err)
+	hs := httptest.NewUnstartedServer(http.HandlerFunc(handler))
+	hs.Config.ConnContext = connContext
+	hs.Start()
+	t.Cleanup(hs.Close)
+	cs.ws = "ws://" + hs.Listener.Addr().String() + "/v1/opamp"
+	return cs
+}
+
+func (cs *closingServer) answer(yes bool) {
+	cs.mu.Lock()
+	defer cs.mu.Unlock()
+	cs.answers = yes
+}
+
+func (cs *closingServer) opened() int {
+	cs.mu.Lock()
+	defer cs.mu.Unlock()
+	return cs.count
+}

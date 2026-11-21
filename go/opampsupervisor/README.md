@@ -194,6 +194,14 @@ agent:
   and exits 0 when connected, healthy and not FAILED, 1 otherwise, 2 with no status to read.
   `--wait DURATION --since UNIX` waits for a Supervisor started since then to connect (0 once it
   has, 1 with its status when it hasn't): the enrollment helpers run it after starting the service.
+  The status also says whether the server has answered this Supervisor since it started
+  (`accepted`: its first message that isn't an error response). A server answers at once a host
+  whose credentials it takes, while one that takes the connection but not the credentials (a
+  used-up enrollment key, say) closes it unanswered: that host reads as connected and not
+  accepted. (A server that over WebSocket sends nothing until it has something to say reads as
+  not accepted too.) `--require-accepted` makes `status` exit 1 without it, and
+  `--wait` wait for it; without the flag, `--wait` still returns 0 on the connection, after giving
+  the server up to 10 seconds to answer so that what it prints says whether it did.
   The command is taken in a file of its own (`status_command.go`) before `main` runs, so
   upstream's `main.go` is unchanged.
 - **The Collector doesn't inherit `OTEL_EXPORTER_OTLP_*`.** Upstream's passed the
