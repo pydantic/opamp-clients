@@ -120,6 +120,10 @@ and date. Tests, CI and docs alone don't need a line.
   with "can't connect" (exit 1) when it read the status file just as the Supervisor replaced it (a
   sharing violation), though the host connected a second later. Such a read is now tried again
   until the wait is up, and for 2 seconds by the plain `status` (#150).
+- Supervisor: a reinstall with a new enrollment key over kept data logged a warning ("Ignoring a
+  message to the local OpAMP server with another instance UID") for each message of the
+  Collector still running with the previous instance UID. The server's new UID is now said once at
+  info, with the previous one, and those messages go at debug (#150).
 - Supervisor: `pydantic-opamp-enroll` (Linux, macOS, Windows) says when the Supervisor service
   failed to start, and gives the command that shows its log. It used to say the Supervisor can't
   connect yet and keeps retrying, as for a running service that can't reach its server (#147).

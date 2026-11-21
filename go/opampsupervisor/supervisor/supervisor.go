@@ -27,7 +27,9 @@
 // take, is FAILED: the collector takes YAML. The Collector run without a remote config has its internal
 // metrics off unless a config sets them (idle_telemetry.go). The own telemetry settings' outcome
 // is in the status, and their refusal is logged at error once per reason
-// (own_telemetry_status.go).
+// (own_telemetry_status.go). A new instance UID from the server is said once, and the
+// collector's messages with the replaced one are expected until it starts again
+// (instance_uid_change.go).
 
 package supervisor
 
@@ -182,6 +184,8 @@ type Supervisor struct {
 	// Changed here: refusals of the own telemetry settings are logged once per reason
 	// (own_telemetry_status.go).
 	ownTelemetryRefusals ownTelemetryRefusals
+	// Changed here: the instance UID the server replaced in this run (instance_uid_change.go).
+	previousInstanceID atomic.Pointer[uuid.UUID]
 
 	noopPipelineTemplate         *template.Template
 	opampextensionTemplate       *template.Template
@@ -1062,9 +1066,7 @@ func (s *Supervisor) handleAgentOpAMPMessage(conn serverTypes.Connection, messag
 	// Changed here: the collector's messages are taken with the Supervisor's instance UID only;
 	// it was checked at bootstrap alone.
 	if id := s.persistentState.instanceID(); !slices.Equal(message.GetInstanceUid(), id[:]) {
-		s.telemetrySettings.Logger.Warn("Ignoring a message to the local OpAMP server with another instance UID",
-			zap.String("instance_uid", hex.EncodeToString(message.GetInstanceUid())),
-			zap.String("expected_instance_uid", id.String()))
+		s.ignoreOtherInstanceUID(message, id) // the replaced UID at debug (instance_uid_change.go)
 		return &protobufs.ServerToAgent{}
 	}
 
@@ -3066,6 +3068,9 @@ func (s *Supervisor) processAgentIdentificationMessage(msg *protobufs.AgentIdent
 	s.telemetrySettings.Logger.Debug("Agent identity is changing",
 		zap.String("old_id", s.persistentState.InstanceID.String()),
 		zap.String("new_id", newInstanceID.String()))
+	// Changed here: the change is said once, and the collector's messages with the replaced UID
+	// are expected until it starts again (instance_uid_change.go).
+	s.notePreviousInstanceID(s.persistentState.instanceID(), newInstanceID)
 
 	err = s.persistentState.SetInstanceID(newInstanceID)
 	if err != nil {

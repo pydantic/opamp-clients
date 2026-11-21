@@ -208,6 +208,11 @@ agent:
   reason, then at debug.
   The command is taken in a file of its own (`status_command.go`) before `main` runs, so
   upstream's `main.go` is unchanged.
+- **A new instance UID from the server is said once.** When the server gives the host a new
+  instance UID (an enrollment with a new key over kept state, where the client starts with the UID
+  it kept), the Supervisor logs it at info with the previous one. The collector started before it
+  sends the previous UID until it starts again; those messages are ignored at debug, where each was
+  a warning.
 - **The Collector doesn't inherit `OTEL_EXPORTER_OTLP_*`.** Upstream's passed the
   Supervisor's whole environment, so headers set on the host reached the own-telemetry endpoint
   a server chose. Set one in `agent.env` to pass it
@@ -241,7 +246,7 @@ Every file from upstream keeps its license header (Apache-2.0, [LICENSE](LICENSE
 paths were rewritten to this module's. The files changed beyond that say what changed in their
 header. These files are new, and are this repository's:
 
-- `supervisor/coreclient.go`, `agent_update.go`, `apply_step.go`, `client_state.go`, `startup.go`, `sealed_storage.go`, `telemetry_env.go`, `idle_telemetry.go`, `reachability.go`, `status.go`, `own_telemetry_status.go`,
+- `supervisor/coreclient.go`, `agent_update.go`, `apply_step.go`, `client_state.go`, `startup.go`, `sealed_storage.go`, `telemetry_env.go`, `idle_telemetry.go`, `reachability.go`, `status.go`, `own_telemetry_status.go`, `instance_uid_change.go`,
   `localserver.go`, `service_log.go`, `config/remote_config_policy.go`, `commander/collector_env.go`,
   `commander/agent_log.go` and `verifier/cosign.go`, and the tests
   beside them (with `supervisor/remote_config_refusal_test.go`, `restart_command_test.go` and
