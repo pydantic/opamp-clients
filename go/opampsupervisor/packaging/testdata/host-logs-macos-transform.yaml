@@ -1,0 +1,32 @@
+receivers:
+  macos_unified_logging:
+    format: ndjson
+    max_log_age: 1m
+    predicate: logType == 'error' OR logType == 'fault'
+processors:
+  transform/unified_log:
+    error_mode: ignore
+    log_statements:
+      - context: log
+        conditions:
+          - IsMatch(body, "^ *[{]")
+        statements:
+          - merge_maps(attributes, ParseJSON(body), "insert")
+          - set(body, attributes["eventMessage"]) where attributes["eventMessage"] != nil
+          - delete_key(attributes, "eventMessage")
+  batch: {}
+exporters:
+  otlp_http/logfire:
+    endpoint: https://logfire-us.pydantic.dev
+    headers:
+      Authorization: Bearer ${env:LOGFIRE_TOKEN}
+service:
+  pipelines:
+    logs:
+      receivers:
+        - macos_unified_logging
+      processors:
+        - transform/unified_log
+        - batch
+      exporters:
+        - otlp_http/logfire

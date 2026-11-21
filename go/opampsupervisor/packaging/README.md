@@ -421,7 +421,7 @@ collector keeps the config it had.
 
 | Rule | Default | Widen it with |
 |---|---|---|
-| `allowed_components` | receivers `otlp`, `host_metrics`, `file_log`, `nop`; processors `batch`, `memory_limiter`, `resource`, `resource_detection`; exporters `otlp_grpc`, `otlp_http`, `debug`, `nop`; extension `health_check` (and the older names `hostmetrics`, `filelog`, `resourcedetection`, `otlp` and `otlphttp`) | an edit to the config |
+| `allowed_components` | receivers `otlp`, `host_metrics`, `file_log`, `nop`; processors `batch`, `memory_limiter`, `resource`, `resource_detection`, `transform` (it changes only the records passing through: OTTL reads no file, environment or network); exporters `otlp_grpc`, `otlp_http`, `debug`, `nop`; extension `health_check` (and the older names `hostmetrics`, `filelog`, `resourcedetection`, `otlp` and `otlphttp`) | an edit to the config |
 | `allowed_providers` | none, except environment names explicitly bound by `agent.connection_env`; no other `${env:...}` or `${file:...}` | an edit to the config (not recommended) |
 | `allowed_exporter_endpoints` | the OpAMP endpoint's host and port, over https (http with `--plaintext`) | `--exporter-endpoint` (`-ExporterEndpoint` on Windows) |
 | `allowed_log_paths` | none | `--log-path` (`-LogPath` on Windows); `--host-logs` adds `/var/log` on Linux, and `/var/log` and `/private/var/log` (one directory) on macOS |

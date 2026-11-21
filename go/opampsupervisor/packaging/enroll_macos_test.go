@@ -279,6 +279,11 @@ func TestMacEnrollHostLogs(t *testing.T) {
 	p := enroll("--host-logs", "--log-path", "/srv/app/logs")
 	assertHostLogs(t, p, enroll(), hostLogsConfig(t, "macos"), `configures receiver "macos_unified_logging"`)
 	require.ErrorContains(t, p.Check("", []byte(`receivers: {macos_unified_logging: {archive_path: /tmp/x.logarchive}}`)), "sets archive_path")
+	// A transform that makes the unified log's JSON bodies readable (the message as the body, the
+	// rest as attributes) runs too.
+	transform, err := os.ReadFile(filepath.Join("testdata", "host-logs-macos-transform.yaml"))
+	require.NoError(t, err)
+	require.NoError(t, p.CheckWithConnectionEnv("", transform, map[string]string{"logfire/otlp": "LOGFIRE_TOKEN"}))
 
 	// The log files: /var/log is a link to /private/var/log on macOS, and a config may name either.
 	assert.Equal(t, []string{"/srv/app/logs", "/var/log", "/private/var/log"}, p.AllowedLogPaths)

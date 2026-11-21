@@ -170,7 +170,7 @@ func TestEnrollAllowsAnyConfigByDefault(t *testing.T) {
 // remote config use.
 var packagedComponents = map[string][]string{
 	"receivers":  {"otlp", "host_metrics", "hostmetrics", "file_log", "filelog", "nop"},
-	"processors": {"batch", "memory_limiter", "resource", "resource_detection", "resourcedetection"},
+	"processors": {"batch", "memory_limiter", "resource", "resource_detection", "resourcedetection", "transform"},
 	"exporters":  {"otlp_grpc", "otlp", "otlp_http", "otlphttp", "debug", "nop"},
 	"extensions": {"health_check"},
 }

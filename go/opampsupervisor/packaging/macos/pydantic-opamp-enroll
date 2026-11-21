@@ -352,7 +352,7 @@ if [ -n "$restricted" ]; then
     # The component types a Logfire config uses, by their names and their older aliases.
     allowed_components:
       receivers: $receivers
-      processors: [batch, memory_limiter, resource, resource_detection, resourcedetection]
+      processors: [batch, memory_limiter, resource, resource_detection, resourcedetection, transform]
       exporters: [otlp_grpc, otlp, otlp_http, otlphttp, debug, nop]
       extensions: $extensions
     # No arbitrary \${...}: only locally bound credential environment names are permitted.
