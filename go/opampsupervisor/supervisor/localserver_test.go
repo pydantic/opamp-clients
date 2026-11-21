@@ -471,6 +471,24 @@ func TestBootstrapNeedsTheToken(t *testing.T) {
 	require.ErrorContains(t, s.getBootstrapInfo(), "never connected")
 }
 
+// A Supervisor told to stop while it waits for the bootstrap collector stops waiting at once, and
+// ends that collector: it used to wait out agent::bootstrap_timeout, long past the time a service
+// manager gives it.
+func TestBootstrapStopsWhenTheSupervisorIsStopped(t *testing.T) {
+	endpoint, _ := remoteHealthServer(t)
+	// A collector that never connects: the bootstrap would wait all of its timeout.
+	s := newBootstrapTestSupervisor(t, endpoint, map[string]string{fakeCollectorNoAuthEnv: "1"})
+	s.config.Agent.BootstrapTimeout = time.Minute
+	ctx, cancel := context.WithCancel(t.Context())
+	s.runCtx = ctx
+	time.AfterFunc(500*time.Millisecond, cancel)
+
+	started := time.Now()
+	err := s.getBootstrapInfo()
+	require.ErrorIs(t, err, context.Canceled)
+	require.Less(t, time.Since(started), 30*time.Second, "it waited for the bootstrap timeout")
+}
+
 // The token goes nowhere the Supervisor sends: not in the effective config it reports (its own
 // merged config is never reported), nor in the collector's log tail.
 func TestLocalServerTokenIsNotReported(t *testing.T) {

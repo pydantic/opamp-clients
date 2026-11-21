@@ -89,3 +89,14 @@ function Uninstall-Collector {
     }
 }
 Uninstall-Collector
+# What is left, and why, as the Linux and macOS script says it: the copy of this script under
+# Program Files is what deletes the kept data later, once the package (and its copy) is gone.
+if (-not $DryRun) {
+    if ($Purge) {
+        Write-Output 'Removed the Collector service, the Pydantic OpAMP Supervisor package and its data.'
+    } else {
+        Write-Output "Removed the Collector service and the Pydantic OpAMP Supervisor package. Kept $root for a reinstall."
+        Write-Output "To delete it too, run: & '$recovery' -Purge"
+    }
+    Write-Output 'The OpAMP server still lists this host until its credentials are revoked there.'
+}

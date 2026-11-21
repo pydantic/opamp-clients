@@ -97,6 +97,12 @@ func TestWindowsUninstallRetainsAndPurges(t *testing.T) {
 				if _, err := os.Stat(filepath.Join(root, "uninstall.ps1")); !os.IsNotExist(err) {
 					t.Fatal("executable recovery code must not be stored with Collector data")
 				}
+				// It says what it kept and how to delete it: the recovery helper it leaves under
+				// Program Files is otherwise a file nobody explained.
+				said := map[bool]string{false: "To delete it too, run: & '" + recovery + "' -Purge", true: "package and its data."}[purge]
+				if exit != "1603" && !strings.Contains(string(output), said) {
+					t.Fatalf("missing %q: %s", said, output)
+				}
 				if !purge && exit == "0" {
 					repeat := exec.Command("powershell", "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-Command",
 						"$TestArguments = @{}\n"+windowsUninstallMocks)

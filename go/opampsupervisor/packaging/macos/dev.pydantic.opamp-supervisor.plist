@@ -21,6 +21,11 @@
 		<key>SuccessfulExit</key>
 		<false/>
 	</dict>
+	<!-- How long launchd waits, after it tells the Supervisor to stop, before it kills it: 20
+	     seconds unless set. The Supervisor gives its Collector 10 to stop and then kills it, and
+	     a Supervisor killed first would leave that Collector running with no parent. -->
+	<key>ExitTimeOut</key>
+	<integer>25</integer>
 	<key>ThrottleInterval</key>
 	<integer>5</integer>
 	<key>StandardOutPath</key>
