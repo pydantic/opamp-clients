@@ -45,6 +45,18 @@ type Status struct {
 	// credentials it refuses (an enrollment key used up or revoked, say), leaves it nil while the
 	// connection reads connected.
 	Accepted *AcceptedState `json:"accepted,omitempty"`
+	// OwnTelemetry is what became of the server's last own telemetry settings: nil before it sent
+	// any.
+	OwnTelemetry *OwnTelemetryState `json:"own_telemetry,omitempty"`
+}
+
+// OwnTelemetryState is the outcome of the server's last own telemetry settings (where the
+// collector sends its own metrics and logs): Status "APPLIED", or "REFUSED" with why (one the
+// remote config policy doesn't allow, say), since Since.
+type OwnTelemetryState struct {
+	Status string    `json:"status"`
+	Since  time.Time `json:"since"`
+	Error  string    `json:"error,omitempty"`
 }
 
 // AcceptedState is when the server first answered the Supervisor in this run: the first
@@ -185,6 +197,21 @@ func (r *statusReport) accepted(logger *zap.Logger) {
 		if st.Accepted == nil {
 			st.Accepted = &AcceptedState{Since: now}
 		}
+	})
+}
+
+// ownTelemetry records the outcome of the server's own telemetry settings: refused with err, or
+// applied. The time is that of the first of a run of the same outcome.
+func (r *statusReport) ownTelemetry(logger *zap.Logger, err error) {
+	r.update(logger, func(st *Status, now time.Time) {
+		ot := &OwnTelemetryState{Status: "APPLIED", Since: now}
+		if err != nil {
+			ot.Status, ot.Error = "REFUSED", err.Error()
+		}
+		if old := st.OwnTelemetry; old != nil && old.Status == ot.Status && old.Error == ot.Error {
+			return
+		}
+		st.OwnTelemetry = ot
 	})
 }
 
@@ -329,6 +356,13 @@ func (st *Status) Print(w io.Writer, now time.Time) {
 		if st.Server != nil && st.Server.Connected {
 			line("", "A server that takes the connection but not the credentials (a used-up or revoked enrollment key, say) looks like this: check the host in the server's UI, and the key")
 		}
+	}
+	switch ot := st.OwnTelemetry; {
+	case ot == nil:
+	case ot.Error != "":
+		line("Own telemetry", "%s since %s: %s", ot.Status, ago(ot.Since), ot.Error)
+	default:
+		line("Own telemetry", "%s since %s", ot.Status, ago(ot.Since))
 	}
 	switch rc := st.RemoteConfig; {
 	case rc == nil:

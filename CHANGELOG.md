@@ -67,6 +67,11 @@ and date. Tests, CI and docs alone don't need a line.
   the host read as connected and healthy; it now reads "not yet", and `--require-accepted` makes
   `status` exit 1 and `--wait` wait for it. Without the flag `--wait` exits as before, but gives
   the server up to 10 seconds after connecting to answer before it prints (#150).
+- Supervisor: `opampsupervisor status` says what became of the server's own telemetry settings
+  (`own_telemetry` in `--json`, an "Own telemetry" line: APPLIED, or REFUSED and why). With
+  `--restricted`, settings that send the Collector's own telemetry to an endpoint the policy
+  doesn't allow were refused with an error line at each connection and nothing else said so; the
+  status says it now, and the same refusal is logged at error once, then at debug (#150).
 - Go: `Client.Answered()`, closed once the server's first answer reaches a platform-mode client
   (a ServerToAgent that isn't an error response, over WebSocket or in an HTTP success): it tells a
   server that took the agent from one that took the connection and closed it unanswered (#150).

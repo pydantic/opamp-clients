@@ -25,7 +25,9 @@
 // fails is tried again on the restart backoff. Health counts only while its connection is the
 // collector's. A remote config holding the Logfire SDK policy (logfire-sdk-policy.json), which SDKs
 // take, is FAILED: the collector takes YAML. The Collector run without a remote config has its internal
-// metrics off unless a config sets them (idle_telemetry.go).
+// metrics off unless a config sets them (idle_telemetry.go). The own telemetry settings' outcome
+// is in the status, and their refusal is logged at error once per reason
+// (own_telemetry_status.go).
 
 package supervisor
 
@@ -177,6 +179,9 @@ type Supervisor struct {
 	// of the remote config the collector starts on (client_state.go).
 	openedClient *coreClient
 	resumed      opamp.Resumed
+	// Changed here: refusals of the own telemetry settings are logged once per reason
+	// (own_telemetry_status.go).
+	ownTelemetryRefusals ownTelemetryRefusals
 
 	noopPipelineTemplate         *template.Template
 	opampextensionTemplate       *template.Template
@@ -1831,8 +1836,8 @@ func (s *Supervisor) setupOwnTelemetry(_ context.Context, settings *protobufs.Co
 	// Changed here: the server's own telemetry destinations are held to the remote config
 	// policy too. They went around it.
 	if err := s.config.Agent.RemoteConfigPolicy.Check(string(config.SpecialConfigFileOwnTelemetry), cfg.Bytes()); err != nil {
-		s.telemetrySettings.Logger.Error("Refusing the own telemetry settings", zap.Error(err))
-		return false, err
+		s.refuseOwnTelemetry(err) // Changed here: once per reason (own_telemetry_status.go).
+		return false, ownTelemetryPolicyError{err}
 	}
 	previous := s.agentConfigOwnTelemetrySection.Load()
 	s.agentConfigOwnTelemetrySection.Store(cfg.String())
@@ -2902,6 +2907,7 @@ func (s *Supervisor) onMessage(ctx context.Context, msg *types.MessageData) {
 			OwnLogs:    msg.OwnLogsConnSettings,
 		})
 		configChanged = ownChanged || configChanged
+		s.noteOwnTelemetry(ownErr) // Changed here: the status says it (own_telemetry_status.go).
 	}
 
 	// Changed here: the connection settings are answered once the collector runs with them, or
@@ -3036,7 +3042,7 @@ func (s *Supervisor) processRemoteConfigMessage(ctx context.Context, msg *protob
 // Changed here: settings it can't apply are refused, and neither saved nor applied.
 func (s *Supervisor) processOwnTelemetryConnSettingsMessage(ctx context.Context, msg *protobufs.ConnectionSettingsOffers) (bool, error) {
 	if err := unsupportedOwnTelemetry(msg); err != nil {
-		s.telemetrySettings.Logger.Error("Refusing the own telemetry settings", zap.Error(err))
+		s.refuseOwnTelemetry(err) // Changed here: once per reason (own_telemetry_status.go).
 		return false, err
 	}
 	changed, err := s.setupOwnTelemetry(ctx, msg)

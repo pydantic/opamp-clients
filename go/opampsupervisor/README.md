@@ -202,6 +202,10 @@ agent:
   not accepted too.) `--require-accepted` makes `status` exit 1 without it, and
   `--wait` wait for it; without the flag, `--wait` still returns 0 on the connection, after giving
   the server up to 10 seconds to answer so that what it prints says whether it did.
+  The status also says what became of the server's own telemetry settings (`own_telemetry`:
+  APPLIED, or REFUSED and why: an endpoint `agent::remote_config_policy` doesn't allow, say). A
+  server offers them again at each connection; their refusal is logged at error once for each
+  reason, then at debug.
   The command is taken in a file of its own (`status_command.go`) before `main` runs, so
   upstream's `main.go` is unchanged.
 - **The Collector doesn't inherit `OTEL_EXPORTER_OTLP_*`.** Upstream's passed the
@@ -237,7 +241,7 @@ Every file from upstream keeps its license header (Apache-2.0, [LICENSE](LICENSE
 paths were rewritten to this module's. The files changed beyond that say what changed in their
 header. These files are new, and are this repository's:
 
-- `supervisor/coreclient.go`, `agent_update.go`, `apply_step.go`, `client_state.go`, `startup.go`, `sealed_storage.go`, `telemetry_env.go`, `idle_telemetry.go`, `reachability.go`, `status.go`,
+- `supervisor/coreclient.go`, `agent_update.go`, `apply_step.go`, `client_state.go`, `startup.go`, `sealed_storage.go`, `telemetry_env.go`, `idle_telemetry.go`, `reachability.go`, `status.go`, `own_telemetry_status.go`,
   `localserver.go`, `service_log.go`, `config/remote_config_policy.go`, `commander/collector_env.go`,
   `commander/agent_log.go` and `verifier/cosign.go`, and the tests
   beside them (with `supervisor/remote_config_refusal_test.go`, `restart_command_test.go` and
