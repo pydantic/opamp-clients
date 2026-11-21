@@ -125,7 +125,7 @@ and date. Tests, CI and docs alone don't need a line.
   with "can't connect" (exit 1) when it read the status file just as the Supervisor replaced it (a
   sharing violation), though the host connected a second later. Such a read is now tried again
   until the wait is up, and for 2 seconds by the plain `status` (#150).
-- Supervisor installers: with `--restricted` (`-Restricted`), a remote config may use the
+- Supervisor installers and container image: with `--restricted` (`-Restricted`, the restricted image config), a remote config may use the
   `transform` processor, so a policy can make records readable (the macOS unified log's JSON
   bodies, say). It changes only the records passing through: OTTL reads no file, environment or
   network. An upgrade brings it to enrolled hosts through `--refresh` (#150).
