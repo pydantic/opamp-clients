@@ -464,7 +464,7 @@ restart_count() {
 not_accepted() {
 	st=$("$supervisor" status --storage "$storage" --json 2>/dev/null) || :
 	if printf '%s\n' "$st" | grep -q '"connected": true' && ! printf '%s\n' "$st" | grep -q '"accepted": {'; then
-		echo "enrolled, but the server at $endpoint took the connection and not the enrollment token: it may be used up, expired or revoked. Enroll again with a new token; check with: sudo $supervisor status --storage $storage" >&2
+		echo "enrolled, but the server at $endpoint took the connection and not the enrollment token: it may be used up, expired or revoked, or the server deleted this host, which keeps its identity. Enroll again with a new token, or for a deleted host remove its data first (sudo pydantic-opamp-uninstall --purge); check with: sudo $supervisor status --storage $storage" >&2
 		exit 1
 	fi
 }

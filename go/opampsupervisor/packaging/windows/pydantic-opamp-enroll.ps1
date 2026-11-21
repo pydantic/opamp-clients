@@ -390,7 +390,7 @@ if ($NoStart) {
         $st = $null
         try { $st = (& $supervisor status --storage $storage --json 2>$null | Out-String) | ConvertFrom-Json } catch { }
         if ($st -and $st.server -and $st.server.connected -and -not $st.accepted) {
-            Fail "enrolled, but the server at $Endpoint took the connection and not the enrollment token: it may be used up, expired or revoked. Enroll again with a new token; check with: & '$supervisor' status --storage '$storage'"
+            Fail "enrolled, but the server at $Endpoint took the connection and not the enrollment token: it may be used up, expired or revoked, or the server deleted this host, which keeps its identity. Enroll again with a new token, or for a deleted host remove its data first (pydantic-opamp-uninstall.ps1 -Purge); check with: & '$supervisor' status --storage '$storage'"
         }
         Fail "enrolled, but the Supervisor can't connect to $Endpoint yet; it keeps retrying. Fix what is above, then check with: & '$supervisor' status --storage '$storage'"
     }
