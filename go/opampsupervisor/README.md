@@ -205,17 +205,36 @@ agent:
   own metrics the server offers, say) or local `agent.config_files` are run. Upstream's left the
   Collector's default Prometheus reader on, and the Collector exited when another process held
   the port (`supervisor/idle_telemetry.go`).
+- **The Collector's log file is held to a size, and earlier runs' logs are kept.** Upstream's
+  empties `agent.log` at every Collector start and lets it grow without limit while the Collector
+  runs. Here a start moves the last run's log to `agent.log.1` (and that one's to `agent.log.2`),
+  so the log of a Collector that failed is still there after the next one started; and a log that
+  passes 10 MiB while the Collector runs is copied to `agent.log.1` and emptied, without
+  restarting anything (`supervisor/commander/agent_log.go`). The few lines written between the
+  copy and the emptying are lost.
+- **A Supervisor told to stop while it starts stops its Collector.** Upstream's takes SIGINT and
+  SIGTERM only once `Start` has returned. `Start` runs the Collector to ask what it is and waits
+  for it, for as long as `agent::bootstrap_timeout`; a signal in that time ended the Supervisor
+  at once and left that Collector running with no parent, and the next start ran a second one
+  beside it. Here the signals are taken first, and one that arrives while it starts ends the
+  wait and stops the Collector (`run_signals.go`, with a case in `getBootstrapInfo`'s wait).
+- **As a Windows service, the Supervisor logs at its config's level.** Upstream's service logger
+  takes no notice of `telemetry::logs::level`: it writes every debug line to the Application
+  event log as an Information event (one for each message from the Collector, so one each
+  heartbeat), and a config that collects that log ships them. Here it logs at the config's level,
+  info unless set, and its lines carry no time of their own, where each began with the seconds
+  since 1970 (`supervisor/service_log.go`).
 
 Every file from upstream keeps its license header (Apache-2.0, [LICENSE](LICENSE)); the import
 paths were rewritten to this module's. The files changed beyond that say what changed in their
 header. These files are new, and are this repository's:
 
 - `supervisor/coreclient.go`, `agent_update.go`, `apply_step.go`, `client_state.go`, `startup.go`, `sealed_storage.go`, `telemetry_env.go`, `idle_telemetry.go`, `reachability.go`, `status.go`,
-  `localserver.go`, `config/remote_config_policy.go`, `commander/collector_env.go`
-  and `verifier/cosign.go`, and the tests
+  `localserver.go`, `service_log.go`, `config/remote_config_policy.go`, `commander/collector_env.go`,
+  `commander/agent_log.go` and `verifier/cosign.go`, and the tests
   beside them (with `supervisor/remote_config_refusal_test.go`, `restart_command_test.go` and
   `supervisor/config/core_test.go`, and the Cosign release fixture in `verifier/testdata/`);
-- `status_command.go`, and its test;
+- `status_command.go` and `run_signals.go`, and their tests;
 - `e2e_packages_test.go`, `e2e_policy_test.go` and `e2e_state_test.go`, and their configs in `testdata/`
   (`testdata/collector/manifest.yaml`, `testdata/supervisor/supervisor_auth_bearer_ws.yaml`,
   `supervisor_packages.yaml` and `supervisor_policy.yaml`);

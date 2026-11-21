@@ -1,5 +1,10 @@
 // Copyright The OpenTelemetry Authors
 // SPDX-License-Identifier: Apache-2.0
+//
+// Derived from opentelemetry-collector-contrib's cmd/opampsupervisor. Changed here: as a service,
+// the Supervisor logs at its config's telemetry::logs::level (info unless set), where it wrote
+// every debug line to the Application event log; and its lines there carry no time of their own
+// (service_log.go).
 
 //go:build windows
 
@@ -72,12 +77,13 @@ func (ws *windowsService) start(elog *eventlog.Log) error {
 	featuregate.GlobalRegistry().RegisterFlags(flag.CommandLine)
 	flag.Parse()
 
-	logger, _ := zap.NewDevelopment(zap.WrapCore(withWindowsCore(elog)))
-
 	cfg, err := config.Load(*configFlag)
 	if err != nil {
 		return fmt.Errorf("load config: %w", err)
 	}
+
+	// Changed here: the config is loaded first, and the logger is held to its level.
+	logger, _ := zap.NewDevelopment(serviceLogLevel(cfg.Telemetry.Logs), zap.WrapCore(withWindowsCore(elog)))
 
 	sup, err := NewSupervisor(context.Background(), logger, cfg)
 	if err != nil {
@@ -162,10 +168,12 @@ func (w windowsEventLogCore) Sync() error {
 }
 
 // TODO: If supervisor logging becomes configurable, update this function to respect that config
+// Changed here: that is done. The level is the config's (serviceLogLevel, in start above; Enabled
+// leaves it to the wrapped core), and the encoder is serviceLogEncoderConfig's (service_log.go).
 func withWindowsCore(elog *eventlog.Log) func(zapcore.Core) zapcore.Core {
 	return func(core zapcore.Core) zapcore.Core {
 		// Use the Windows Event Log
-		encoderConfig := zap.NewProductionEncoderConfig()
+		encoderConfig := serviceLogEncoderConfig() // Changed here: no time in the line.
 		encoderConfig.LineEnding = "\r\n"
 		return windowsEventLogCore{core, elog, zapcore.NewConsoleEncoder(encoderConfig)}
 	}

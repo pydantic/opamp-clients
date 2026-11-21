@@ -77,7 +77,7 @@ func TestUninstallRetainsDataAndCanPurgeLater(t *testing.T) {
 					t.Fatalf("%v: %s", err, out)
 				}
 				// Fleet e2e 2026-10-28: the default run said only what pkgutil or dpkg printed.
-				if !strings.Contains(out, "Kept "+config) || !strings.Contains(out, filepath.Join(config, "uninstall")+" --purge") {
+				if !strings.Contains(out, "Kept "+config) || !strings.Contains(out, "run: sudo "+filepath.Join(config, "uninstall")+" --purge") {
 					t.Fatalf("no summary of what was kept: %s", out)
 				}
 				for _, path := range []string{filepath.Join(config, "keep"), filepath.Join(state, "keep"), filepath.Join(config, "uninstall")} {

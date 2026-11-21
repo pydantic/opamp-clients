@@ -102,6 +102,11 @@ func startService(t *testing.T) func() {
 		out, _ := timed(t, "", "powershell", "-NoProfile", "-Command",
 			"Get-WinEvent -FilterHashtable @{LogName='Application'; ProviderName='"+service+"'} -MaxEvents 50 | Sort-Object TimeCreated | Format-List TimeCreated, Message")
 		t.Logf("Supervisor output:\n%s", out)
+		// The service logs at its config's level, info here: each event's message begins with
+		// its level, and none is a debug line (the Collector's every message to the local OpAMP
+		// server was one, an event each heartbeat).
+		assert.Regexp(t, `(?m)^Message\s*: info\b`, string(out))
+		assert.NotRegexp(t, `(?m)^Message\s*: debug\b`, string(out))
 	}
 }
 

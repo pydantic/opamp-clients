@@ -102,6 +102,33 @@ and date. Tests, CI and docs alone don't need a line.
 
 ### Fixed
 
+- Supervisor: the Collector's log file, `agent.log` in the storage directory, is held to 10 MiB
+  while the Collector runs (past that it is copied to `agent.log.1` and emptied), and a Collector
+  start keeps the logs of the two runs before it as `agent.log.1` and `agent.log.2`. It grew
+  without limit, and each start emptied it, so the log of a Collector that failed was gone once
+  the next one started. (#148)
+- Supervisor: one told to stop while it starts (a service stopped seconds after it was started,
+  say) stops the Collector it started. It ended at once and left that Collector running with no
+  parent, and the next start ran a second Collector beside it. On macOS, launchd also gives the
+  Supervisor 25 seconds to stop, where it killed it after 20. (#148)
+- Supervisor on macOS: `pydantic-opamp-enroll`, run on a Mac whose Supervisor runs (`--refresh`
+  too, which an upgrade runs), waits for launchd to finish unloading the service before it loads
+  it again. It could fail with "Bootstrap failed: 5: Input/output error" and leave the service
+  unloaded. (#148)
+- Supervisor on Windows: the service logs at its config's `telemetry::logs::level` (info unless
+  set). It wrote every debug line to the Application event log as an Information event, one each
+  heartbeat, which a config that collects that log then sent as telemetry. Its lines there no
+  longer begin with a time (the event has one). (#148)
+- Supervisor on macOS: with `--restricted`, `pydantic-opamp-enroll --host-logs` also lets the
+  server's configs read the files under `/var/log` (`/private/var/log`), and keep read positions
+  with `file_storage` in `/opt/pydantic-opamp/var/collector`, as it does on Linux. It allowed the
+  unified log receiver only, so a config that reads log files was refused. Run the enroll script
+  again, or upgrade the package, to get the wider policy. (#148)
+- Supervisor on Windows: `pydantic-opamp-uninstall.ps1` says what it removed and what it kept, and
+  how to delete the kept data later, as the Linux and macOS script does. It printed nothing. (#148)
+- Supervisor on Linux and macOS: the command `pydantic-opamp-uninstall` prints for deleting the
+  kept data begins with `sudo`. As printed it failed with "Permission denied" for anyone but root.
+  (#148)
 - Python, Node.js: setting the SDK up again in one process (Python's `configure_logfire()` or
   `manage()`, Node.js's `manage()`, called a second time) keeps the instance it joined the fleet
   as. It used to start over: another instance UID (a second slot of the default state directory)

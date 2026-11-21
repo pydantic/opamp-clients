@@ -26,7 +26,21 @@ func macEnroll(t *testing.T, root, tools, stdin string, args ...string) (string,
 		t.Skip("the enroll script is for macOS")
 	}
 	launchctl := filepath.Join(tools, "launchctl")
-	require.NoError(t, os.WriteFile(launchctl, []byte("#!/bin/sh\necho \"$@\" >>\""+filepath.Join(tools, "launchctl.log")+"\"\n"), 0o755))
+	require.NoError(t, os.WriteFile(launchctl, []byte("#!/bin/sh\necho \"$@\" >>\""+filepath.Join(tools, "launchctl.log")+"\"\n"+
+		// It keeps whether the daemon is loaded, as launchd does: bootstrap loads it, bootout
+		// unloads it, and print says which, with a state line when loaded and 113 (launchctl's
+		// "no such service") when not. With LAUNCHCTL_STOPPING naming a file, a daemon booted out
+		// stays loaded until that many prints have been made.
+		"loaded=\""+filepath.Join(tools, "launchctl.loaded")+"\"\n"+
+		"case $1 in\n"+
+		"bootstrap) touch \"$loaded\" ;;\n"+
+		"bootout) rm -f \"$loaded\" ;;\n"+
+		"print)\n"+
+		"  left=$(cat \"${LAUNCHCTL_STOPPING:-/dev/null}\" 2>/dev/null)\n"+
+		"  if [ \"${left:-0}\" -gt 0 ]; then echo $((left - 1)) >\"$LAUNCHCTL_STOPPING\"; echo 'state = running'; exit 0; fi\n"+
+		"  [ -e \"$loaded\" ] || exit 113\n"+
+		"  echo 'state = running' ;;\n"+
+		"esac\n"), 0o755))
 	cmd := exec.Command("./macos/pydantic-opamp-enroll", args...)
 	cmd.Env = append(os.Environ(), "OPAMP_ENROLL_ROOT="+root, "LAUNCHCTL="+launchctl, "OPAMP_SUPERVISOR="+fakeSupervisor(t, tools))
 	cmd.Stdin = strings.NewReader(stdin)
@@ -57,6 +71,7 @@ func TestMacEnroll(t *testing.T) {
 	log, err := os.ReadFile(filepath.Join(tools, "launchctl.log"))
 	require.NoError(t, err)
 	assert.Equal(t, "bootout system/dev.pydantic.opamp-supervisor\n"+
+		"print system/dev.pydantic.opamp-supervisor\n"+
 		"bootstrap system /Library/LaunchDaemons/dev.pydantic.opamp-supervisor.plist\n", string(log))
 
 	collector := filepath.Join(t.TempDir(), "otelcol")
@@ -170,7 +185,27 @@ func TestMacEnrollRefuses(t *testing.T) {
 	}
 }
 
-// With --restricted, --host-logs lets the server read this Mac's unified logs, but not an archive from any path.
+// Enrolling again (and --refresh, which an upgrade runs) on a Mac whose Supervisor runs waits for
+// launchd to finish unloading it before loading it again: bootout returns while the Supervisor
+// still stops its Collector, and a bootstrap then failed (5: Input/output error), leaving the
+// service unloaded.
+func TestMacEnrollWaitsForTheUnload(t *testing.T) {
+	root, tools := t.TempDir(), t.TempDir()
+	stopping := filepath.Join(tools, "stopping")
+	require.NoError(t, os.WriteFile(stopping, []byte("2\n"), 0o600))
+	t.Setenv("LAUNCHCTL_STOPPING", stopping)
+	out, err := macEnroll(t, root, tools, "t", "--endpoint", "wss://opamp.example.com/v1/opamp")
+	require.NoError(t, err, out)
+	log, err := os.ReadFile(filepath.Join(tools, "launchctl.log"))
+	require.NoError(t, err)
+	const print = "print system/dev.pydantic.opamp-supervisor\n"
+	assert.Equal(t, "bootout system/dev.pydantic.opamp-supervisor\n"+print+print+print+
+		"bootstrap system /Library/LaunchDaemons/dev.pydantic.opamp-supervisor.plist\n", string(log))
+}
+
+// With --restricted, --host-logs lets the server read this Mac's unified logs, but not an archive from any
+// path, and the files under /var/log, with file_storage keeping its place in the Supervisor's own
+// directory, and nowhere else.
 func TestMacEnrollHostLogs(t *testing.T) {
 	enroll := func(args ...string) config.RemoteConfigPolicy {
 		root, tools := t.TempDir(), t.TempDir()
@@ -191,9 +226,35 @@ func TestMacEnrollHostLogs(t *testing.T) {
 		require.NoError(t, err)
 		return loaded.Agent.RemoteConfigPolicy
 	}
-	p := enroll("--host-logs")
+	p := enroll("--host-logs", "--log-path", "/srv/app/logs")
 	assertHostLogs(t, p, enroll(), hostLogsConfig(t, "macos"), `configures receiver "macos_unified_logging"`)
 	require.ErrorContains(t, p.Check("", []byte(`receivers: {macos_unified_logging: {archive_path: /tmp/x.logarchive}}`)), "sets archive_path")
+
+	// The log files: /var/log is a link to /private/var/log on macOS, and a config may name either.
+	assert.Equal(t, []string{"/srv/app/logs", "/var/log", "/private/var/log"}, p.AllowedLogPaths)
+	// The test's stand-in for /opt/pydantic-opamp/var, as enroll makes it.
+	require.Len(t, p.AllowedStorageDirectories, 1)
+	storage := p.AllowedStorageDirectories[0]
+	assert.Equal(t, "collector", filepath.Base(storage))
+	fileLogs := []byte(strings.NewReplacer("STORAGE", storage).Replace(`
+extensions:
+  file_storage/host_logs: {directory: STORAGE, create_directory: true}
+receivers:
+  file_log/system:
+    include: [/var/log/*.log, /private/var/log/install.log]
+    start_at: end
+    storage: file_storage/host_logs
+exporters:
+  otlp_http/logfire: {endpoint: https://logfire-us.pydantic.dev}
+service:
+  extensions: [file_storage/host_logs]
+  pipelines:
+    logs: {receivers: [file_log/system], exporters: [otlp_http/logfire]}
+`))
+	require.NoError(t, p.Check("", fileLogs))
+	require.ErrorContains(t, enroll().Check("", fileLogs), `configures extension "file_storage/host_logs"`)
+	require.ErrorContains(t, p.Check("", []byte(`extensions: {file_storage: {directory: /etc/cron.d}}`)), "allowed_storage_directories doesn't allow")
+	require.ErrorContains(t, p.Check("", []byte(`receivers: {filelog: {include: [/etc/master.passwd]}}`)), "allowed_log_paths doesn't allow")
 }
 
 // --refresh, which the .pkg's postinstall runs on an upgrade, writes the config again with the
@@ -239,6 +300,7 @@ func TestMacEnrollRefresh(t *testing.T) {
 			log, err := os.ReadFile(filepath.Join(tools, "launchctl.log"))
 			require.NoError(t, err)
 			assert.Equal(t, "bootout system/dev.pydantic.opamp-supervisor\n"+
+				"print system/dev.pydantic.opamp-supervisor\n"+
 				"bootstrap system /Library/LaunchDaemons/dev.pydantic.opamp-supervisor.plist\n", string(log))
 		})
 	}
