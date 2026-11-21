@@ -66,10 +66,10 @@ and date. Tests, CI and docs alone don't need a line.
   connection but not the credentials (a used-up enrollment key, say) closes it unanswered, and
   the host read as connected and healthy; it now reads "not yet", and `--require-accepted` makes
   `status` exit 1 and `--wait` wait for it. Without the flag `--wait` exits as before, but gives
-  the server up to 10 seconds after connecting to answer before it prints (#PR).
+  the server up to 10 seconds after connecting to answer before it prints (#150).
 - Go: `Client.Answered()`, closed once the server's first answer reaches a platform-mode client
   (a ServerToAgent that isn't an error response, over WebSocket or in an HTTP success): it tells a
-  server that took the agent from one that took the connection and closed it unanswered (#PR).
+  server that took the agent from one that took the connection and closed it unanswered (#150).
 - Supervisor installers and container image: the Collector runs with
   `--feature-gates=telemetry.newPipelineTelemetry`, so its own metrics count the items every
   receiver, processor (`batch` too) and exporter takes in and passes on. A Prometheus reader of
