@@ -511,6 +511,16 @@ func TestEnrollWaitsForTheConnection(t *testing.T) {
 	systemctlLog, err := os.ReadFile(filepath.Join(e.tools, "systemctl.log"))
 	require.NoError(t, err)
 	assert.Contains(t, string(systemctlLog), "stop pydantic-opamp-supervisor.service\n")
+	// A 403 (a missing permission, say) is not a revoked credential: the state stays.
+	require.NoError(t, os.WriteFile(state, []byte("sealed"), 0o600))
+	require.NoError(t, os.WriteFile(filepath.Join(e.tools, "json"), []byte(strings.ReplaceAll(revokedJSON, "401", "403")), 0o600))
+	require.NoError(t, os.WriteFile(filepath.Join(e.tools, "status"), []byte("1"), 0o600))
+	out, err = e.run(t, "bootstrap-token", "--endpoint", "wss://opamp.example.com/v1/opamp")
+	require.Error(t, err)
+	assert.NotContains(t, out, "the server refused this host's saved credentials")
+	assert.FileExists(t, state)
+	require.NoError(t, os.Remove(filepath.Join(e.tools, "status")))
+
 	// Refused again after that: no second try, and what to check.
 	require.NoError(t, os.Remove(filepath.Join(e.tools, "heal")))
 	require.NoError(t, os.WriteFile(state, []byte("sealed"), 0o600))
