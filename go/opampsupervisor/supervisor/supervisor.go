@@ -25,7 +25,8 @@
 // fails is tried again on the restart backoff. Health counts only while its connection is the
 // collector's. A remote config holding the Logfire SDK policy (logfire-sdk-policy.json), which SDKs
 // take, is FAILED: the collector takes YAML. The Collector run without a remote config has its internal
-// metrics off unless a config sets them (idle_telemetry.go).
+// metrics off unless a config sets them (idle_telemetry.go). The agent description carries a key
+// derived from the host's machine ID (host_key.go).
 
 package supervisor
 
@@ -1161,6 +1162,8 @@ func (s *Supervisor) forwardCustomMessagesToServerLoop() {
 func (s *Supervisor) setAgentDescription(ad *protobufs.AgentDescription) {
 	ad.IdentifyingAttributes = applyKeyValueOverrides(s.config.Agent.Description.IdentifyingAttributes, ad.IdentifyingAttributes)
 	ad.NonIdentifyingAttributes = applyKeyValueOverrides(s.config.Agent.Description.NonIdentifyingAttributes, ad.NonIdentifyingAttributes)
+	// Changed here: with this host's key (host_key.go).
+	ad.NonIdentifyingAttributes = withHostKey(ad.NonIdentifyingAttributes)
 	s.agentDescription.Store(ad)
 }
 
@@ -1169,7 +1172,7 @@ func (s *Supervisor) setAgentDescription(ad *protobufs.AgentDescription) {
 func (s *Supervisor) configuredAgentDescription() *protobufs.AgentDescription {
 	return &protobufs.AgentDescription{
 		IdentifyingAttributes:    applyKeyValueOverrides(s.config.Agent.Description.IdentifyingAttributes, nil),
-		NonIdentifyingAttributes: applyKeyValueOverrides(s.config.Agent.Description.NonIdentifyingAttributes, nil),
+		NonIdentifyingAttributes: withHostKey(applyKeyValueOverrides(s.config.Agent.Description.NonIdentifyingAttributes, nil)), // Changed here: with this host's key (host_key.go).
 	}
 }
 

@@ -61,6 +61,10 @@ and date. Tests, CI and docs alone don't need a line.
 
 ### Added
 
+- Supervisor: the agent description reports `pydantic.fleet.host_key`, a UUID derived from the
+  host's machine ID by HMAC-SHA256 with a constant of this package (the machine ID itself isn't
+  reported), the same for as long as the host keeps its machine ID, so a server can tie a host
+  enrolled again to the one it replaces. Upgraded hosts report it once the new Supervisor runs (#PR).
 - Supervisor installers and container image: the Collector runs with
   `--feature-gates=telemetry.newPipelineTelemetry`, so its own metrics count the items every
   receiver, processor (`batch` too) and exporter takes in and passes on. A Prometheus reader of
