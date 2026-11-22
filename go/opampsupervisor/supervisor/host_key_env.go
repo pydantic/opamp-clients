@@ -44,13 +44,24 @@ func (s *Supervisor) collectorEnv() map[string]string {
 	if !ok {
 		base, ok = os.LookupEnv(resourceAttributesEnv)
 	}
+	// The older variable, as the Collector would see it. A host key there is dropped too: the
+	// detector reads it whenever OTEL_RESOURCE_ATTRIBUTES is empty, which it is when that held only
+	// a host key and the Supervisor reports none.
+	legacyName, legacy, found := lookupEnv(env, legacyResourceEnv)
+	if !found {
+		legacyName, legacy, found = lookupEnv(s.config.Agent.Env, legacyResourceEnv)
+	}
+	if !found {
+		legacy, found = os.LookupEnv(legacyResourceEnv)
+	}
+	if found {
+		if filtered := withHostKeyResourceAttribute(legacy, ""); filtered != legacy {
+			env[legacyName], legacy = filtered, filtered
+		}
+	}
 	if !ok || base == "" {
 		// The detector reads the older variable only while this one is empty.
-		if _, legacy, found := lookupEnv(s.config.Agent.Env, legacyResourceEnv); found {
-			base = legacy
-		} else {
-			base = os.Getenv(legacyResourceEnv)
-		}
+		base = legacy
 	}
 	value := withHostKeyResourceAttribute(base, key)
 	if key == "" && value == base {

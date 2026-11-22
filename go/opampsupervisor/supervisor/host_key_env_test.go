@@ -65,6 +65,19 @@ func TestTheCollectorKeepsTheOlderResourceVariable(t *testing.T) {
 	// Without a key the older variable is left to the detector as it was.
 	hostKey = func() string { return "" }
 	assert.NotContains(t, s.collectorEnv(), resourceAttributesEnv)
+	assert.NotContains(t, s.collectorEnv(), legacyResourceEnv)
+
+	// A host key in it is dropped: with none to report, the detector would read it there.
+	s.config.Agent.Env = nil
+	t.Setenv(legacyResourceEnv, "pydantic.fleet.host_key=old")
+	assert.Equal(t, "", s.collectorEnv()[legacyResourceEnv])
+	t.Setenv(legacyResourceEnv, "pydantic.fleet.host_key=old,team=infra")
+	assert.Equal(t, map[string]string{legacyResourceEnv: "team=infra"}, s.collectorEnv())
+
+	// The connection's own environment is read first, as for OTEL_RESOURCE_ATTRIBUTES.
+	hostKey = func() string { return "k" }
+	s.connectionEnv.Store(&map[string]string{legacyResourceEnv: "deployment.environment=staging"})
+	assert.Equal(t, "deployment.environment=staging,pydantic.fleet.host_key=k", s.collectorEnv()[resourceAttributesEnv])
 }
 
 func TestWithHostKeyResourceAttribute(t *testing.T) {
