@@ -460,8 +460,10 @@ if ($NoStart) {
         $st = $null
         try { $st = (& $supervisor status --storage $storage --json 2>$null | Out-String) | ConvertFrom-Json } catch { }
         if ($st -and $st.server -and $st.server.connected -and -not $st.accepted) {
-            $deleted = if ($tried -or @(Get-StatesAside).Count) { '' } else { ', or the server deleted this host, which keeps its identity' }
-            $purge = if ($tried -or @(Get-StatesAside).Count) { '' } else { ', or for a deleted host remove its data first (pydantic-opamp-uninstall.ps1 -Purge)' }
+            # Not with credentials set aside: a purge removes them.
+            $kept = $tried -or @(Get-StatesAside).Count -or (Test-Path -Path "$state.replaced-*")
+            $deleted = if ($kept) { '' } else { ', or the server deleted this host, which keeps its identity' }
+            $purge = if ($kept) { '' } else { ', or for a deleted host remove its data first (pydantic-opamp-uninstall.ps1 -Purge)' }
             Fail "enrolled, but the server at $Endpoint took the connection and not the enrollment token: it may be used up, expired or revoked$deleted. Enroll again with a new token$purge; check with: & '$supervisor' status --storage '$storage'"
         }
         Fail "enrolled, but the Supervisor can't connect to $Endpoint yet; it keeps retrying. Fix what is above, then check with: & '$supervisor' status --storage '$storage'"

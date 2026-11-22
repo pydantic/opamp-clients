@@ -521,7 +521,7 @@ not_accepted() {
 		deleted=", or the server deleted this host, which keeps its identity"
 		purge=", or for a deleted host remove its data first (sudo pydantic-opamp-uninstall --purge)"
 		# Not with credentials set aside: a purge removes them.
-		[ -z "$restarted_fresh$(states_aside)" ] || deleted= purge=
+		[ -z "$restarted_fresh$(states_aside)$(ls "$storage" | grep '^opamp-state\.replaced-')" ] || deleted= purge=
 		echo "enrolled, but the server at $endpoint took the connection and not the enrollment token: it may be used up, expired or revoked$deleted. Enroll again with a new token$purge; check with: sudo $supervisor status --storage $storage" >&2
 		fail_wait
 	fi

@@ -627,6 +627,16 @@ func TestEnrollWaitsForTheConnection(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, "sealed", string(kept))
 	require.Len(t, aside(), 1)
+	// Unanswered, with only what a person replaced there: no advice to remove that either.
+	require.NoError(t, os.WriteFile(filepath.Join(e.tools, "json"), []byte(refusedJSON), 0o600))
+	kept0 := aside()[0]
+	require.NoError(t, os.Rename(kept0, filepath.Join(e.tools, "kept0")))
+	out, err = e.run(t, "bootstrap-token", "--endpoint", "wss://opamp.example.com/v1/opamp")
+	require.Error(t, err)
+	assert.Contains(t, out, "took the connection and not the enrollment token")
+	assert.NotContains(t, out, "purge")
+	assert.NotContains(t, out, "put them back with")
+	require.NoError(t, os.Rename(filepath.Join(e.tools, "kept0"), kept0))
 	// What fails later for another reason, or in an upgrade, is nothing to put credentials back for.
 	require.NoError(t, os.Remove(filepath.Join(e.tools, "json")))
 	for _, args := range [][]string{{"--endpoint", "wss://opamp.example.com/v1/opamp"}, {"--refresh"}} {
