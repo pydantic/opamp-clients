@@ -30,10 +30,12 @@ import (
 // Supervisor, so what it prints says whether it did. The enrollment helpers run it after they start the service, so an install that can't
 // reach its server (an untrusted certificate, say) says so instead of succeeding.
 //
-// With --require-accepted the server must also have answered this Supervisor in its run
-// (Status.Accepted): the command exits 1 without it, and --wait waits for it too. A server that
-// takes the connection but not the credentials (an enrollment key it refuses, say) closes it
-// unanswered and reads as connected; this tells the two apart.
+// With --require-accepted the server must also have taken this Supervisor in its run
+// (Status.Accepted): the command exits 1 without it, and --wait waits for it too, and for it to
+// last a few seconds (acceptedFor), unless the host
+// tries again only after the wait is up (Status.Enrollment: the server says the host's identity
+// is another installation's, say). A server that takes the connection but not the credentials (an enrollment
+// key it refuses, say) closes it unanswered and reads as connected; this tells the two apart.
 //
 // It is a new file rather than a change to upstream's main.go: the command is taken here, before
 // main runs.
@@ -51,7 +53,7 @@ func statusCommand(args []string, stdout, stderr io.Writer) int {
 	jsonOut := flags.Bool("json", false, "Print the status as JSON, as the status file holds it")
 	wait := flags.Duration("wait", 0, "Wait this long for the Supervisor to connect to its OpAMP server")
 	since := flags.Int64("since", 0, "With --wait: only a Supervisor started at or after this Unix time counts")
-	requireAccepted := flags.Bool("require-accepted", false, "Also require that the server has answered this Supervisor since it started; with --wait, wait for it")
+	requireAccepted := flags.Bool("require-accepted", false, "Also require that the server has taken this Supervisor since it started; with --wait, wait for it")
 	if err := flags.Parse(args); err != nil {
 		return 2
 	}
@@ -130,9 +132,15 @@ func printStatus(st *supervisor.Status, jsonOut bool, stdout, stderr io.Writer) 
 	return 0
 }
 
+// acceptedFor is how long --wait --require-accepted has the host accepted and connected before it
+// takes it for that: a server may answer a host on credentials it has just ended (it deleted the
+// host, and not every part of it has heard), and refuse it a moment later.
+const acceptedFor = 3 * time.Second
+
 // waitConnected polls the status file until a Supervisor started at or after since is connected
-// and taken by the server, or, without accepted, connected for supervisor.AcceptGrace (or until
-// wait is up, connected); or wait is up; it then prints the status as the plain command does. A
+// and taken by the server (with accepted, for acceptedFor, past wait if it must), or, without
+// accepted, connected for supervisor.AcceptGrace (or until wait is up, connected); or wait is up; it
+// then prints the status as the plain command does. A
 // read that meets the Supervisor's replacing of the file (a sharing violation on Windows) is
 // tried again until wait is up, and access denied on Windows (that, or a real permission error)
 // for 2 seconds; a status file that can't be read otherwise fails at once, since waiting won't
@@ -140,6 +148,8 @@ func printStatus(st *supervisor.Status, jsonOut bool, stdout, stderr io.Writer) 
 func waitConnected(dir string, wait time.Duration, since time.Time, accepted, jsonOut bool, stdout, stderr io.Writer) int {
 	deadline := time.Now().Add(wait)
 	var failing time.Time // when the run of failed reads began
+	// Since when the host is seen connected and taken as it is, by these times of the status.
+	var seen, lastSince, lastAccepted time.Time
 	for {
 		st, err := readStatus(dir)
 		if err != nil && !errors.Is(err, fs.ErrNotExist) {
@@ -156,15 +166,31 @@ func waitConnected(dir string, wait time.Duration, since time.Time, accepted, js
 		current := err == nil && !st.Started.Before(since) && st.Running()
 		connected := current && st.Server != nil && st.Server.Connected
 		late := time.Now().After(deadline)
+		taken := connected && st.IsAccepted()
+		if !taken || !st.Server.Since.Equal(lastSince) || !st.Accepted.Since.Equal(lastAccepted) {
+			seen = time.Now()
+			if taken {
+				lastSince, lastAccepted = st.Server.Since, st.Accepted.Since
+			}
+		}
+		// For that long by the status, or as seen here (whatever the clock did).
+		lasts := taken && (time.Since(seen) >= acceptedFor || time.Since(st.Server.Since) >= acceptedFor && time.Since(st.Accepted.Since) >= acceptedFor)
 		switch {
-		case connected && st.IsAccepted():
+		case taken && (!accepted || lasts):
 			return printStatus(st, jsonOut, stdout, stderr)
+		case accepted && current && st.Enrollment != nil && st.Enrollment.RetryAt.After(deadline):
+			// Waiting longer changes nothing.
+			if code := printStatus(st, jsonOut, stdout, stderr); code != 0 {
+				return code
+			}
+			return 1
 		case connected && !accepted && time.Since(st.Server.Since) >= supervisor.AcceptGrace:
 			// Connected is enough without --require-accepted; the server was given its grace to
 			// take the Supervisor first, so what is printed says whether it did.
 			return printStatus(st, jsonOut, stdout, stderr)
 		case connected && !accepted && late:
 			return printStatus(st, jsonOut, stdout, stderr)
+		case taken && !time.Now().After(deadline.Add(acceptedFor)): // will it last?
 		case late && !current:
 			fmt.Fprintf(stderr, "the Supervisor hasn't reported its status in %s within %s: check its log\n", dir, wait)
 			return 1

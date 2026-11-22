@@ -246,6 +246,30 @@ func TestMacEnrollWaitsForTheConnection(t *testing.T) {
 	assert.NotContains(t, out, "keeps retrying")
 	require.NoError(t, os.Remove(filepath.Join(tools, "json")))
 
+	// It said so as it closed the connection.
+	require.NoError(t, os.WriteFile(filepath.Join(tools, "json"), []byte(spentJSON), 0o600))
+	out, err = macEnroll(t, root, tools, "t", "--endpoint", "wss://opamp.example.com/v1/opamp")
+	require.Error(t, err)
+	assert.Contains(t, out, "took the connection and not the enrollment token: it may be used up, expired or revoked")
+	assert.NotContains(t, out, "not enrolled: the server")
+
+	// The server offered the host credentials and doesn't take it with one.
+	require.NoError(t, os.WriteFile(filepath.Join(tools, "json"), []byte(notTakenJSON), 0o600))
+	out, err = macEnroll(t, root, tools, "t", "--endpoint", "wss://opamp.example.com/v1/opamp")
+	require.Error(t, err)
+	assert.Contains(t, out, "not enrolled: the server at wss://opamp.example.com/v1/opamp holds this host's identity for another installation")
+	assert.Contains(t, out, "sudo /opt/pydantic-opamp/bin/pydantic-opamp-uninstall --purge")
+	assert.NotContains(t, out, "keeps retrying")
+	assert.NotContains(t, out, "Enrolled with")
+	// For another reason, with no advice to remove anything.
+	require.NoError(t, os.WriteFile(filepath.Join(tools, "json"), []byte(strings.Replace(notTakenJSON, "identity_taken", "other", 1)), 0o600))
+	out, err = macEnroll(t, root, tools, "t", "--endpoint", "wss://opamp.example.com/v1/opamp")
+	require.Error(t, err)
+	assert.Contains(t, out, "not enrolled: the server at wss://opamp.example.com/v1/opamp answered this host and hasn't taken it")
+	assert.NotContains(t, out, "--purge")
+	assert.NotContains(t, out, "keeps retrying")
+	require.NoError(t, os.Remove(filepath.Join(tools, "json")))
+
 	// Not running, or running but started again since the bootstrap (caught between crashes).
 	for _, state := range []string{"inactive", "crashing"} {
 		require.NoError(t, os.WriteFile(filepath.Join(tools, state), nil, 0o600))

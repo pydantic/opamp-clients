@@ -41,11 +41,15 @@ type Status struct {
 	Collector *CollectorStatus `json:"collector,omitempty"`
 	// RemoteConfig is the last one's status: nil before the server sent one.
 	RemoteConfig *RemoteConfigState `json:"remote_config,omitempty"`
-	// Accepted is when the server first answered this Supervisor in this run: nil while it hasn't.
-	// A server that takes the connection and then closes it unanswered, as one does for
-	// credentials it refuses (an enrollment key used up or revoked, say), leaves it nil while the
-	// connection reads connected.
+	// Accepted is when the server took this Supervisor in this run: nil while it hasn't. A server
+	// that takes the connection and then closes it unanswered, as one does for credentials it
+	// refuses (an enrollment key used up or revoked, say), or that only offers this host
+	// credentials of its own, leaves it nil while the connection reads connected.
 	Accepted *AcceptedState `json:"accepted,omitempty"`
+	// Enrollment is how the host's enrollment goes while the server hasn't taken it: the
+	// credentials it offered, why none is in use, and what it said. nil once accepted, and while
+	// the server said nothing of it.
+	Enrollment *EnrollmentState `json:"enrollment,omitempty"`
 	// OwnTelemetry is what became of the server's last own telemetry settings: nil before it sent
 	// any.
 	OwnTelemetry *OwnTelemetryState `json:"own_telemetry,omitempty"`
@@ -68,13 +72,16 @@ type OwnTelemetryState struct {
 	Error  string    `json:"error,omitempty"`
 }
 
-// AcceptedState is when the server first answered the Supervisor in this run: the first
-// ServerToAgent from it, not an error response, to reach the client (go/opamp's
-// Client.Answered). A server answers at once a host whose credentials it takes; one that takes
-// the connection and closes it unanswered doesn't. A server that over WebSocket sends nothing
-// until it has something to say leaves it nil too. It is the Supervisor's own run: a restart
-// starts without it, whatever was saved, and it isn't taken back in the run (credentials refused
-// at a later connection with an HTTP error make the connection fail, which Server says).
+// AcceptedState is when the server took the Supervisor on the connection it uses, in this run (go/opamp's
+// Standing.Accepted): the first ServerToAgent from it, not an error response, to reach the client
+// that offered no credential, or came on one the server issued. A host the server
+// issues a credential is taken once the server has answered it on that credential, not when it is
+// offered it. A server answers at once a host whose credentials it takes; one that takes the
+// connection and closes it unanswered doesn't. A server that over WebSocket sends nothing until it
+// has something to say leaves it nil too. It is the Supervisor's own run: a restart starts without
+// it, whatever was saved. It is taken back when the server closes a connection for policy (until it
+// answers again), or one made with the configured credential after it offered another (credentials refused at a later
+// connection with an HTTP error make the connection fail, which Server says).
 type AcceptedState struct {
 	Since time.Time `json:"since"`
 }
@@ -111,6 +118,8 @@ type statusReport struct {
 	now  func() time.Time
 	// closed: the client stopped, and the file says so for good.
 	closed bool
+	// takes counts the times the server took the Supervisor (accepted).
+	takes int
 }
 
 func newStatusReport(dir string) *statusReport {
@@ -202,21 +211,23 @@ func (r *statusReport) remoteConfig(logger *zap.Logger, s *protobufs.RemoteConfi
 	})
 }
 
-// accepted records the server's first answer of the run.
-func (r *statusReport) accepted(logger *zap.Logger) {
+// accepted records that the server took this Supervisor, for the takes-th time (opamp.Standing).
+func (r *statusReport) accepted(logger *zap.Logger, takes int) {
 	if r == nil {
 		return
 	}
 	r.mu.Lock()
-	done := r.st.Accepted != nil
+	done := r.st.Accepted != nil && r.st.Enrollment == nil && r.takes == takes
 	r.mu.Unlock()
 	if done {
 		return
 	}
 	r.update(logger, func(st *Status, now time.Time) {
-		if st.Accepted == nil {
+		st.Enrollment = nil
+		if st.Accepted == nil || r.takes != takes {
 			st.Accepted = &AcceptedState{Since: now}
 		}
+		r.takes = takes
 	})
 }
 
@@ -313,18 +324,22 @@ func (st *Status) Running() bool {
 	return !st.Stopped && processAlive(st.PID)
 }
 
-// OK is whether all is well: running, connected, the collector healthy, and the last remote
-// config not FAILED.
+// OK is whether all is well: running, connected, the collector healthy, the last remote config not
+// FAILED, and the server not refusing the host's enrollment.
 func (st *Status) OK() bool {
 	return st.Running() && st.Server != nil && st.Server.Connected &&
 		st.Collector != nil && st.Collector.Healthy &&
-		(st.RemoteConfig == nil || st.RemoteConfig.Status != "FAILED") && st.SaveError == ""
+		(st.RemoteConfig == nil || st.RemoteConfig.Status != "FAILED") && st.SaveError == "" &&
+		(st.Enrollment == nil || st.Enrollment.Error == "")
 }
 
 // Print writes the status for a person, now being the time to count ages from.
 func (st *Status) Print(w io.Writer, now time.Time) {
 	ago := func(t time.Time) string {
 		return fmt.Sprintf("%s (%s ago)", t.Local().Format(time.DateTime), now.Sub(t).Round(time.Second))
+	}
+	in := func(t time.Time) string {
+		return fmt.Sprintf("%s (in %s)", t.Local().Format(time.DateTime), t.Sub(now).Round(time.Second))
 	}
 	line := func(label, format string, args ...any) {
 		fmt.Fprintf(w, "%-14s %s\n", label, fmt.Sprintf(format, args...))
@@ -345,6 +360,8 @@ func (st *Status) Print(w io.Writer, now time.Time) {
 		line("OpAMP server", "%s: not tried yet", st.Endpoint)
 	case s.Connected:
 		line("OpAMP server", "%s: connected since %s", st.Endpoint, ago(s.Since))
+	case st.Enrollment.waiting(now):
+		line("OpAMP server", "%s: not connected since %s, until %s", st.Endpoint, ago(s.Since), in(st.Enrollment.RetryAt))
 	default:
 		why := s.Error
 		if why == "" {
@@ -369,7 +386,9 @@ func (st *Status) Print(w io.Writer, now time.Time) {
 	}
 	switch a := st.Accepted; {
 	case a != nil:
-		line("Accepted", "yes: the server answered this host at %s", ago(a.Since))
+		line("Accepted", "yes: the server took this host at %s", ago(a.Since))
+	case st.Enrollment != nil:
+		st.Enrollment.print(line, in, now)
 	case st.Server != nil && st.Server.Connected && now.Sub(st.Server.Since) < AcceptGrace:
 		line("Accepted", "not yet: waiting for the server's first answer since it connected")
 	default:

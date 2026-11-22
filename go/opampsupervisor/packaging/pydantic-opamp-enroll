@@ -512,16 +512,31 @@ fail_wait() {
 	exit 1
 }
 
-# not_accepted fails the install when the Supervisor is connected but the server never answered
-# it: a server that takes the connection but not the credentials (a used-up, expired or revoked
+# not_accepted fails the install when the server didn't take the host: it offered it credentials
+# that aren't in use, or the Supervisor is connected but the server never answered it. A server that
+# takes the connection but not the credentials (a used-up, expired or revoked
 # enrollment token) closes it unanswered.
 not_accepted() {
 	st=$("$supervisor" status --storage "$storage" --json 2>/dev/null) || :
-	if printf '%s\n' "$st" | grep -q '"connected": true' && ! printf '%s\n' "$st" | grep -q '"accepted": {'; then
-		deleted=", or the server deleted this host, which keeps its identity"
-		purge=", or for a deleted host remove its data first (sudo pydantic-opamp-uninstall --purge)"
-		# Not with credentials set aside: a purge removes them.
-		[ -z "$restarted_fresh$(states_aside)$(ls "$storage" | grep '^opamp-state\.replaced-')" ] || deleted= purge=
+	deleted=", or the server deleted this host, which keeps its identity"
+	purge=", or for a deleted host remove its data first (sudo pydantic-opamp-uninstall --purge)"
+	taken="Remove this host's data (sudo pydantic-opamp-uninstall --purge), then enroll it again with a new token"
+	# Not with credentials set aside: a purge removes them.
+	if [ -n "$restarted_fresh$(states_aside)$(ls "$storage" | grep '^opamp-state\.replaced-')" ]; then
+		deleted= purge=
+		taken="Copy what is set aside in $storage elsewhere, remove this host's data (sudo pydantic-opamp-uninstall --purge), then enroll it again with a new token"
+	fi
+	# The server answered the host and didn't take it ("enrollment" in the status, gone once it
+	# does). A refused token is told below.
+	if printf '%s\n' "$st" | grep -q '"identity_taken": true'; then
+		echo "not enrolled: the server at $endpoint holds this host's identity for another installation (a host it deleted, say). $taken; check with: sudo $supervisor status --storage $storage" >&2
+		fail_wait
+	fi
+	if printf '%s\n' "$st" | grep -q '"enrollment": {' && ! printf '%s\n' "$st" | grep -q '"token_refused": true'; then
+		echo "not enrolled: the server at $endpoint answered this host and hasn't taken it. Why, how many credentials it offered, and when the host tries again are above; check with: sudo $supervisor status --storage $storage" >&2
+		fail_wait
+	fi
+	if printf '%s\n' "$st" | grep -q '"token_refused": true' || { printf '%s\n' "$st" | grep -q '"connected": true' && ! printf '%s\n' "$st" | grep -q '"accepted": {'; }; then
 		echo "enrolled, but the server at $endpoint took the connection and not the enrollment token: it may be used up, expired or revoked$deleted. Enroll again with a new token$purge; check with: sudo $supervisor status --storage $storage" >&2
 		fail_wait
 	fi
@@ -545,7 +560,7 @@ refused_saved() {
 }
 
 # wait_connected waits up to 30 seconds for the Supervisor started at $1 (Unix seconds), with $2
-# restarts counted before, to connect and the server to answer it (--require-accepted).
+# restarts counted before, to connect and the server to take it (--require-accepted).
 # An install that can't reach its server (an untrusted certificate, a refused key) fails here,
 # with what to check, instead of reporting success; the service keeps retrying.
 wait_connected() {

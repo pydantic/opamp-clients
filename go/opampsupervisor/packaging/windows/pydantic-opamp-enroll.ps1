@@ -381,8 +381,8 @@ if ($NoStart) {
     # retrying.
     $supervisor = if ($env:OPAMP_SUPERVISOR) { $env:OPAMP_SUPERVISOR } else { Join-Path $programs 'opampsupervisor.exe' }
     $storage = Join-Path $root 'var'
-    # --require-accepted: connected is not enough; the server must have answered (a server that
-    # takes the connection but not the credentials closes it unanswered).
+    # --require-accepted: connected is not enough; the server must have taken the host (a
+    # server that takes the connection but not the credentials closes it unanswered).
     & $supervisor status --storage $storage --wait 30s --since $started --require-accepted
     # The wait's outcome, kept: the status reads below set $LASTEXITCODE too.
     $waited = $LASTEXITCODE
@@ -459,11 +459,21 @@ if ($NoStart) {
         if ((Get-Service -Name $service -ErrorAction SilentlyContinue).Status -ne 'Running') { Fail-Start }
         $st = $null
         try { $st = (& $supervisor status --storage $storage --json 2>$null | Out-String) | ConvertFrom-Json } catch { }
-        if ($st -and $st.server -and $st.server.connected -and -not $st.accepted) {
-            # Not with credentials set aside: a purge removes them.
-            $kept = $tried -or @(Get-StatesAside).Count -or (Test-Path -Path "$state.replaced-*")
-            $deleted = if ($kept) { '' } else { ', or the server deleted this host, which keeps its identity' }
-            $purge = if ($kept) { '' } else { ', or for a deleted host remove its data first (pydantic-opamp-uninstall.ps1 -Purge)' }
+        # Not with credentials set aside: a purge removes them.
+        $kept = $tried -or @(Get-StatesAside).Count -or (Test-Path -Path "$state.replaced-*")
+        $deleted = if ($kept) { '' } else { ', or the server deleted this host, which keeps its identity' }
+        $purge = if ($kept) { '' } else { ', or for a deleted host remove its data first (pydantic-opamp-uninstall.ps1 -Purge)' }
+        # The server answered the host and didn't take it ("enrollment" in the status, gone once it
+        # does). A refused token is told below.
+        if ($st -and $st.enrollment -and $st.enrollment.identity_taken) {
+            $taken = if ($kept) { "Copy what is set aside in $storage elsewhere, remove this host's data (pydantic-opamp-uninstall.ps1 -Purge), then enroll it again with a new token" }
+                else { "Remove this host's data (pydantic-opamp-uninstall.ps1 -Purge), then enroll it again with a new token" }
+            Fail "not enrolled: the server at $Endpoint holds this host's identity for another installation (a host it deleted, say). $taken; check with: & '$supervisor' status --storage '$storage'"
+        }
+        if ($st -and $st.enrollment -and -not $st.enrollment.token_refused) {
+            Fail "not enrolled: the server at $Endpoint answered this host and hasn't taken it. Why, how many credentials it offered, and when the host tries again are above; check with: & '$supervisor' status --storage '$storage'"
+        }
+        if ($st -and ($st.enrollment.token_refused -or ($st.server -and $st.server.connected -and -not $st.accepted))) {
             Fail "enrolled, but the server at $Endpoint took the connection and not the enrollment token: it may be used up, expired or revoked$deleted. Enroll again with a new token$purge; check with: & '$supervisor' status --storage '$storage'"
         }
         Fail "enrolled, but the Supervisor can't connect to $Endpoint yet; it keeps retrying. Fix what is above, then check with: & '$supervisor' status --storage '$storage'"

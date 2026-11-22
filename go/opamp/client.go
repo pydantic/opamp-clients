@@ -268,8 +268,8 @@ type Client struct {
 	// saveError is how the last save ended, and saves says that one did (the executor's).
 	saveError *atomic.Pointer[string]
 	saves     <-chan struct{}
-	// answered is the executor's, in platform mode; nil in core mode.
-	answered <-chan struct{}
+	// standing is the executor's, in platform mode; nil in core mode.
+	standing *standing
 }
 
 // Start starts a client. notify is called for every Notification, one at a time, on the client's
@@ -443,7 +443,9 @@ func (o *Opened) start(status Status, first []*corepb.Input, notify func(*Client
 	cl.saveError, cl.saves = &x.saveError, x.saves
 	x.configure(cfg.Header)
 	if !o.coreMode {
-		cl.answered = x.answered
+		x.standing = newStanding()
+		x.standing.configure(cfg.Endpoint, cfg.Header, cfg.AcceptConnectionSettings)
+		cl.standing = x.standing
 	}
 	if cfg.fs != nil {
 		x.fs = cfg.fs
@@ -524,15 +526,29 @@ func (c *Client) SaveError() string {
 	return ""
 }
 
-// Answered is closed once an answer from the server has reached the client since Start: a
-// ServerToAgent that isn't an error response, in a WebSocket message or in an HTTP success (with
-// the protobuf content type, or none). It is how an application tells a server that took the
-// agent from one that took the connection and closed it unanswered (as one may for credentials
-// it refuses, while the connection reads connected); a server that answers HTTP requests always
-// answers, but over WebSocket one may send nothing until it has something to say (opamp-go's
-// server does so), so a server it never closes for may leave it open. It is never taken back.
-// Platform mode only, where the client makes the requests: nil in core mode.
-func (c *Client) Answered() <-chan struct{} { return c.answered }
+// Standing is how the agent stands with its server now: whether the server took it, and what
+// became of the credentials it offered. It is how an application tells a server that took the
+// agent from one that took the connection and closed it unanswered (as one may for credentials it
+// refuses, while the connection reads connected), or that only offers the agent credentials it
+// then refuses. A server that answers HTTP requests always answers, but over WebSocket one may
+// send nothing until it has something to say (opamp-go's server does so), so one that takes the
+// agent may leave it not accepted. Platform mode only, where the client makes the requests: the
+// zero Standing in core mode.
+func (c *Client) Standing() Standing {
+	if c.standing == nil {
+		return Standing{}
+	}
+	return c.standing.now()
+}
+
+// StandingChanged receives a value when Standing has changed since the last one received; it is
+// never closed. nil in core mode.
+func (c *Client) StandingChanged() <-chan struct{} {
+	if c.standing == nil {
+		return nil
+	}
+	return c.standing.changed
+}
 
 func (c *Client) setUID(uid []byte) {
 	if len(uid) != 16 {
