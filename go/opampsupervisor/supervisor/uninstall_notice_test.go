@@ -6,6 +6,7 @@ package supervisor
 import (
 	"context"
 	"errors"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"net/http/httputil"
@@ -222,4 +223,17 @@ func TestAToldUninstallForgetsTheClientsState(t *testing.T) {
 		s.forgetClient()
 	}
 	assert.True(t, kept(), "not told: kept")
+}
+
+// The server may have acted on a notice whose answer never arrived (the connection was cut, or the
+// process killed): the host can't know, so it says it wasn't told and keeps its state. Its next
+// enrollment, refused as revoked (401), is the enroll helper's to start again from the token.
+func TestAnUninstallNoticeWithoutAnAnswerKeepsTheState(t *testing.T) {
+	acted := 0
+	lost := fakeSender{endpoint: "https://fleet.example/v1/opamp", do: func(*http.Request) (*http.Response, error) {
+		acted++
+		return nil, io.ErrUnexpectedEOF
+	}}
+	assert.Equal(t, "not told: unexpected EOF", sendUninstallNotice(context.Background(), lost))
+	assert.Equal(t, 1, acted, "the server was asked, and no more")
 }
