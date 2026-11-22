@@ -370,6 +370,24 @@ func TestUninstallRequestIsSafeInTheServiceUsersDirectory(t *testing.T) {
 				t.Fatal("a linked notice was read: " + out)
 			}
 		})
+		t.Run(platform+"/a linked notice planted as the service stops", func(t *testing.T) {
+			_, state, tools, invoke := uninstallFixture(t, platform)
+			victim := filepath.Join(t.TempDir(), "victim")
+			if err := os.WriteFile(victim, []byte("told\n"), 0600); err != nil {
+				t.Fatal(err)
+			}
+			stubs(t, tools, `ln -sf "`+victim+`" "`+state+`/uninstall-notice"`)
+			out, err := invoke()
+			if err != nil {
+				t.Fatalf("%v: %s", err, out)
+			}
+			if strings.Contains(out, "Fleet was told") || !strings.Contains(out, "the Supervisor did not say") {
+				t.Fatal("a linked notice was read: " + out)
+			}
+			if b, err := os.ReadFile(victim); err != nil || string(b) != "told\n" {
+				t.Fatalf("the link was followed: %q %v", b, err)
+			}
+		})
 		t.Run(platform+"/a fifo at the request", func(t *testing.T) {
 			_, state, tools, invoke := uninstallFixture(t, platform)
 			stubs(t, tools, ":")
