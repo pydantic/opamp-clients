@@ -5,15 +5,19 @@ package supervisor
 
 import (
 	"bytes"
+	"context"
 	"encoding/hex"
 	"path/filepath"
 	"testing"
 	"time"
 
+	"github.com/google/uuid"
+	"github.com/open-telemetry/opamp-go/client/types"
 	"github.com/open-telemetry/opamp-go/protobufs"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
+	"go.uber.org/zap/zaptest"
 
 	"github.com/pydantic/opamp-clients/go/opamp"
 	"github.com/pydantic/opamp-clients/go/opamp/collector"
@@ -28,7 +32,12 @@ func TestARefusedConfigStaysFailedWhileTheLastOneRuns(t *testing.T) {
 		applying = protobufs.RemoteConfigStatuses_RemoteConfigStatuses_APPLYING
 		failed   = protobufs.RemoteConfigStatuses_RemoteConfigStatuses_FAILED
 	)
-	old, refused, next := remoteConfig("receivers: {old: {}}"), remoteConfig("receivers: {refused: {}}"), remoteConfig("receivers: {next: {}}")
+	config := func(hash, body string) *protobufs.AgentRemoteConfig {
+		rc := remoteConfig(body)
+		rc.ConfigHash = []byte(hash)
+		return rc
+	}
+	old, refused, next := config("old-config", "receivers: {old: {}}"), config("refused-config", "receivers: {refused: {}}"), config("next-config", "receivers: {next: {}}")
 	hash := func(rc *protobufs.AgentRemoteConfig) string { return hex.EncodeToString(rc.GetConfigHash()) }
 	setup := func(t *testing.T) (*coreClient, string) {
 		dir := t.TempDir()
@@ -85,7 +94,7 @@ func TestARefusedConfigStaysFailedWhileTheLastOneRuns(t *testing.T) {
 			st.Print(&out, time.Now())
 			assert.Contains(t, out.String(), "Remote config  FAILED since")
 			assert.Contains(t, out.String(), why)
-			assert.Contains(t, out.String(), "running instead: the config with hash "+short(hash(old))+" (APPLIED since")
+			assert.Contains(t, out.String(), "the config before it (hash "+short(hash(old))+") runs instead: APPLIED since")
 
 			// The server's next config is the status again.
 			send(c, next)
@@ -108,7 +117,7 @@ func TestARefusedConfigStaysFailedWhileTheLastOneRuns(t *testing.T) {
 	assert.True(t, st.OK(), "all is well here: what the refused config's status turns false")
 
 	// A config that FAILED of itself, the server's own, with nothing running before it: no
-	// "running instead".
+	// "runs instead".
 	c, dir = setup(t)
 	send(c, refused)
 	report(t, c, refused, failed, why)
@@ -117,5 +126,36 @@ func TestARefusedConfigStaysFailedWhileTheLastOneRuns(t *testing.T) {
 	assert.Nil(t, st.RunningConfig)
 	var out bytes.Buffer
 	st.Print(&out, time.Now())
-	assert.NotContains(t, out.String(), "running instead")
+	assert.NotContains(t, out.String(), "runs instead")
+}
+
+// A Supervisor started again after a refusal: the core reports the refused config's FAILED itself,
+// and the server sends it no more. The status still says it, and what runs instead once the
+// Supervisor reports the config it starts on.
+func TestARefusedConfigStaysFailedAcrossARestart(t *testing.T) {
+	ts := newCoreTestServer(t)
+	dir := t.TempDir()
+	refused := &protobufs.RemoteConfigStatus{LastRemoteConfigHash: []byte("refused-config"),
+		Status: protobufs.RemoteConfigStatuses_RemoteConfigStatuses_FAILED, ErrorMessage: "refused by the policy"}
+	c := newCoreClient(zaptest.NewLogger(t), filepath.Join(dir, coreClientStateFile), nil)
+	require.NoError(t, c.SetAgentDescription(&protobufs.AgentDescription{}))
+	require.NoError(t, c.Start(t.Context(), types.StartSettings{
+		OpAMPServerURL:     ts.url,
+		InstanceUid:        types.InstanceUid(uuid.MustParse("018fee23-4a51-7303-a441-73faed7d9deb")),
+		Capabilities:       protobufs.AgentCapabilities_AgentCapabilities_ReportsRemoteConfig | protobufs.AgentCapabilities_AgentCapabilities_AcceptsRemoteConfig,
+		RemoteConfigStatus: refused,
+	}))
+	defer func() { assert.NoError(t, c.Stop(context.Background())) }()
+	require.NoError(t, c.SetRemoteConfigStatus(&protobufs.RemoteConfigStatus{LastRemoteConfigHash: []byte("old-config"),
+		Status: protobufs.RemoteConfigStatuses_RemoteConfigStatuses_APPLIED}))
+
+	st, err := ReadStatus(dir)
+	require.NoError(t, err)
+	require.NotNil(t, st.RemoteConfig)
+	assert.Equal(t, hex.EncodeToString([]byte("refused-config")), st.RemoteConfig.Hash)
+	assert.Equal(t, "FAILED", st.RemoteConfig.Status)
+	assert.Equal(t, "refused by the policy", st.RemoteConfig.Error)
+	require.NotNil(t, st.RunningConfig)
+	assert.Equal(t, hex.EncodeToString([]byte("old-config")), st.RunningConfig.Hash)
+	assert.False(t, st.OK())
 }

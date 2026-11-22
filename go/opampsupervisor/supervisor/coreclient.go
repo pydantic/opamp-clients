@@ -226,6 +226,16 @@ func (c *coreClient) Start(ctx context.Context, settings types.StartSettings) er
 	c.uid = c.opened.InstanceUID()
 	c.reach = newReachability(c.logger, settings.OpAMPServerURL)
 	c.report.started(c.logger, c.reach.endpoint, c.uid)
+	// A config refused before this start stays the status: the core reports the refusal again
+	// itself, and the server, told so, sends it no more.
+	refused := c.opened.Resumed().RemoteConfigRefused
+	if refused == nil && initial.RemoteConfigStatus.GetStatus() == protobufs.RemoteConfigStatuses_RemoteConfigStatuses_FAILED {
+		refused = initial.RemoteConfigStatus
+	}
+	if refused != nil {
+		c.report.receivedRemoteConfig(refused.GetLastRemoteConfigHash())
+		c.report.remoteConfig(c.logger, refused)
+	}
 	started, err := c.opened.Start(initial, c.onNotification)
 	if err != nil {
 		return err

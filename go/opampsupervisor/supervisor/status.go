@@ -41,7 +41,8 @@ type Status struct {
 	// RemoteConfig is the last one's status: nil before the server sent one.
 	RemoteConfig *RemoteConfigState `json:"remote_config,omitempty"`
 	// RunningConfig is, while the server's last config FAILED (the policy refused it, say), the
-	// config the collector runs instead, as last reported: nil when there is none to tell.
+	// config before it, which the collector runs instead, as last reported: nil when there is
+	// none to tell.
 	RunningConfig *RemoteConfigState `json:"running_config,omitempty"`
 	// Accepted is when the server first answered this Supervisor in this run: nil while it hasn't.
 	// A server that takes the connection and then closes it unanswered, as one does for
@@ -104,7 +105,8 @@ type statusReport struct {
 	now  func() time.Time
 	// closed: the client stopped, and the file says so for good.
 	closed bool
-	// received is the hash of the last remote config the server sent, in hex.
+	// received is the hash of the last remote config the client was given, in hex: by the server,
+	// or saved and handed over at start (a refused one too).
 	received string
 }
 
@@ -178,7 +180,7 @@ func (r *statusReport) health(logger *zap.Logger, h *protobufs.ComponentHealth) 
 	})
 }
 
-// receivedRemoteConfig: the server sent a remote config with this hash.
+// receivedRemoteConfig: the client was given a remote config with this hash.
 func (r *statusReport) receivedRemoteConfig(hash []byte) {
 	if r == nil {
 		return
@@ -409,7 +411,7 @@ func (st *Status) Print(w io.Writer, now time.Time) {
 		line("Remote config", "%s since %s (hash %s)", rc.Status, ago(rc.Since), short(rc.Hash))
 	}
 	if run := st.RunningConfig; run != nil && st.RemoteConfig != nil {
-		line("", "running instead: the config with hash %s (%s since %s)", short(run.Hash), run.Status, ago(run.Since))
+		line("", "the config before it (hash %s) runs instead: %s since %s", short(run.Hash), run.Status, ago(run.Since))
 	}
 }
 
