@@ -277,7 +277,8 @@ telemetry_conf='[Service]
 LoadCredentialEncrypted=opamp-telemetry-token:/etc/pydantic-opamp/telemetry-token.cred'
 # An administrator's own file of the name stays: with the credential in it, it does what this one does, and
 # without, it can't be had.
-if [ -n "$telemetry_stdin" ] && [ -e "$dropin/telemetry.conf" ] && ! grep -qx "${telemetry_conf#*"$nl"}" "$dropin/telemetry.conf"; then
+if [ -n "$telemetry_stdin" ] && { [ -e "$dropin/telemetry.conf" ] || [ -L "$dropin/telemetry.conf" ]; } &&
+	! grep -qxs "${telemetry_conf#*"$nl"}" "$dropin/telemetry.conf"; then
 	fail "$dropin/telemetry.conf isn't this package's, and is kept: rename it (another .conf name there does the same), then run this again"
 fi
 

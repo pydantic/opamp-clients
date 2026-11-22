@@ -94,6 +94,19 @@ func TestEnrollKeepsAnAdministratorsTelemetryDropIn(t *testing.T) {
 	}
 }
 
+// A link that leads nowhere is an administrator's too: nothing is written where it points.
+func TestEnrollDoesNotWriteThroughATelemetryDropInLink(t *testing.T) {
+	e := newEnrollment(t)
+	dropin := filepath.Join(e.root, "etc/systemd/system/pydantic-opamp-supervisor.service.d/telemetry.conf")
+	target := filepath.Join(t.TempDir(), "elsewhere.conf")
+	require.NoError(t, os.MkdirAll(filepath.Dir(dropin), 0o755))
+	require.NoError(t, os.Symlink(target, dropin))
+	out, err := e.run(t, "runtime-token\nwrite-token\n", "--endpoint", "wss://opamp.example.com", "--telemetry-token-stdin", "--no-start")
+	require.Error(t, err)
+	assert.Contains(t, out, "telemetry.conf isn't this package's, and is kept: rename it")
+	assert.NoFileExists(t, target)
+}
+
 func TestMacEnrollTelemetryCredentials(t *testing.T) {
 	root, tools := t.TempDir(), t.TempDir()
 	out, err := macEnroll(t, root, tools, "runtime-token\nwrite-token\n", "--endpoint", "wss://opamp.example.com", "--telemetry-token-stdin", "--no-start")
