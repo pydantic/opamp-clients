@@ -109,3 +109,43 @@ func TestDoTakesAWebSocketEndpointsOrigin(t *testing.T) {
 type roundTripFunc func(*http.Request) (*http.Response, error)
 
 func (f roundTripFunc) RoundTrip(r *http.Request) (*http.Response, error) { return f(r) }
+
+// A redirect is the caller's to see, not followed with the credentials; the headers that describe the
+// OpAMP message aren't the notice's; a refused request's body is closed.
+func TestDoFollowsNoRedirectAndCopiesNoMessageHeaders(t *testing.T) {
+	elsewhere := atomic.Int64{}
+	other := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { elsewhere.Add(1) }))
+	defer other.Close()
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("X-Got-Type", r.Header.Get("Content-Type"))
+		w.Header().Set("X-Got-Auth", r.Header.Get("Authorization"))
+		http.Redirect(w, r, other.URL+"/stolen", http.StatusTemporaryRedirect)
+	}))
+	defer ts.Close()
+	var used atomic.Pointer[usedRequest]
+	used.Store(&usedRequest{url: ts.URL + "/v1/opamp", header: http.Header{
+		"Authorization": {"Bearer k"}, "Content-Type": {"application/x-protobuf"}, "Accept-Encoding": {"identity"}, "Sec-Websocket-Key": {"x"}}})
+	c := &Client{used: &used, http: http.DefaultTransport}
+	req, _ := http.NewRequest(http.MethodPost, ts.URL+"/v1/x", nil)
+	resp, err := c.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	resp.Body.Close()
+	if resp.StatusCode != http.StatusTemporaryRedirect || elsewhere.Load() != 0 {
+		t.Fatalf("status %d, %d requests elsewhere", resp.StatusCode, elsewhere.Load())
+	}
+	if resp.Header.Get("X-Got-Auth") != "Bearer k" || resp.Header.Get("X-Got-Type") != "" {
+		t.Fatalf("sent auth %q and content type %q", resp.Header.Get("X-Got-Auth"), resp.Header.Get("X-Got-Type"))
+	}
+	body := &closeRecorder{}
+	bad, _ := http.NewRequest(http.MethodPost, "http://elsewhere.example/x", body)
+	if _, err := c.Do(bad); err == nil || !body.closed {
+		t.Fatalf("refused: %v, body closed: %v", err, body.closed)
+	}
+}
+
+type closeRecorder struct{ closed bool }
+
+func (*closeRecorder) Read([]byte) (int, error) { return 0, nil }
+func (c *closeRecorder) Close() error           { c.closed = true; return nil }

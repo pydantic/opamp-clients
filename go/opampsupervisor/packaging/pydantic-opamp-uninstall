@@ -66,12 +66,48 @@ for directory in "$@"; do
     done
 done
 
+# Fleet hears of the uninstall from the Supervisor itself, as it stops: the request asks it to tell
+# its server, with the credentials it connects with (this script never reads them), and it writes
+# what came of it to the notice file. Best effort, bounded by the Supervisor (10 seconds): the
+# uninstall goes on whatever came of it. The storage directory is the service user's, so nothing
+# of theirs is followed or opened as root: the request is made with mkdir (it follows no link, and
+# neither blocks nor truncates), and removed by rmdir; a notice that is a link is not read.
+notice_requested=
+fleet_told=
+drop_request() {
+    rmdir "$state/uninstall-requested" 2>/dev/null || :
+}
+request_notice() {
+    rm -f "$state/uninstall-notice" 2>/dev/null || :
+    if [ -d "$state" ] && [ ! -L "$state" ] && mkdir "$state/uninstall-requested" 2>/dev/null; then
+        notice_requested=yes
+        # A stop that fails (or this script ending) leaves no request: the Supervisor that goes on
+        # running must not tell the server at a later stop.
+        trap drop_request EXIT
+    fi
+}
+say_notice() {
+    [ -n "$notice_requested" ] || return 0
+    line=
+    if [ -f "$state/uninstall-notice" ] && [ ! -L "$state/uninstall-notice" ]; then
+        IFS= read -r line <"$state/uninstall-notice" || :
+    fi
+    case $line in
+        told) fleet_told=yes; echo 'Fleet was told this host is being removed.' ;;
+        'not told: '*) printf '%s\n' "Fleet was not told this host is being removed: ${line#not told: }." ;;
+        *) echo 'Fleet was not told this host is being removed: the Supervisor did not say, as it stopped.' ;;
+    esac
+    drop_request
+    rm -f "$state/uninstall-notice" 2>/dev/null || :
+    notice_requested=
+}
+
 stop_macos() {
     label=system/dev.pydantic.opamp-supervisor
     code=0
     launchctl print "$label" >/dev/null 2>&1 || code=$?
     case $code in
-        0) launchctl bootout "$label" ;;
+        0) request_notice; launchctl bootout "$label" ;;
         113) return ;;
         *) fail "cannot inspect the Collector service (launchctl $code)" ;;
     esac
@@ -96,10 +132,14 @@ uninstall() {
         for unit in pydantic-opamp-supervisor.service pydantic-otelcol.service; do
             load=$(systemctl show --property=LoadState --value "$unit")
             if [ "$load" != not-found ]; then
+                if [ "$unit" = pydantic-opamp-supervisor.service ] && systemctl is-active --quiet "$unit"; then
+                    request_notice
+                fi
                 systemctl disable --now "$unit"
             fi
         done
     fi
+    say_notice
     # The package manager removes the installed helper. Keep a root-only copy for repeat calls.
     mkdir -p "$config"
     [ ! -L "$recovery" ] || fail "refusing symbolic link: $recovery"
@@ -166,4 +206,4 @@ else
     # As root: the kept helper, like the kept data, is root's alone.
     echo "To delete them too, run: sudo $recovery --purge"
 fi
-echo "The OpAMP server still lists this host until its credentials are revoked there."
+[ -n "$fleet_told" ] || echo "The OpAMP server still lists this host until its credentials are revoked there."

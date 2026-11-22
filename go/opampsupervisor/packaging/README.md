@@ -620,7 +620,19 @@ Run `pydantic-opamp-uninstall` as root on Linux, or
 `/opt/pydantic-opamp/bin/pydantic-opamp-uninstall` as root on macOS.
 On Windows, run `pydantic-opamp-uninstall.ps1` from the installed program directory
 in an Administrator terminal. These helpers stop the service and remove the native
-package. They do not contact the OpAMP server or revoke any remote credentials.
+package.
+
+They tell Fleet first, so it can tell an uninstalled host from one that is down. The helper asks the
+running Supervisor, with a request in the default storage directory, and prints one line for what
+came of it; the Supervisor, stopping, sends `POST /v1/fleet/installations/self/uninstall/` to its
+server's origin with the credentials it connects with (the helper never reads them). Best effort: a
+server that refuses or doesn't answer within 10 seconds, a Supervisor that isn't running, or a
+custom storage directory, means Fleet isn't told, and the removal goes on. The server then ends the
+host's credentials, so a reinstall over the kept data enrolls again: run `pydantic-opamp-enroll` with
+a new enrollment token (the one the host used may be spent). Fleet is told before the package is removed, so a removal that then fails leaves
+a host Fleet lists as uninstalled. A later `--purge` finds no Supervisor running and makes no call,
+and neither do other ways of removing the package (`apt remove`, `rpm --erase`, uninstalling the
+`.msi` directly).
 
 Use `--dry-run` (`-DryRun` on Windows) to preview the operation. The default keeps
 configuration, credentials, downloaded packages, and log read positions for a

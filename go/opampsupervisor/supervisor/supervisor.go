@@ -30,7 +30,8 @@
 // (own_telemetry_status.go). A new instance UID from the server is said once, and the
 // collector's messages with the replaced one are expected until it starts again
 // (instance_uid_change.go). On macOS the collector's own log is sampled by default
-// (log_sampling.go).
+// (log_sampling.go). An uninstall tells the server this
+// host is being removed (uninstall_notice.go).
 
 package supervisor
 
@@ -2696,6 +2697,8 @@ func (s *Supervisor) Shutdown() {
 
 	s.telemetrySettings.Logger.Debug("Supervisor shutting down...")
 
+	waitNotice := s.noticeUninstall() // Changed here: an uninstall tells the server, while the collector stops.
+
 	close(s.doneChan)
 
 	// Shutdown in order from producer to consumer (agent -> customMessageForwarder -> local OpAMP server -> client to remote OpAMP server).
@@ -2730,6 +2733,7 @@ func (s *Supervisor) Shutdown() {
 		}
 	}
 
+	waitNotice() // Changed here: the uninstall notice ends before the client does (uninstall_notice.go).
 	if s.opampClient != nil {
 		err := s.SetHealth(
 			&protobufs.ComponentHealth{

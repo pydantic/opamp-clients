@@ -75,6 +75,15 @@ and date. Tests, CI and docs alone don't need a line.
 - Go: `Client.Answered()`, closed once the server's first answer reaches a platform-mode client
   (a ServerToAgent that isn't an error response, over WebSocket or in an HTTP success): it tells a
   server that took the agent from one that took the connection and closed it unanswered (#150).
+- Supervisor installers: the uninstall helpers (Linux, macOS, Windows) tell the server the host is
+  being removed, so it can tell an uninstalled host from one that is down. The running Supervisor
+  sends it, with the credentials it connects with, as the helper stops it; the helper prints whether
+  the server was told, and the removal goes on either way. It needs a server with
+  `POST /v1/fleet/installations/self/uninstall/` (#157).
+- Go: `opamp.Client.Do` sends a request to the server's origin with the client's connection (TLS,
+  proxy) and the headers it sends the server, so an application can tell the server something
+  outside OpAMP without holding the credentials; `opamp.ErrNoServer` before the client has
+  reached it (platform mode only) (#157).
 - Supervisor installers and container image: the Collector runs with
   `--feature-gates=telemetry.newPipelineTelemetry`, so its own metrics count the items every
   receiver, processor (`batch` too) and exporter takes in and passes on. A Prometheus reader of

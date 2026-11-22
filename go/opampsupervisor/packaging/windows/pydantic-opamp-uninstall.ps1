@@ -38,6 +38,41 @@ function Remove-OwnedTree([string]$path) {
     }
 }
 
+# Fleet hears of the uninstall from the Supervisor itself, as it stops: the request file asks it to
+# tell its server, with the credentials it connects with (this script never reads them), and it
+# writes what came of it to the notice file. Best effort, bounded by the Supervisor (10 seconds):
+# the uninstall goes on whatever came of it.
+$script:fleetTold = $false
+function Request-Notice([string]$storage) {
+    try {
+        if (-not (Test-Path -LiteralPath $storage -PathType Container)) { return $false }
+        Remove-Item -LiteralPath (Join-Path $storage 'uninstall-notice') -Force -ErrorAction SilentlyContinue
+        [IO.File]::WriteAllText((Join-Path $storage 'uninstall-requested'), '')
+        return $true
+    } catch { return $false }
+}
+function Clear-Request([string]$storage) {
+    Remove-Item -LiteralPath (Join-Path $storage 'uninstall-requested') -Force -ErrorAction SilentlyContinue
+}
+# Saying what came of it must not fail the removal: the files are read and removed if they can be.
+function Write-Notice([string]$storage) {
+    try {
+        $line = ''
+        $notice = Join-Path $storage 'uninstall-notice'
+        if (Test-Path -LiteralPath $notice) { $line = ([IO.File]::ReadAllText($notice)).Trim() }
+        if ($line -eq 'told') {
+            $script:fleetTold = $true
+            Write-Output 'Fleet was told this host is being removed.'
+        } elseif ($line -like 'not told: *') {
+            Write-Output "Fleet was not told this host is being removed: $($line.Substring(10))."
+        } else {
+            Write-Output 'Fleet was not told this host is being removed: the Supervisor did not say, as it stopped.'
+        }
+        Remove-Item -LiteralPath $notice -Force -ErrorAction SilentlyContinue
+    } catch { }
+    Clear-Request $storage
+}
+
 function Uninstall-Collector {
     if ($DryRun) {
         Write-Output "Stop $service and remove its MSI package."
@@ -66,8 +101,16 @@ function Uninstall-Collector {
         throw 'The service has no registered MSI package. Retained data has not been deleted.'
     }
     if ($running) {
-        Stop-Service -Name $service -ErrorAction Stop
-        $running.WaitForStatus('Stopped', [TimeSpan]::FromSeconds(30))
+        $storage = Join-Path $root 'var'
+        $requested = $running.Status -eq 'Running' -and (Request-Notice $storage)
+        try {
+            Stop-Service -Name $service -ErrorAction Stop
+            $running.WaitForStatus('Stopped', [TimeSpan]::FromSeconds(30))
+        } finally {
+            # A stop that fails leaves no request: the Supervisor that goes on running must not
+            # tell the server at a later stop.
+            if ($requested) { Write-Notice $storage }
+        }
     }
     # Keep executable recovery code under Program Files, separate from retained data.
     New-Item -ItemType Directory -Force -Path $programs | Out-Null
@@ -98,5 +141,5 @@ if (-not $DryRun) {
         Write-Output "Removed the Collector service and the Pydantic OpAMP Supervisor package. Kept $root for a reinstall."
         Write-Output "To delete it too, run: & '$recovery' -Purge"
     }
-    Write-Output 'The OpAMP server still lists this host until its credentials are revoked there.'
+    if (-not $script:fleetTold) { Write-Output 'The OpAMP server still lists this host until its credentials are revoked there.' }
 }
