@@ -218,12 +218,15 @@ func (p RemoteConfigPolicy) check(name string, body []byte, connectionEnv []stri
 const fileStorageType = "file_storage"
 
 // systemLogSettings are the settings of the system log receivers that reach past this host's own
-// logs: a Windows event log receiver's remote servers (and the credentials for them), and a macOS
-// unified logging receiver's archive, read from any path. Only the local config may set them.
+// logs: a Windows event log receiver's remote servers (and the credentials for them), a macOS
+// unified logging receiver's archive, read from any path, and a journald receiver's journal files
+// or directory, read from any path, the root it runs journalctl in and the journalctl it runs
+// (any program). Only the local config may set them.
 var systemLogSettings = map[string][]string{
 	"windows_event_log":     {"remote"},
 	"windowseventlog":       {"remote"},
 	"macos_unified_logging": {"archive_path"},
+	"journald":              {"directory", "files", "root_path", "journalctl_path"},
 }
 
 // checkSystemLogs refuses a system log receiver set to read past this host's own logs.

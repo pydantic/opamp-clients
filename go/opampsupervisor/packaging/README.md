@@ -111,8 +111,8 @@ Other options:
   telemetry (repeat it for more). The default is the `--endpoint`'s host and port, over https.
 - `--log-path PATH`, with `--restricted`, lets the server's configs read the logs in a file or a
   directory (repeat it for more). The default is none.
-- `--host-logs`, with `--restricted`, lets the server's configs read the host's system logs. The
-  default is no.
+- `--host-logs`, with `--restricted`, lets the server's configs read the host's system logs (on
+  Linux the journal and the files under /var/log). The default is no.
 
 ### Telemetry credentials for managed Collectors
 
@@ -434,10 +434,12 @@ What each rule checks in a remote config:
   are not in the default list. They read the host's system logs and write files, so a server's
   config can turn them on only where the host's operator allowed it: `--host-logs` adds them
   where the system has them (`windows_event_log` and `file_storage` on Windows,
-  `macos_unified_logging` and `file_storage` on macOS, `file_storage` on Linux).
+  `macos_unified_logging` and `file_storage` on macOS, `journald` and `file_storage` on Linux).
 - **System logs.** A Windows event log receiver's `remote` (other hosts' logs, with their
-  credentials) and a macOS unified logging receiver's `archive_path` (an archive read from any
-  path) are refused: the local config can set them, the server can't.
+  credentials), a macOS unified logging receiver's `archive_path` (an archive read from any
+  path), and a journald receiver's `journalctl_path` (the program it runs), `root_path`,
+  `directory` and `files` (a journal other than this host's) are refused: the local config can
+  set them, the server can't.
 - **Storage.** A `file_storage` extension must name its `directory`, and it and any
   `compaction::directory` must be an allowed storage directory or lie under one.
 - **Providers.** Remote configs may reference exactly the environment names bound by the local
@@ -468,7 +470,10 @@ Either way, on Linux the collector runs as `pydantic-opamp`. The package adds th
 journal) where those groups exist, once per host. To opt out, remove it from them, for example
 `sudo gpasswd -d pydantic-opamp adm`, and restart the service; upgrades leave it out
 (`/etc/pydantic-opamp/log-groups` records that the groups were added). On RHEL-family hosts
-/var/log/messages is root's alone; read the journal instead.
+(Fedora, RHEL, CentOS Stream, Rocky, Alma) /var/log/messages and /var/log/secure are root's
+alone; read the journal instead, with a `journald` receiver, which `--host-logs` allows. A file
+receiver that can't open its files is still healthy and sends nothing: `opampsupervisor status`
+names each file the Collector couldn't open (`Log files`), from the Collector's current log.
 
 ### Widening it
 

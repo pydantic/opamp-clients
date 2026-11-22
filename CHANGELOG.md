@@ -102,6 +102,13 @@ and date. Tests, CI and docs alone don't need a line.
 
 ### Fixed
 
+- Supervisor on Linux: with `--restricted`, `pydantic-opamp-enroll --host-logs` also lets the
+  server's configs read the journal, with a `journald` receiver (not its `journalctl_path`,
+  `root_path`, `directory` or `files`, which stay the local config's). On RHEL-family hosts the
+  syslog files are root's alone, so a restricted host could send none of its system logs (#152).
+- Supervisor: `opampsupervisor status` names each file the Collector's log receivers couldn't
+  open (a file receiver that can't read its files is healthy and sends nothing), and says to read
+  the journal where the syslog files are root's alone (#152).
 - Supervisor: `pydantic-opamp-enroll` (Linux, macOS, Windows) says when the Supervisor service
   failed to start, and gives the command that shows its log. It used to say the Supervisor can't
   connect yet and keeps retrying, as for a running service that can't reach its server (#147).

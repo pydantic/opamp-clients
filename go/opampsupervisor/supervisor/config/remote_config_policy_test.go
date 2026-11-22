@@ -392,10 +392,11 @@ func TestRemoteConfigPolicyStorageDirectories(t *testing.T) {
 // The system log receivers read this host's own logs, not a remote host's or an archive's.
 func TestRemoteConfigPolicySystemLogs(t *testing.T) {
 	p := hostPolicy()
-	p.AllowedComponents["receivers"] = append(p.AllowedComponents["receivers"], "windows_event_log", "windowseventlog", "macos_unified_logging")
+	p.AllowedComponents["receivers"] = append(p.AllowedComponents["receivers"], "windows_event_log", "windowseventlog", "macos_unified_logging", "journald")
 	for _, body := range []string{
 		`receivers: {windows_event_log/system: {channel: System, start_at: end}}`,
 		`receivers: {macos_unified_logging: {max_log_age: 1m, predicate: "logType == 'error'"}}`,
+		`receivers: {journald/system: {units: [sshd, crond], priority: info, start_at: end}}`,
 	} {
 		require.NoError(t, p.Check("", []byte(body)), body)
 	}
@@ -403,6 +404,12 @@ func TestRemoteConfigPolicySystemLogs(t *testing.T) {
 		`receivers: {windows_event_log/x: {channel: System, remote: {server: dc1, username: a, password: b}}}`: `receiver "windows_event_log/x" sets remote, which only the local config may`,
 		`receivers: {windowseventlog: {channel: System, remote: {server: dc1}}}`:                               `receiver "windowseventlog" sets remote`,
 		`receivers: {macos_unified_logging: {archive_path: /Users/a/system_logs.logarchive}}`:                  `receiver "macos_unified_logging" sets archive_path, which only the local config may`,
+		// The journal of this host alone, by its own journalctl: not one from another path or
+		// root, nor another program.
+		`receivers: {journald: {journalctl_path: /tmp/x}}`:                                       `receiver "journald" sets journalctl_path, which only the local config may`,
+		`receivers: {journald/c: {root_path: /mnt/other, journalctl_path: /usr/bin/journalctl}}`: `receiver "journald/c" sets root_path`,
+		`receivers: {journald: {directory: /home/a/journal}}`:                                    `receiver "journald" sets directory`,
+		`receivers: {journald: {files: [/tmp/x.journal]}}`:                                       `receiver "journald" sets files`,
 	} {
 		require.ErrorContains(t, p.Check("", []byte(body)), wantErr, body)
 	}
