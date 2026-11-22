@@ -388,30 +388,49 @@ if ($NoStart) {
     $waited = $LASTEXITCODE
     # Enrolling (not -Refresh) with the token this host enrolled with before, after the server
     # revoked its own credentials (it deleted the host, say): the client keeps them while the
-    # token is the same and never falls back to it, so they are forgotten, with the instance UID
+    # token is the same and never falls back to it, so they are set aside, with the instance UID
     # kept with them, and the Supervisor starts again from the token, once; a token the server
-    # refuses too fails as below. A healthy host enrolled again is never refused, and keeps its
-    # identity.
+    # refuses too fails as below, and they are put back. A healthy host enrolled again is never
+    # refused, and keeps its identity.
     $state = Join-Path $storage 'opamp-state'
+    # Where the saved credentials go while the host is enrolled without them.
+    $aside = Join-Path $root 'opamp-state.refused'
+    $setAside = $false
     if ($waited -ne 0 -and -not $Refresh -and (Test-Path -LiteralPath $state)) {
         $st = $null
         try { $st = (& $supervisor status --storage $storage --json 2>$null | Out-String) | ConvertFrom-Json } catch { }
         # 401: not valid. A 403 can mean a missing permission instead, and is left alone.
         if ($st -and $st.server -and $st.server.http_status -eq 401) {
-            Note "the server refused this host's saved credentials (it deleted the host, say), so pydantic-opamp-enroll removed them, with the identity kept with them, and enrolls it again with the enrollment token, as a new host"
+            Note "the server refused this host's saved credentials (it deleted the host, say), so pydantic-opamp-enroll set them aside, with the identity kept with them, and enrolls it again with the enrollment token, as a new host"
             Stop-Service -Name $service -Force -ErrorAction SilentlyContinue
-            Remove-Item -LiteralPath $state -Force
+            # Beside the config, which only administrators write.
+            Remove-Item -LiteralPath $aside -Force -Recurse -ErrorAction SilentlyContinue
+            Move-Item -LiteralPath $state -Destination $aside -Force
+            $setAside = $true
             $started = [DateTimeOffset]::UtcNow.ToUnixTimeSeconds()
             Restart-Supervisor
             & $supervisor status --storage $storage --wait 30s --since $started --require-accepted
             $waited = $LASTEXITCODE
+            if ($waited -eq 0) { Remove-Item -LiteralPath $aside -Force }
         }
+    }
+    # Ends a failed wait. With the saved credentials set aside, the new try failed too: they are put
+    # back, and the Supervisor started with them, so a server that refused them for a while only
+    # doesn't leave this host a new one.
+    function Restore-Saved {
+        if (-not $setAside) { return }
+        Stop-Service -Name $service -Force -ErrorAction SilentlyContinue
+        Remove-Item -LiteralPath $state -Force -ErrorAction SilentlyContinue
+        Move-Item -LiteralPath $aside -Destination $state -Force
+        Start-Service -Name $service -ErrorAction SilentlyContinue
+        Note "the saved credentials are put back, with the identity kept with them: enrolling this host as a new one failed too. If the server deleted it, enroll again with a new token"
     }
     if ($waited -ne 0) {
         # A service that isn't running never got to connect: say so, and where its log is, instead.
-        if ((Get-Service -Name $service -ErrorAction SilentlyContinue).Status -ne 'Running') { Fail-Start }
+        if ((Get-Service -Name $service -ErrorAction SilentlyContinue).Status -ne 'Running') { Restore-Saved; Fail-Start }
         $st = $null
         try { $st = (& $supervisor status --storage $storage --json 2>$null | Out-String) | ConvertFrom-Json } catch { }
+        Restore-Saved
         if ($st -and $st.server -and $st.server.connected -and -not $st.accepted) {
             Fail "enrolled, but the server at $Endpoint took the connection and not the enrollment token: it may be used up, expired or revoked, or the server deleted this host, which keeps its identity. Enroll again with a new token, or for a deleted host remove its data first (pydantic-opamp-uninstall.ps1 -Purge); check with: & '$supervisor' status --storage '$storage'"
         }

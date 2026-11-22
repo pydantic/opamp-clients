@@ -139,7 +139,11 @@ func TestMacEnrollWaitsForTheConnection(t *testing.T) {
 	out, err = macEnroll(t, root, tools, "t", "--endpoint", "wss://opamp.example.com/v1/opamp")
 	require.Error(t, err, "the fake status still fails after the second start")
 	assert.Equal(t, 1, strings.Count(out, "the server refused this host's saved credentials"))
-	assert.NoFileExists(t, state)
+	assert.Contains(t, out, "put the saved credentials back")
+	kept, err := os.ReadFile(state)
+	require.NoError(t, err)
+	assert.Equal(t, "sealed", string(kept))
+	assert.NoFileExists(t, filepath.Join(root, "opt/pydantic-opamp/etc/opamp-state.refused"))
 	require.NoError(t, os.Remove(filepath.Join(tools, "json")))
 
 	// Connected, and the server never answered: the token was refused.

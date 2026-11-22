@@ -119,9 +119,10 @@ and date. Tests, CI and docs alone don't need a line.
 - Supervisor installers: a host deleted on the server and enrolled again over its kept data with
   the same token could never connect: the client kept the host's own issued credentials, which
   the delete revoked, and doesn't fall back from them to the token. `pydantic-opamp-enroll` (not
-  `--refresh`) now forgets them, and the instance UID kept with them, when the server refuses
-  them as not valid (HTTP 401; not a 403, which can mean a missing permission), says so, and
-  starts again from the token, once, as a new host. A new token already worked: it discards
+  `--refresh`) now sets them aside, and the instance UID kept with them, when the server refuses
+  them as not valid for the whole wait (HTTP 401; not a 403, which can mean a missing permission),
+  says so, and starts again from the token, once, as a new host. If that fails too (a server that
+  refuses for a while, a wrong token), they are put back. A new token already worked: it discards
   them (#150).
 - Supervisor installers: `pydantic-opamp-enroll` (Linux, macOS, Windows) fails an install whose
   enrollment token the server refuses (used up, expired, revoked), saying so, where it reported
