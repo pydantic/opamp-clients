@@ -211,6 +211,12 @@ agent:
   host with no machine ID (a container, say) reports none. Like the other attributes of the agent
   description, it is also a resource attribute of the Collector's own telemetry. Hosts cloned from
   one image share the key unless the image makes a new machine ID.
+  The Collector is given the same key in its environment, as `pydantic.fleet.host_key` in
+  `OTEL_RESOURCE_ATTRIBUTES` (added to what the host's environment or `agent.env` already says
+  there, in place of a host key they set): a config whose `resourcedetection` processor lists the
+  `env` detector stamps it on the host's data, so a server can tell the data is that host's. The
+  config needs no `${env:...}` reference for it, which a remote config policy would refuse
+  (`host_key_env.go`, and a line in `Start`).
 - **The Collector doesn't inherit `OTEL_EXPORTER_OTLP_*`.** Upstream's passed the
   Supervisor's whole environment, so headers set on the host reached the own-telemetry endpoint
   a server chose. Set one in `agent.env` to pass it
@@ -244,7 +250,7 @@ Every file from upstream keeps its license header (Apache-2.0, [LICENSE](LICENSE
 paths were rewritten to this module's. The files changed beyond that say what changed in their
 header. These files are new, and are this repository's:
 
-- `supervisor/coreclient.go`, `agent_update.go`, `apply_step.go`, `client_state.go`, `startup.go`, `sealed_storage.go`, `telemetry_env.go`, `idle_telemetry.go`, `reachability.go`, `status.go`, `host_key.go`,
+- `supervisor/coreclient.go`, `agent_update.go`, `apply_step.go`, `client_state.go`, `startup.go`, `sealed_storage.go`, `telemetry_env.go`, `idle_telemetry.go`, `reachability.go`, `status.go`, `host_key.go`, `host_key_env.go`,
   `localserver.go`, `service_log.go`, `config/remote_config_policy.go`, `commander/collector_env.go`,
   `commander/agent_log.go` and `verifier/cosign.go`, and the tests
   beside them (with `supervisor/remote_config_refusal_test.go`, `restart_command_test.go` and

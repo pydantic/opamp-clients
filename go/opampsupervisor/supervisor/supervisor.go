@@ -26,7 +26,8 @@
 // collector's. A remote config holding the Logfire SDK policy (logfire-sdk-policy.json), which SDKs
 // take, is FAILED: the collector takes YAML. The Collector run without a remote config has its internal
 // metrics off unless a config sets them (idle_telemetry.go). The agent description carries a key
-// derived from the host's machine ID (host_key.go).
+// derived from the host's machine ID (host_key.go), which the Collector is given as the
+// pydantic.fleet.host_key resource attribute in OTEL_RESOURCE_ATTRIBUTES (host_key_env.go).
 
 package supervisor
 
@@ -531,10 +532,7 @@ func (s *Supervisor) Start(ctx context.Context) error {
 	}
 	s.commander.SetPassthroughLogHook(s.appendPassthroughLogLine)
 	s.commander.SetEnvironmentProvider(func() map[string]string {
-		if env := s.connectionEnv.Load(); env != nil {
-			return *env
-		}
-		return nil
+		return s.collectorEnv() // Changed here: and the host key, as a resource attribute (host_key_env.go).
 	})
 
 	s.agentWG.Go(func() {

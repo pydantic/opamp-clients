@@ -66,6 +66,10 @@ and date. Tests, CI and docs alone don't need a line.
   `systemd-id128 machine-id --app-specific=c8fe2a9e-5d40-4615-8f88-fd606391a0ca --uuid`; the
   machine ID itself isn't reported), the same for as long as the host keeps its machine ID, so a server can tie a host
   enrolled again to the one it replaces. Upgraded hosts report it once the new Supervisor runs (#151).
+- Supervisor: the Collector is given the host key as `pydantic.fleet.host_key` in
+  `OTEL_RESOURCE_ATTRIBUTES`, so a config whose `resourcedetection` processor lists the `env`
+  detector stamps it on the host's data, which a server can then match to the host it enrolled.
+  It needs no environment reference in the config, so restricted hosts take it too (#154).
 - Supervisor installers and container image: the Collector runs with
   `--feature-gates=telemetry.newPipelineTelemetry`, so its own metrics count the items every
   receiver, processor (`batch` too) and exporter takes in and passes on. A Prometheus reader of
