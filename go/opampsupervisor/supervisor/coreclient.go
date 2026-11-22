@@ -297,6 +297,7 @@ func (c *coreClient) onNotification(cl *collector.Client, n collector.Notificati
 			cb.OnError(ctx, &protobufs.ServerErrorResponse{Type: n.ErrorType, ErrorMessage: n.Message})
 		}
 	case opamp.RemoteConfig:
+		c.report.receivedRemoteConfig(n.RemoteConfig.GetConfigHash())
 		message(&types.MessageData{RemoteConfig: n.RemoteConfig})
 	case opamp.ConnectionSettings:
 		offers := n.ConnectionSettings
