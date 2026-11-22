@@ -388,6 +388,28 @@ func TestUninstallRequestIsSafeInTheServiceUsersDirectory(t *testing.T) {
 				t.Fatalf("the link was followed: %q %v", b, err)
 			}
 		})
+		// The notice turns into a FIFO just before it is taken: after any check of its path.
+		t.Run(platform+"/a notice swapped for a fifo as it is read", func(t *testing.T) {
+			_, state, tools, invoke := uninstallFixture(t, platform)
+			stubs(t, tools, `printf 'told\n' >"`+state+`/uninstall-notice"`)
+			mv, err := exec.LookPath("mv")
+			if err != nil {
+				t.Fatal(err)
+			}
+			swap := `case "$*" in *uninstall-notice*) rm -f "` + state + `/uninstall-notice"; mkfifo "` + state + `/uninstall-notice" ;; esac
+exec ` + mv + ` "$@"`
+			if err := os.WriteFile(filepath.Join(tools, "mv"), []byte("#!/bin/sh\n"+swap+"\n"), 0755); err != nil {
+				t.Fatal(err)
+			}
+			out, err := invoke()
+			if err != nil || !strings.Contains(out, "the Supervisor did not say") {
+				t.Fatalf("%v: %s", err, out)
+			}
+			left, err := filepath.Glob(filepath.Join(state, ".uninstall-notice*"))
+			if err != nil || len(left) != 0 {
+				t.Fatalf("left behind: %v %v", left, err)
+			}
+		})
 		t.Run(platform+"/a fifo at the request", func(t *testing.T) {
 			_, state, tools, invoke := uninstallFixture(t, platform)
 			stubs(t, tools, ":")

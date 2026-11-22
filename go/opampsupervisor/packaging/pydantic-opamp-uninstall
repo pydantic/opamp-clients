@@ -86,12 +86,28 @@ request_notice() {
         trap drop_request EXIT
     fi
 }
+# The notice's first line. The service user can put anything at its path at any time (a link, a
+# FIFO that blocks whoever opens it), so a check of the path says nothing about what is opened. It
+# is moved, by a rename that follows and opens nothing, into a directory only this script's user can
+# enter, and checked and read there. In a subshell, which stands in that directory: the service
+# user can move the directory, but not what is in it.
+read_notice() (
+    box=$state/.uninstall-notice.$$
+    mkdir -m 0700 "$box" 2>/dev/null || exit 0
+    here=$(cd -P "$state" 2>/dev/null && pwd -P) || exit 0
+    if cd -P "$box" 2>/dev/null && [ "$(pwd -P)" = "$here/.uninstall-notice.$$" ] && [ -O . ]; then
+        mv -f "$state/uninstall-notice" ./notice 2>/dev/null || :
+        if [ -f notice ] && [ ! -L notice ]; then
+            head -c 512 notice | head -n 1 || :
+        fi
+        rm -f notice 2>/dev/null || :
+        cd / || :
+    fi
+    rmdir "$box" 2>/dev/null || :
+)
 say_notice() {
     [ -n "$notice_requested" ] || return 0
-    line=
-    if [ -f "$state/uninstall-notice" ] && [ ! -L "$state/uninstall-notice" ]; then
-        IFS= read -r line <"$state/uninstall-notice" || :
-    fi
+    line=$(read_notice) || line=
     case $line in
         told) fleet_told=yes; echo 'Fleet was told this host is being removed.' ;;
         'not told: '*) printf '%s\n' "Fleet was not told this host is being removed: ${line#not told: }." ;;
