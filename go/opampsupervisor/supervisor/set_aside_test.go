@@ -65,7 +65,9 @@ func longRunning(t *testing.T) int {
 // deadPID is a process that has ended.
 func deadPID(t *testing.T) int {
 	t.Helper()
-	cmd := exec.Command(os.Args[0], "-test.run=^$")
+	self, err := os.Executable()
+	require.NoError(t, err)
+	cmd := exec.Command(self, "-test.run=^$")
 	require.NoError(t, cmd.Run())
 	return cmd.Process.Pid
 }
@@ -143,7 +145,9 @@ func TestAReusedProcessIDIsNotTheHelper(t *testing.T) {
 	assert.False(t, ranAt(deadPID(t), time.Now()))
 	if runtime.GOOS != "windows" {
 		// Ended, and not waited for.
-		cmd := exec.Command(os.Args[0], "-test.run=^$")
+		self, err := os.Executable()
+		require.NoError(t, err)
+		cmd := exec.Command(self, "-test.run=^$")
 		require.NoError(t, cmd.Start())
 		assert.Eventually(t, func() bool { return !ranAt(cmd.Process.Pid, time.Now()) }, 10*time.Second, 10*time.Millisecond)
 		require.NoError(t, cmd.Wait())
