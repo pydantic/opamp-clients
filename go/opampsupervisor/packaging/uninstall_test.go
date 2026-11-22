@@ -324,6 +324,9 @@ esac`
 				if left := uninstallLeft(t, state); len(left) != 0 {
 					t.Fatalf("left behind: %v", left)
 				}
+				if strings.Contains(out, "is not removed") {
+					t.Fatalf("removed, and said not to be: %s", out)
+				}
 				if got := strings.Contains(out, "A reinstall enrolls as a new host"); got != c.gone {
 					t.Fatalf("new host line: %v, want %v: %s", got, c.gone, out)
 				}
