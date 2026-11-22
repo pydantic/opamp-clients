@@ -212,11 +212,14 @@ agent:
   description, it is also a resource attribute of the Collector's own telemetry. Hosts cloned from
   one image share the key unless the image makes a new machine ID.
   The Collector is given the same key in its environment, as `pydantic.fleet.host_key` in
-  `OTEL_RESOURCE_ATTRIBUTES` (added to what the host's environment or `agent.env` already says
-  there, in place of a host key they set): a config whose `resourcedetection` processor lists the
-  `env` detector stamps it on the host's data, so a server can tell the data is that host's. The
-  config needs no `${env:...}` reference for it, which a remote config policy would refuse
-  (`host_key_env.go`, and a line in `Start`).
+  `OTEL_RESOURCE_ATTRIBUTES`, percent-encoded: a config whose `resourcedetection` processor lists
+  the `env` detector stamps it on the data that Collector produces, so a server can tell that the
+  data came from that host's Collector. (A Collector that forwards other hosts' data stamps its own
+  key on theirs.) The config needs no `${env:...}` reference for it, which a remote config policy
+  would refuse. What the host's environment or `agent.env` already says in
+  `OTEL_RESOURCE_ATTRIBUTES` (or, when that is empty, the older `OTEL_RESOURCE`, which the
+  detector reads only then) is kept; a host key there is replaced, or dropped when the Supervisor
+  reports none (`host_key_env.go`, and a line in `Start`).
 - **The Collector doesn't inherit `OTEL_EXPORTER_OTLP_*`.** Upstream's passed the
   Supervisor's whole environment, so headers set on the host reached the own-telemetry endpoint
   a server chose. Set one in `agent.env` to pass it

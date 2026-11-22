@@ -531,9 +531,7 @@ func (s *Supervisor) Start(ctx context.Context) error {
 		return err
 	}
 	s.commander.SetPassthroughLogHook(s.appendPassthroughLogLine)
-	s.commander.SetEnvironmentProvider(func() map[string]string {
-		return s.collectorEnv() // Changed here: and the host key, as a resource attribute (host_key_env.go).
-	})
+	s.commander.SetEnvironmentProvider(s.collectorEnv) // the credentials and the host key (host_key_env.go)
 
 	s.agentWG.Go(func() {
 		s.runAgentProcess()
