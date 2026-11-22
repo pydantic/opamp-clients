@@ -212,9 +212,10 @@ func TestStatesSetAsideStay(t *testing.T) {
 	if runtime.GOOS != "windows" {
 		require.NoError(t, os.Symlink(state, filepath.Join(dir, setAsidePrefix+"20261122T150405Z-1")))
 	}
+	require.NoError(t, os.WriteFile(filepath.Join(dir, replacedPrefix+"20261122T150405Z-1"), nil, 0o600))
 	st, err := ReadStatus(dir)
 	require.NoError(t, err)
-	require.Len(t, st.SetAside, 4)
+	require.Len(t, st.SetAside, 5)
 	assert.Equal(t, statesSetAside(dir), st.SetAside)
 	var out bytes.Buffer
 	st.Print(&out, time.Now())

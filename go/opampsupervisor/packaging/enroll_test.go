@@ -603,22 +603,33 @@ func TestEnrollWaitsForTheConnection(t *testing.T) {
 	kept, err = os.ReadFile(state)
 	require.NoError(t, err)
 	assert.Equal(t, "sealed", string(kept))
-	require.Len(t, aside(), 2)
-	replaced := false
-	for _, path := range aside() {
-		b, err := os.ReadFile(path)
-		require.NoError(t, err)
-		replaced = replaced || string(b) == "new\n"
-	}
-	assert.True(t, replaced, "what was in its place is kept")
+	require.Len(t, aside(), 1)
+	replaced, err := filepath.Glob(state + ".replaced-*")
+	require.NoError(t, err)
+	require.Len(t, replaced, 1)
+	b, err = os.ReadFile(replaced[0])
+	require.NoError(t, err)
+	assert.Equal(t, "new\n", string(b), "what was in its place is kept")
 	// Run again: nothing changes.
 	run = exec.Command("/bin/sh", "-c", strings.ReplaceAll(command, "systemctl ", e.systemctl+" "))
 	run.Env = append(os.Environ(), "OPAMP_ENROLL_ROOT="+e.root)
-	_, _ = run.CombinedOutput()
+	b, _ = run.CombinedOutput()
+	assert.Contains(t, string(b), "nothing is put back, the copy is not there")
 	kept, err = os.ReadFile(state)
 	require.NoError(t, err)
 	assert.Equal(t, "sealed", string(kept))
-	require.Len(t, aside(), 2)
+	require.Len(t, aside(), 1)
+	// What fails later for another reason, or in an upgrade, is nothing to put credentials back for.
+	require.NoError(t, os.Remove(filepath.Join(e.tools, "json")))
+	for _, args := range [][]string{{"--endpoint", "wss://opamp.example.com/v1/opamp"}, {"--refresh"}} {
+		out, err = e.run(t, "bootstrap-token", args...)
+		require.Error(t, err)
+		assert.NotContains(t, out, "put them back with")
+	}
+	require.NoError(t, os.WriteFile(filepath.Join(e.tools, "json"), []byte(revokedJSON), 0o600))
+	out, err = e.run(t, "bootstrap-token", "--refresh")
+	require.Error(t, err)
+	assert.NotContains(t, out, "put them back with")
 
 	// The new try's start fails: said so.
 	require.NoError(t, os.WriteFile(filepath.Join(e.tools, "fail-start"), nil, 0o600))
@@ -628,7 +639,7 @@ func TestEnrollWaitsForTheConnection(t *testing.T) {
 	assert.Contains(t, out, "failed to start")
 	assert.Contains(t, out, "UTC, and the identity kept with them, are set aside in")
 	assert.Contains(t, out, "the saved credentials are not set aside: if the Supervisor started, its log says why")
-	require.Len(t, aside(), 2)
+	require.Len(t, aside(), 1)
 	requests, err := filepath.Glob(state + ".set-aside-*")
 	require.NoError(t, err)
 	assert.Empty(t, requests)
@@ -656,7 +667,7 @@ func TestEnrollWaitsForTheConnection(t *testing.T) {
 		assert.NotContains(t, out, "the server refused this host's saved credentials")
 	}
 	require.NoError(t, os.Remove(state))
-	require.Len(t, aside(), 2)
+	require.Len(t, aside(), 1)
 	require.NoError(t, os.Remove(filepath.Join(e.tools, "json")))
 
 	// A service that failed to start (an unreadable credential, say) never tried to connect: the

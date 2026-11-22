@@ -127,20 +127,25 @@ func TestWinEnrollSetsAside(t *testing.T) {
 			kept, err = os.ReadFile(state)
 			require.NoError(t, err)
 			assert.Equal(t, "sealed", string(kept))
-			aside, err = filepath.Glob(state + ".refused-2*")
+			replaced, err := filepath.Glob(state + ".replaced-2*")
 			require.NoError(t, err)
-			require.Len(t, aside, 1)
-			kept, err = os.ReadFile(aside[0])
+			require.Len(t, replaced, 1)
+			kept, err = os.ReadFile(replaced[0])
 			require.NoError(t, err)
 			assert.Equal(t, "new", string(kept))
-			// Enrolled again, with nothing to set aside: the one before is said.
-			require.NoError(t, os.WriteFile(filepath.Join(dir, "json"), []byte(strings.ReplaceAll(revokedJSON, ",\n    \"issued_refused\": 5", "")), 0o600))
-			b, err = exec.Command("powershell", "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-File", filepath.Join(dir, "fakes.ps1"), "-Helper", helper, "-Root", root).CombinedOutput()
-			require.Error(t, err, string(b))
-			again := strings.NewReplacer("\r", "", "\n", " ").Replace(string(b))
-			assert.Contains(t, again, "saved credentials the server refused in an earlier run, at 20")
-			assert.Regexp(t, `at 20\d\d-\d\d-\d\d \d\d:\d\d:\d\d UTC`, again)
-			assert.Contains(t, again, filepath.Base(aside[0]))
+			// Enrolled again, unreachable, with a copy there: nothing to put back. Refused: that copy is said.
+			older := state + ".refused-20261121T000000Z-1"
+			require.NoError(t, os.WriteFile(older, []byte("older"), 0o600))
+			rerun := func(json string) string {
+				require.NoError(t, os.WriteFile(filepath.Join(dir, "json"), []byte(json), 0o600))
+				b, err := exec.Command("powershell", "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-File", filepath.Join(dir, "fakes.ps1"), "-Helper", helper, "-Root", root).CombinedOutput()
+				require.Error(t, err, string(b))
+				return strings.NewReplacer("\r", "", "\n", " ").Replace(string(b))
+			}
+			assert.NotContains(t, rerun("{ \"server\": { \"connected\": false } }"), "put them back with")
+			again := rerun(strings.ReplaceAll(revokedJSON, ",\n    \"issued_refused\": 5", ""))
+			assert.Contains(t, again, "saved credentials the server refused in an earlier run, at 2026-11-21 00:00:00 UTC")
+			assert.Contains(t, again, filepath.Base(older))
 			// Run again: nothing changes.
 			_, _ = exec.Command("powershell", "-NoProfile", "-NonInteractive", "-Command", command).CombinedOutput()
 			kept, err = os.ReadFile(state)

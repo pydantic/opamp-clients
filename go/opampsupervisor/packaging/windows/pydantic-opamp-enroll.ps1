@@ -441,14 +441,17 @@ if ($NoStart) {
         if ($notSaved) { Note "the server took this host as a new one, and its new credentials could not be saved: a restart loses them. Why: & '$supervisor' status --storage '$storage'" }
         $which = 'this host now enrolls as a new one: the saved credentials the server refused'
         if ($tried -and -not $aside) { Note "the saved credentials are not set aside: if the Supervisor started, its log says why" }
-        if (-not $aside) {
-            # The last that an earlier run had set aside, if there is one.
+        $st = $null
+        if (-not $aside -and -not $Refresh) { try { $st = (& $supervisor status --storage $storage --json 2>$null | Out-String) | ConvertFrom-Json } catch { } }
+        if ($st -and $st.server -and ($st.server.http_status -eq 401 -or ($st.server.connected -and -not $st.accepted))) {
+            # The last that an earlier run had set aside, if there is one, and the server refuses this host
+            # now, too: an outage, or an upgrade, is nothing to put credentials back for.
             $all = @(Get-StatesAside)
             $aside = $all | Sort-Object | Select-Object -Last 1
             $which = 'saved credentials the server refused in an earlier run, at ' + ("$aside" -replace '^.*refused-(....)(..)(..)T(..)(..)(..)Z.*$', '$1-$2-$3 $4:$5:$6 UTC')
             if ($all.Count -gt 1) { $more = "there are more set aside than these, the last: & '$supervisor' status --storage '$storage' lists them" }
         }
-        if ($aside) { Note "$which, and the identity kept with them, are set aside in $aside. If the server refused them for a while only, put them back with: try { Stop-Service $service -ErrorAction Stop; if (Test-Path -LiteralPath '$aside') { `$n = '$state.refused-' + [DateTime]::UtcNow.ToString('yyyyMMddTHHmmssZ') + '-' + `$PID; if (Test-Path -LiteralPath '$state') { Move-Item -LiteralPath '$state' -Destination `$n -ErrorAction Stop }; try { Move-Item -LiteralPath '$aside' -Destination '$state' -ErrorAction Stop } catch { Move-Item -LiteralPath `$n -Destination '$state'; throw } } } finally { Start-Service $service }" }
+        if ($aside) { Note "$which, and the identity kept with them, are set aside in $aside. If the server refused them for a while only, put them back with: try { Stop-Service $service -ErrorAction Stop; if (Test-Path -LiteralPath '$aside') { `$n = '$state.replaced-' + [DateTime]::UtcNow.ToString('yyyyMMddTHHmmssZ') + '-' + `$PID; if (Test-Path -LiteralPath '$state') { Move-Item -LiteralPath '$state' -Destination `$n -ErrorAction Stop }; try { Move-Item -LiteralPath '$aside' -Destination '$state' -ErrorAction Stop } catch { Move-Item -LiteralPath `$n -Destination '$state'; throw } } else { 'nothing is put back, the copy is not there' } } finally { Start-Service $service }" }
         if ($more) { Note $more }
         if ($notSaved) { exit 1 }
         # A service that isn't running never got to connect: say so, and where its log is, instead.

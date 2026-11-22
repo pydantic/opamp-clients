@@ -446,7 +446,11 @@ run_count() {
 # made them, they go into no command.
 states_aside() {
 	for f in "$storage"/opamp-state.refused-*-*; do
-		case ${f#"$storage"/opamp-state.refused-} in *[!0-9TZ.-]*) continue ;; esac
+		case ${f#"$storage"/opamp-state.refused-} in
+		*[!0-9TZ.-]*) continue ;;
+		[0-9]*T[0-9]*Z*-[0-9]*) ;;
+		*) continue ;;
+		esac
 		if [ -f "$f" ] && [ ! -L "$f" ]; then echo "$f"; fi
 	done
 }
@@ -467,11 +471,20 @@ new_aside() {
 # tell_aside says what $2 are, set aside in $1, and how to put them back (what is in their place then is set
 # aside instead).
 tell_aside() {
-	echo "$2, and the identity kept with them, are set aside in $1. If the server refused them for a while only, put them back with: sudo sh -c 'launchctl bootout system/$label; n=0; while launchctl print system/$label >/dev/null 2>&1 && [ \$n -lt 30 ]; do sleep 1; n=\$((n+1)); done; if launchctl print system/$label >/dev/null 2>&1; then echo still stopping, nothing is put back: run this again >&2; else n=$storage/opamp-state.refused-\$(date -u +%Y%m%dT%H%M%SZ)-\$\$; [ -f $1 ] && { [ ! -e $storage/opamp-state ] || mv $storage/opamp-state \$n; } && { mv $1 $storage/opamp-state || mv \$n $storage/opamp-state; }; fi; launchctl bootstrap system $plist'" >&2
+	echo "$2, and the identity kept with them, are set aside in $1. If the server refused them for a while only, put them back with: sudo sh -c 'launchctl bootout system/$label; n=0; while launchctl print system/$label >/dev/null 2>&1 && [ \$n -lt 30 ]; do sleep 1; n=\$((n+1)); done; if launchctl print system/$label >/dev/null 2>&1; then echo still stopping, nothing is put back: run this again >&2; else n=$storage/opamp-state.replaced-\$(date -u +%Y%m%dT%H%M%SZ)-\$\$; if [ -f $1 ]; then { [ ! -e $storage/opamp-state ] || mv $storage/opamp-state \$n; } && { mv $1 $storage/opamp-state || mv \$n $storage/opamp-state; }; else echo nothing is put back, the copy is not there >&2; fi; fi; launchctl bootstrap system $plist'" >&2
 }
 
-# tell_earlier is tell_aside of the last that an earlier run had set aside, if there is one.
+# tell_earlier is tell_aside of the last that an earlier run had set aside, if there is one and the server
+# refuses this host now, too: an outage, or an upgrade, is nothing to put credentials back for.
 tell_earlier() {
+	[ -z "$refresh" ] || return 0
+	st=$("$supervisor" status --storage "$storage" --json 2>/dev/null) || :
+	case $st in
+	*'"http_status": 401'*) ;;
+	*'"accepted": {'*) return 0 ;;
+	*'"connected": true'*) ;;
+	*) return 0 ;;
+	esac
 	earlier=$(states_aside | tail -n 1)
 	[ -n "$earlier" ] || return 0
 	at=$(echo "${earlier##*refused-}" | sed 's/^\(....\)\(..\)\(..\)T\(..\)\(..\)\(..\)Z.*/\1-\2-\3 \4:\5:\6 UTC/')

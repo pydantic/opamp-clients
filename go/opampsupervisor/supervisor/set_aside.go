@@ -28,6 +28,8 @@ import (
 const (
 	setAsideRequest = coreClientStateFile + ".set-aside-"
 	setAsidePrefix  = coreClientStateFile + ".refused-"
+	// replacedPrefix is what the command that puts one back names the state it replaces.
+	replacedPrefix = coreClientStateFile + ".replaced-"
 )
 
 // setAsideFor is how long a request stands.
@@ -110,15 +112,18 @@ func lastRunRefused(dir string) bool {
 	return err == nil && st.Accepted == nil && st.Server != nil && st.Server.IssuedRefused >= refusedTries
 }
 
-// asideName is what setStateAside names one: only such a file is a state set aside.
-var asideName = regexp.MustCompile("^" + regexp.QuoteMeta(setAsidePrefix) + `\d{8}T\d{6}Z(\.\d+)?-\d+$`)
+// asideName is what setStateAside, or the command that puts one back, names one: only such a file is a state
+// set aside.
+var asideName = regexp.MustCompile("^(" + regexp.QuoteMeta(setAsidePrefix) + "|" + regexp.QuoteMeta(replacedPrefix) + `)\d{8}T\d{6}Z(\.\d+)?-\d+$`)
 
-// statesSetAside are the states set aside in dir, the oldest first.
+// statesSetAside are the states set aside in dir, the oldest first, and those that a person put one back over.
 func statesSetAside(dir string) []string {
 	var out []string
-	for _, name := range namesWith(dir, setAsidePrefix) {
-		if path := filepath.Join(dir, name); asideName.MatchString(name) && isFile(path) {
-			out = append(out, path)
+	for _, prefix := range []string{setAsidePrefix, replacedPrefix} {
+		for _, name := range namesWith(dir, prefix) {
+			if path := filepath.Join(dir, name); asideName.MatchString(name) && isFile(path) {
+				out = append(out, path)
+			}
 		}
 	}
 	return out

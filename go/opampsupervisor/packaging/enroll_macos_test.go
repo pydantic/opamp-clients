@@ -168,7 +168,7 @@ func TestMacEnrollWaitsForTheConnection(t *testing.T) {
 	kept, err = os.ReadFile(state)
 	require.NoError(t, err)
 	assert.Equal(t, "sealed", string(kept))
-	aside, err = filepath.Glob(state + ".refused-*")
+	aside, err = filepath.Glob(state + ".replaced-*")
 	require.NoError(t, err)
 	require.Len(t, aside, 1)
 	kept, err = os.ReadFile(aside[0])
@@ -183,6 +183,19 @@ func TestMacEnrollWaitsForTheConnection(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, "sealed", string(kept))
 	assert.FileExists(t, filepath.Join(tools, "loaded"))
+	// What fails later for another reason is nothing to put credentials back for, nor is a name that isn't
+	// the Supervisor's.
+	require.NoError(t, os.WriteFile(state+".refused-20261122T000000Z-1", []byte("older"), 0o600))
+	require.NoError(t, os.WriteFile(state+".refused-..-1", []byte("x"), 0o600))
+	require.NoError(t, os.Remove(filepath.Join(tools, "json")))
+	out, err = macEnroll(t, root, tools, "t", "--endpoint", "wss://opamp.example.com/v1/opamp")
+	require.Error(t, err)
+	assert.NotContains(t, out, "put them back with")
+	require.NoError(t, os.WriteFile(filepath.Join(tools, "json"), []byte(refusedJSON), 0o600))
+	out, err = macEnroll(t, root, tools, "t", "--endpoint", "wss://opamp.example.com/v1/opamp")
+	require.Error(t, err)
+	assert.Contains(t, out, "in an earlier run, at 2026-11-22 00:00:00 UTC, and the identity kept with them, are set aside in "+state+".refused-20261122T000000Z-1.")
+	assert.NotContains(t, out, "there are more set aside")
 	// Taken, and its new state not saved: not enrolled, and the way back said.
 	for _, how := range []string{`rm -f "$S/opamp-state"`, "true"} {
 		require.NoError(t, os.WriteFile(filepath.Join(tools, "heal"), nil, 0o600))
