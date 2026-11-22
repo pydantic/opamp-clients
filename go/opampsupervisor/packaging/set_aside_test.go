@@ -118,7 +118,9 @@ func TestEnrollNamesItsOwnCopy(t *testing.T) {
 # By the process ID of the copy, which the directory's owner can read, and sorted before it.
 for f in "$S".refused-20261*; do pid=${f##*-}; done
 : >"$S.refused-0\$(touch PWNED)-$pid"
-[ -L "$S.refused-00000000T000000Z-$pid" ] || ln -s x "$S.refused-00000000T000000Z-$pid"
+echo other >"$S.other"
+[ -L "$S.refused-00000000T000000Z-$pid" ] || ln -s "$S.other" "$S.refused-00000000T000000Z-$pid"
+: >"$S.refused-..-$pid"
 `), 0o600))
 	cmd := exec.Command("./pydantic-opamp-enroll", "--endpoint", "wss://opamp.example.com/v1/opamp")
 	cmd.Env = append(os.Environ(), "OPAMP_ENROLL_ROOT="+e.root, "SYSTEMD_CREDS="+e.creds, "SYSTEMCTL="+e.systemctl, "OPAMP_SUPERVISOR="+e.supervisor)
@@ -134,6 +136,7 @@ for f in "$S".refused-20261*; do pid=${f##*-}; done
 	assert.Equal(t, "sealed", string(kept))
 	assert.NotContains(t, string(out), "PWNED")
 	assert.NotContains(t, string(out), "00000000T000000Z")
+	assert.NotContains(t, string(out), "refused-..-")
 }
 
 // The same on macOS: what is printed names no name that isn't the Supervisor's, nor another run's copy.
@@ -149,7 +152,9 @@ func TestMacEnrollNamesItsOwnCopy(t *testing.T) {
 : >"$S.refused-29991122T000001Z-2"
 for f in "$S".refused-20261*; do pid=${f##*-}; done
 : >"$S.refused-0\$(touch PWNED)-$pid"
-[ -L "$S.refused-00000000T000000Z-$pid" ] || ln -s x "$S.refused-00000000T000000Z-$pid"
+echo other >"$S.other"
+[ -L "$S.refused-00000000T000000Z-$pid" ] || ln -s "$S.other" "$S.refused-00000000T000000Z-$pid"
+: >"$S.refused-..-$pid"
 `), 0o600))
 	out, err := macEnroll(t, root, tools, "t", "--endpoint", "wss://opamp.example.com/v1/opamp")
 	require.Error(t, err)
@@ -161,6 +166,7 @@ for f in "$S".refused-20261*; do pid=${f##*-}; done
 	assert.Equal(t, "sealed", string(kept))
 	assert.NotContains(t, out, "PWNED")
 	assert.NotContains(t, out, "00000000T000000Z")
+	assert.NotContains(t, out, "refused-..-")
 }
 
 // A retry that ends connected and unanswered doesn't advise removing the data its copy is in; and a request

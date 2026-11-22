@@ -195,6 +195,9 @@ func TestMacEnrollWaitsForTheConnection(t *testing.T) {
 	out, err = macEnroll(t, root, tools, "t", "--endpoint", "wss://opamp.example.com/v1/opamp")
 	require.Error(t, err)
 	assert.Contains(t, out, "in an earlier run, at 2026-11-22 00:00:00 UTC, and the identity kept with them, are set aside in "+state+".refused-20261122T000000Z-1.")
+	out, err = macEnroll(t, root, tools, "", "--refresh")
+	require.Error(t, err)
+	assert.NotContains(t, out, "put them back with", "an upgrade")
 	assert.NotContains(t, out, "there are more set aside")
 	// Taken, and its new state not saved: not enrolled, and the way back said.
 	for _, how := range []string{`rm -f "$S/opamp-state"`, "true"} {

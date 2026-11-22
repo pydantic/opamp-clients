@@ -677,7 +677,7 @@ func TestEnrollWaitsForTheConnection(t *testing.T) {
 	out, err = e.run(t, "", "--refresh")
 	require.Error(t, err)
 	assert.NotContains(t, out, "the server refused this host's saved credentials")
-	for _, plant := range []func() error{func() error { return os.Mkdir(state, 0o700) }, func() error { return os.Symlink(t.TempDir(), state) }} {
+	for _, plant := range []func() error{func() error { return os.Mkdir(state, 0o700) }, func() error { return os.Symlink(t.TempDir(), state) }, func() error { return os.Symlink(aside()[0], state) }} {
 		require.NoError(t, os.Remove(state))
 		require.NoError(t, plant())
 		out, err = e.run(t, "bootstrap-token", "--endpoint", "wss://opamp.example.com/v1/opamp")
