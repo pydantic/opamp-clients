@@ -437,19 +437,31 @@ if [ -z "$edited" ]; then
 	printf '%s' "$saved" >"$options"
 fi
 
-# wait_failed ends a failed wait. With the saved credentials set aside (wait_connected), the new try
-# failed too: they are put back, and the Supervisor started with them, so a server that refused them
-# for a while only doesn't leave this host a new one.
-wait_failed() {
-	if [ -n "$restarted_fresh" ] && [ -f "$aside" ]; then
-		unload
-		rm -f "$storage/opamp-state"
-		mv -f "$aside" "$storage/opamp-state"
-		"$launchctl" bootstrap system "$plist" || :
-		echo "pydantic-opamp-enroll put the saved credentials back, with the identity kept with them: enrolling this host as a new one failed too. If the server deleted it, enroll again with a new token" >&2
-	fi
-	exit 1
+# move puts a file in another's place, never into a directory there (the storage is the service's).
+move() {
+	[ ! -d "$2" ] && mv -f "$1" "$2"
 }
+
+# restore_saved, at every exit, puts back the saved credentials set aside (wait_connected), unless the
+# host is enrolled without them: the new try failed too, or was cut short. A server that refused them
+# for a while only, or a wrong token, doesn't leave this host without its identity.
+restore_saved() {
+	[ -n "$set_aside" ] || return 0
+	set_aside=
+	(unload) || :
+	rm -f "$storage/opamp-state" 2>/dev/null || :
+	if [ ! -e "$storage/opamp-state" ] && move "$aside" "$storage/opamp-state"; then
+		echo "pydantic-opamp-enroll put the saved credentials back, with the identity kept with them: enrolling this host as a new one failed too. If the server deleted it, enroll again with a new token" >&2
+	else
+		echo "pydantic-opamp-enroll could not put the saved credentials back; they are in $aside" >&2
+	fi
+	"$launchctl" bootstrap system "$plist" || :
+}
+set_aside=
+trap 'code=$?; restore_saved; exit "$code"' EXIT
+trap 'exit 129' HUP
+trap 'exit 130' INT
+trap 'exit 143' TERM
 
 # not_accepted fails the install when the Supervisor is connected but the server never answered
 # it: a server that takes the connection but not the credentials (a used-up, expired or revoked
@@ -458,7 +470,7 @@ not_accepted() {
 	st=$("$supervisor" status --storage "$storage" --json 2>/dev/null) || :
 	if printf '%s\n' "$st" | grep -q '"connected": true' && ! printf '%s\n' "$st" | grep -q '"accepted": {'; then
 		echo "enrolled, but the server at $endpoint took the connection and not the enrollment token: it may be used up, expired or revoked, or the server deleted this host, which keeps its identity. Enroll again with a new token, or for a deleted host remove its data first (sudo /opt/pydantic-opamp/bin/pydantic-opamp-uninstall --purge); check with: sudo $supervisor status --storage $storage" >&2
-		wait_failed
+		exit 1
 	fi
 }
 
@@ -468,7 +480,7 @@ not_accepted() {
 # the same, and which the server revoked (it deleted the host, say). The client never falls back
 # from them to the token.
 refused_saved() {
-	[ -z "$refresh" ] && [ -z "$restarted_fresh" ] && [ -e "$storage/opamp-state" ] || return 1
+	[ -z "$refresh" ] && [ -z "$restarted_fresh" ] && [ -f "$storage/opamp-state" ] && [ ! -L "$storage/opamp-state" ] || return 1
 	"$supervisor" status --storage "$storage" --json 2>/dev/null | grep -q '"http_status": 401'
 }
 
@@ -478,6 +490,9 @@ refused_saved() {
 # with what to check, instead of reporting success; the service keeps retrying.
 wait_connected() {
 	if "$supervisor" status --storage "$storage" --wait 30s --since "$1" --require-accepted; then
+		# Enrolled: refused credentials set aside, by this run or one before it, aren't needed.
+		set_aside=
+		rm -f "$aside" || :
 		return 0
 	fi
 	# Enrolling (not --refresh) with the token this host enrolled with before, after the server
@@ -489,12 +504,17 @@ wait_connected() {
 		restarted_fresh=1
 		echo "the server refused this host's saved credentials (it deleted the host, say), so pydantic-opamp-enroll set them aside, with the identity kept with them, and enrolls it again with the enrollment token, as a new host" >&2
 		unload
-		rm -rf "$aside"
-		mv -f "$storage/opamp-state" "$aside"
+		# In the directory that only root writes. One left there by a run cut short is older, and is
+		# the one to put back.
+		if [ -f "$aside" ]; then
+			rm -f "$storage/opamp-state"
+		else
+			move "$storage/opamp-state" "$aside"
+		fi
+		set_aside=1
 		started=$(date +%s)
 		"$launchctl" bootstrap system "$plist"
 		wait_connected "$started"
-		rm -f "$aside"
 		return 0
 	fi
 	# A daemon that isn't running, or that launchd has started more than once since the bootstrap
@@ -505,15 +525,19 @@ wait_connected() {
 	case $runs in '' | *[!0-9]*) runs=0 ;; esac
 	if ! printf '%s\n' "$info" | grep -q 'state = running' || [ "$runs" -gt 1 ]; then
 		echo "the Supervisor service ($label) failed to start, so it never connected to $endpoint. Its log says why: sudo tail -n 50 $storage/log/supervisor.log" >&2
-		wait_failed
+		exit 1
 	fi
 	not_accepted
 	echo "enrolled, but the Supervisor can't connect to $endpoint yet; it keeps retrying. Fix what is above, then check with: sudo $supervisor status --storage $storage" >&2
-	wait_failed
+	exit 1
 }
 
 done=Enrolled
 [ -z "$refresh" ] || done=Refreshed
+# Left by a run cut short (a power loss, say) before the host was enrolled without them.
+if [ -f "$aside" ] && [ ! -e "$storage/opamp-state" ] && [ -d "$storage" ]; then
+	move "$aside" "$storage/opamp-state" || :
+fi
 if [ -n "$start" ]; then
 	# Loaded already (enrolling again, or --refresh): unload it first, so it reads the new config.
 	unload

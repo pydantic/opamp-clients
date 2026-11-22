@@ -42,7 +42,16 @@ show) cat "$restarts" 2>/dev/null ;;
 restart)
 	crashes=$(cat "`+filepath.Join(dir, "crashes")+`" 2>/dev/null) || exit 0
 	echo $(($(cat "$restarts" 2>/dev/null || echo 0) + crashes)) >"$restarts" ;;
-start) [ -e "`+filepath.Join(dir, "heal")+`" ] && rm -f "`+filepath.Join(dir, "status")+`" "`+filepath.Join(dir, "json")+`" ;;
+stop)
+	# dir/fail-stop: the second stop fails.
+	if [ -e "`+filepath.Join(dir, "fail-stop")+`" ]; then
+		[ ! -e "`+filepath.Join(dir, "stopped")+`" ] || exit 1
+		: >"`+filepath.Join(dir, "stopped")+`"
+	fi ;;
+start)
+	[ ! -e "`+filepath.Join(dir, "fail-start")+`" ] || exit 1
+	: >"`+filepath.Join(dir, "started")+`"
+	[ -e "`+filepath.Join(dir, "heal")+`" ] && rm -f "`+filepath.Join(dir, "status")+`" "`+filepath.Join(dir, "json")+`" ;;
 esac
 exit 0
 `), 0o755))
@@ -63,6 +72,8 @@ case " $* " in *" --json "*)
 	exit "$code" ;;
 esac
 echo "$@" >>"`+filepath.Join(dir, "supervisor.log")+`"
+# dir/fail-term: the second wait is cut short.
+if [ -e "`+filepath.Join(dir, "fail-term")+`" ] && [ -e "`+filepath.Join(dir, "started")+`" ]; then kill -TERM "$PPID"; sleep 1; fi
 [ "$code" = 0 ] || echo "OpAMP server   can't reach it: this host doesn't trust the server's certificate"
 exit "$code"
 `), 0o755))
@@ -543,6 +554,52 @@ func TestEnrollWaitsForTheConnection(t *testing.T) {
 	systemctlLog, err = os.ReadFile(filepath.Join(e.tools, "systemctl.log"))
 	require.NoError(t, err)
 	assert.Regexp(t, `(?s)stop pydantic-opamp-supervisor.*start pydantic-opamp-supervisor.*stop pydantic-opamp-supervisor.*start pydantic-opamp-supervisor`, string(systemctlLog))
+
+	// Put back too when the new try is cut short: the start, or the stop after it, fails, or the run is
+	// stopped. And a copy a run cut short left aside is what is put back, never replaced.
+	for _, how := range []string{"start", "stop", "term"} {
+		require.NoError(t, os.WriteFile(state, []byte("sealed"), 0o600))
+		require.NoError(t, os.WriteFile(filepath.Join(e.tools, "fail-"+how), nil, 0o600))
+		_ = os.Remove(filepath.Join(e.tools, "started"))
+		out, err = e.run(t, "bootstrap-token", "--endpoint", "wss://opamp.example.com/v1/opamp")
+		require.Error(t, err, how)
+		kept, err = os.ReadFile(state)
+		require.NoError(t, err, "%s: %s", how, out)
+		assert.Equal(t, "sealed", string(kept), how)
+		assert.NoFileExists(t, aside, how)
+		require.NoError(t, os.Remove(filepath.Join(e.tools, "fail-"+how)))
+	}
+	require.NoError(t, os.WriteFile(aside, []byte("older"), 0o600))
+	out, err = e.run(t, "bootstrap-token", "--endpoint", "wss://opamp.example.com/v1/opamp")
+	require.Error(t, err)
+	kept, err = os.ReadFile(state)
+	require.NoError(t, err)
+	assert.Equal(t, "older", string(kept))
+	require.NoError(t, os.Remove(state))
+	require.NoError(t, os.WriteFile(aside, []byte("older"), 0o600))
+	out, err = e.run(t, "bootstrap-token", "--endpoint", "wss://opamp.example.com/v1/opamp")
+	require.Error(t, err)
+	kept, err = os.ReadFile(state)
+	require.NoError(t, err, out)
+	assert.Equal(t, "older", string(kept), "left aside with nothing in its place: put back first")
+	// Enrolled, one left aside by an earlier run goes.
+	require.NoError(t, os.Remove(filepath.Join(e.tools, "status")))
+	require.NoError(t, os.WriteFile(aside, []byte("older"), 0o600))
+	out, err = e.run(t, "bootstrap-token", "--endpoint", "wss://opamp.example.com/v1/opamp")
+	require.NoError(t, err, out)
+	assert.NoFileExists(t, aside)
+	assert.FileExists(t, state)
+	require.NoError(t, os.WriteFile(filepath.Join(e.tools, "status"), []byte("1"), 0o600))
+	// Something else in its place isn't moved, or written into.
+	for _, plant := range []func() error{func() error { return os.Mkdir(state, 0o700) }, func() error { return os.Symlink(t.TempDir(), state) }} {
+		require.NoError(t, os.Remove(state))
+		require.NoError(t, plant())
+		out, err = e.run(t, "bootstrap-token", "--endpoint", "wss://opamp.example.com/v1/opamp")
+		require.Error(t, err)
+		assert.NotContains(t, out, "the server refused this host's saved credentials")
+		assert.NoFileExists(t, aside)
+	}
+	require.NoError(t, os.Remove(state))
 	require.NoError(t, os.Remove(filepath.Join(e.tools, "json")))
 	require.NoError(t, os.WriteFile(filepath.Join(e.tools, "status"), []byte("1"), 0o600))
 
