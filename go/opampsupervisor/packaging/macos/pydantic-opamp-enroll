@@ -473,7 +473,9 @@ tell_aside() {
 # tell_earlier is tell_aside of the last that an earlier run had set aside, if there is one.
 tell_earlier() {
 	earlier=$(states_aside | tail -n 1)
-	[ -z "$earlier" ] || tell_aside "$earlier" "saved credentials the server refused before this run"
+	[ -n "$earlier" ] || return 0
+	tell_aside "$earlier" "saved credentials the server refused before this run"
+	[ "$(states_aside | wc -l)" -eq 1 ] || echo "there are more set aside than these, the last: sudo $supervisor status --storage $storage lists them" >&2
 }
 
 # fail_wait ends a run whose wait failed.

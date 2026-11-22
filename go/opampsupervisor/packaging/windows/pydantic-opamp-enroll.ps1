@@ -396,6 +396,7 @@ if ($NoStart) {
     $aside = $null
     $tried = $false
     $notSaved = $false
+    $more = $null
     # The saved states set aside. Other names aren't the Supervisor's: whoever made them, they go into no command.
     function Get-StatesAside {
         Get-ChildItem -LiteralPath $storage -Filter 'opamp-state.refused-*' -File -ErrorAction SilentlyContinue |
@@ -443,9 +444,12 @@ if ($NoStart) {
         if (-not $aside) {
             # The last that an earlier run had set aside, if there is one.
             $which = 'saved credentials the server refused before this run'
-            $aside = @(Get-StatesAside) | Sort-Object | Select-Object -Last 1
+            $all = @(Get-StatesAside)
+            $aside = $all | Sort-Object | Select-Object -Last 1
+            if ($all.Count -gt 1) { $more = "there are more set aside than these, the last: & '$supervisor' status --storage '$storage' lists them" }
         }
         if ($aside) { Note "$which, and the identity kept with them, are set aside in $aside. If the server refused them for a while only, put them back with: try { Stop-Service $service -ErrorAction Stop; if (Test-Path -LiteralPath '$aside') { `$n = '$state.refused-' + [DateTime]::UtcNow.ToString('yyyyMMddTHHmmssZ') + '-' + `$PID; if (Test-Path -LiteralPath '$state') { Move-Item -LiteralPath '$state' -Destination `$n -ErrorAction Stop }; try { Move-Item -LiteralPath '$aside' -Destination '$state' -ErrorAction Stop } catch { Move-Item -LiteralPath `$n -Destination '$state'; throw } } } finally { Start-Service $service }" }
+        if ($more) { Note $more }
         if ($notSaved) { exit 1 }
         # A service that isn't running never got to connect: say so, and where its log is, instead.
         if ((Get-Service -Name $service -ErrorAction SilentlyContinue).Status -ne 'Running') { Fail-Start }

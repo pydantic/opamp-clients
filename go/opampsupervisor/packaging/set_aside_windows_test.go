@@ -133,6 +133,13 @@ func TestWinEnrollSetsAside(t *testing.T) {
 			kept, err = os.ReadFile(aside[0])
 			require.NoError(t, err)
 			assert.Equal(t, "new", string(kept))
+			// Enrolled again, with nothing to set aside: the one before is said.
+			require.NoError(t, os.WriteFile(filepath.Join(dir, "json"), []byte(strings.ReplaceAll(revokedJSON, ",\n    \"issued_refused\": 5", "")), 0o600))
+			b, err = exec.Command("powershell", "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-File", filepath.Join(dir, "fakes.ps1"), "-Helper", helper, "-Root", root).CombinedOutput()
+			require.Error(t, err, string(b))
+			again := strings.NewReplacer("\r", "", "\n", " ").Replace(string(b))
+			assert.Contains(t, again, "saved credentials the server refused before this run")
+			assert.Contains(t, again, filepath.Base(aside[0]))
 			// Run again: nothing changes.
 			_, _ = exec.Command("powershell", "-NoProfile", "-NonInteractive", "-Command", command).CombinedOutput()
 			kept, err = os.ReadFile(state)

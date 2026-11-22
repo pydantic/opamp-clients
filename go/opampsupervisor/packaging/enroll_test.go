@@ -584,6 +584,8 @@ func TestEnrollWaitsForTheConnection(t *testing.T) {
 	require.Len(t, aside(), 2)
 	assert.Contains(t, again, "saved credentials the server refused before this run, and the identity kept with them, are set aside in "+aside()[1])
 	assert.Contains(t, again, "put them back with: sudo ")
+	assert.Contains(t, again, "there are more set aside than these, the last: ")
+	assert.NotContains(t, out, "there are more set aside")
 	require.NoError(t, os.WriteFile(filepath.Join(e.tools, "json"), []byte(revokedJSON), 0o600))
 	assert.NotContains(t, out, "purge")
 	_, command, ok := strings.Cut(out, "put them back with: sudo ")
