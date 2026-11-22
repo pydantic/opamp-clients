@@ -175,6 +175,14 @@ func TestMacEnrollWaitsForTheConnection(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, "new\n", string(kept))
 	assert.FileExists(t, filepath.Join(tools, "loaded"))
+	// Run again: nothing changes.
+	run = exec.Command("/bin/sh", "-c", strings.ReplaceAll(command, "launchctl ", filepath.Join(tools, "launchctl")+" "))
+	run.Env = append(os.Environ(), "OPAMP_ENROLL_ROOT="+root)
+	_, _ = run.CombinedOutput()
+	kept, err = os.ReadFile(state)
+	require.NoError(t, err)
+	assert.Equal(t, "sealed", string(kept))
+	assert.FileExists(t, filepath.Join(tools, "loaded"))
 	// Of a status before this start, or --refresh: not asked.
 	out, err = macEnroll(t, root, tools, "", "--refresh")
 	require.Error(t, err)

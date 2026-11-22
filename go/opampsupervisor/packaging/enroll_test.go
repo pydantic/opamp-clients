@@ -580,6 +580,9 @@ func TestEnrollWaitsForTheConnection(t *testing.T) {
 	_, command, ok := strings.Cut(out, "put them back with: sudo ")
 	require.True(t, ok, out)
 	command, _, _ = strings.Cut(command, "\n")
+	if runtime.GOOS != "linux" {
+		command = strings.ReplaceAll(command, "mv -T ", "mv ") // coreutils'
+	}
 	// The command, run: the old state is back, and what was there is set aside instead.
 	run := exec.Command("/bin/sh", "-c", strings.ReplaceAll(command, "systemctl ", e.systemctl+" "))
 	run.Env = append(os.Environ(), "OPAMP_ENROLL_ROOT="+e.root)
@@ -596,6 +599,14 @@ func TestEnrollWaitsForTheConnection(t *testing.T) {
 		replaced = replaced || string(b) == "new\n"
 	}
 	assert.True(t, replaced, "what was in its place is kept")
+	// Run again: nothing changes.
+	run = exec.Command("/bin/sh", "-c", strings.ReplaceAll(command, "systemctl ", e.systemctl+" "))
+	run.Env = append(os.Environ(), "OPAMP_ENROLL_ROOT="+e.root)
+	_, _ = run.CombinedOutput()
+	kept, err = os.ReadFile(state)
+	require.NoError(t, err)
+	assert.Equal(t, "sealed", string(kept))
+	require.Len(t, aside(), 2)
 
 	// The new try's start fails: said so.
 	require.NoError(t, os.WriteFile(filepath.Join(e.tools, "fail-start"), nil, 0o600))
@@ -604,7 +615,7 @@ func TestEnrollWaitsForTheConnection(t *testing.T) {
 	require.Error(t, err)
 	assert.Contains(t, out, "failed to start")
 	assert.NotContains(t, out, "are set aside in")
-	assert.Contains(t, out, "the saved credentials are not set aside: the Supervisor's log says why")
+	assert.Contains(t, out, "the saved credentials are not set aside: if the Supervisor started, its log says why")
 	require.Len(t, aside(), 2)
 	requests, err := filepath.Glob(state + ".set-aside-*")
 	require.NoError(t, err)

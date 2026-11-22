@@ -5,6 +5,7 @@ package opamp
 
 import (
 	"bytes"
+	"cmp"
 	"context"
 	"crypto/rand"
 	"crypto/sha256"
@@ -106,7 +107,7 @@ func isWSAnswer(data []byte) bool {
 func (x *executor) saved(in *corepb.Input) {
 	detail := ""
 	if f := in.GetStoreFailed(); f != nil {
-		detail = f.GetDetail()
+		detail = cmp.Or(f.GetDetail(), "the save failed")
 	}
 	x.saveError.Store(&detail)
 	select {
@@ -115,13 +116,16 @@ func (x *executor) saved(in *corepb.Input) {
 	}
 }
 
-// configure keeps the configured headers.
+// configure keeps the configured headers, but those the core sets itself.
 func (x *executor) configure(header http.Header) {
 	x.configured = http.Header{}
 	for name, values := range header {
 		for _, v := range values {
 			x.configured.Add(name, v)
 		}
+	}
+	for _, name := range []string{"User-Agent", "Content-Type", "Accept-Encoding", "OpAMP-Instance-UID"} {
+		x.configured.Del(name)
 	}
 }
 

@@ -437,8 +437,8 @@ if ($NoStart) {
     }
     if ($waited -ne 0 -or $notSaved) {
         if ($notSaved) { Note "the server took this host as a new one, and its new credentials could not be saved: a restart loses them. Why: & '$supervisor' status --storage '$storage'" }
-        if ($aside) { Note "the saved credentials the server refused, and the identity kept with them, are set aside in $aside, and this host now enrolls as a new one. If the server refused them for a while only, put them back with: try { Stop-Service $service -ErrorAction Stop; if (Test-Path -LiteralPath '$state') { Move-Item -LiteralPath '$state' -Destination ('$state.refused-' + [DateTime]::UtcNow.ToString('yyyyMMddTHHmmssZ') + '-' + `$PID) -ErrorAction Stop }; Move-Item -LiteralPath '$aside' -Destination '$state' -ErrorAction Stop } finally { Start-Service $service }" }
-        elseif ($tried) { Note "the saved credentials are not set aside: the Supervisor's log says why" }
+        if ($aside) { Note "the saved credentials the server refused, and the identity kept with them, are set aside in $aside, and this host now enrolls as a new one. If the server refused them for a while only, put them back with: try { Stop-Service $service -ErrorAction Stop; if (Test-Path -LiteralPath '$aside') { `$n = '$state.refused-' + [DateTime]::UtcNow.ToString('yyyyMMddTHHmmssZ') + '-' + `$PID; if (Test-Path -LiteralPath '$state') { Move-Item -LiteralPath '$state' -Destination `$n -ErrorAction Stop }; try { Move-Item -LiteralPath '$aside' -Destination '$state' -ErrorAction Stop } catch { Move-Item -LiteralPath `$n -Destination '$state'; throw } } } finally { Start-Service $service }" }
+        elseif ($tried) { Note "the saved credentials are not set aside: if the Supervisor started, its log says why" }
         if ($notSaved) { exit 1 }
         # A service that isn't running never got to connect: say so, and where its log is, instead.
         if ((Get-Service -Name $service -ErrorAction SilentlyContinue).Status -ne 'Running') { Fail-Start }

@@ -31,6 +31,7 @@ func TestUsedIssued(t *testing.T) {
 		"none of them":               {http.Header{"Authorization": {"Bearer a"}}, header("X", "y"), true},
 		"none configured":            {nil, header("Authorization", "Bearer b"), false},
 		"one of two, issued":         {http.Header{"A": {"1"}, "B": {"2"}}, header("A", "1", "B", "3"), true},
+		"what the core sets":         {http.Header{"User-Agent": {"x"}, "opamp-instance-uid": {"y"}, "Content-Type": {"z"}}, header("User-Agent", "core"), false},
 		"two values, the same order": {http.Header{"A": {"1", "2"}}, header("A", "1", "A", "2"), false},
 	} {
 		t.Run(name, func(t *testing.T) {
@@ -63,6 +64,11 @@ func TestSaveError(t *testing.T) {
 	<-c.Saves()
 	if c.SaveError() != "no space left" {
 		t.Fatal(c.SaveError())
+	}
+	x.saved(storeFailed(2, errors.New("")))
+	<-c.Saves()
+	if c.SaveError() == "" {
+		t.Fatal("saved, with no reason that it wasn't")
 	}
 	x.saved(&corepb.Input{Kind: &corepb.Input_Stored{Stored: &corepb.Id{Id: 3}}})
 	<-c.Saves()

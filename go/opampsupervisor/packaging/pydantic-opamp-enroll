@@ -480,16 +480,9 @@ new_aside() {
 # tell_aside says that the saved credentials are set aside in $1, and how to put them back (what is in their
 # place then is set aside instead).
 tell_aside() {
-	echo "the saved credentials the server refused, and the identity kept with them, are set aside in $1, and this host now enrolls as a new one. If the server refused them for a while only, put them back with: sudo sh -c 'systemctl stop $unit && { if [ -e $storage/opamp-state ]; then mv $storage/opamp-state $storage/opamp-state.refused-\$(date -u +%Y%m%dT%H%M%SZ)-\$\$; fi && mv $1 $storage/opamp-state; }; systemctl start $unit'" >&2
+	echo "the saved credentials the server refused, and the identity kept with them, are set aside in $1, and this host now enrolls as a new one. If the server refused them for a while only, put them back with: sudo sh -c 'systemctl stop $unit && { n=$storage/opamp-state.refused-\$(date -u +%Y%m%dT%H%M%SZ)-\$\$; [ -f $1 ] && { [ ! -e $storage/opamp-state ] || mv -T $storage/opamp-state \$n; } && { mv -T $1 $storage/opamp-state || mv -T \$n $storage/opamp-state; }; }; systemctl start $unit'" >&2
 }
 
-# wait_connected waits up to 30 seconds for the Supervisor started at $1 (Unix seconds), with $2
-# restarts counted before, to connect and the server to answer it (--require-accepted).
-# An install that can't reach its server (an untrusted certificate, a refused key) fails here,
-# with what to check, instead of reporting success; the service keeps retrying.
-# not_accepted fails the install when the Supervisor is connected but the server never answered
-# it: a server that takes the connection but not the credentials (a used-up, expired or revoked
-# enrollment token) closes it unanswered.
 not_accepted() {
 	st=$("$supervisor" status --storage "$storage" --json 2>/dev/null) || :
 	if printf '%s\n' "$st" | grep -q '"connected": true' && ! printf '%s\n' "$st" | grep -q '"accepted": {'; then
@@ -518,6 +511,13 @@ refused_saved() {
 	"$supervisor" status --storage "$storage" --wait 1s --since "$1" --require-accepted --json 2>/dev/null | grep -Eq '"issued_refused": ([3-9]|[1-9][0-9])'
 }
 
+# wait_connected waits up to 30 seconds for the Supervisor started at $1 (Unix seconds), with $2
+# restarts counted before, to connect and the server to answer it (--require-accepted).
+# An install that can't reach its server (an untrusted certificate, a refused key) fails here,
+# with what to check, instead of reporting success; the service keeps retrying.
+# not_accepted fails the install when the Supervisor is connected but the server never answered
+# it: a server that takes the connection but not the credentials (a used-up, expired or revoked
+# enrollment token) closes it unanswered.
 wait_connected() {
 	if "$supervisor" status --storage "$storage" --wait 30s --since "$1" --require-accepted; then
 		return 0
@@ -551,7 +551,7 @@ wait_connected() {
 			if [ -n "$aside" ]; then
 				tell_aside "$aside"
 			else
-				echo "the saved credentials are not set aside: the Supervisor's log says why" >&2
+				echo "the saved credentials are not set aside: if the Supervisor started, its log says why" >&2
 			fi
 			exit "$code"
 		fi

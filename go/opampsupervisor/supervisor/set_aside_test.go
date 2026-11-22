@@ -100,7 +100,16 @@ func TestSetStateAside(t *testing.T) {
 		"not allowed":            {func(t *testing.T, dir string) { askAside(t, dir, me, 0) }, func(r *statusReport) { refuse(r); r.connectFailed(nil, 403, "", true) }, false},
 		"refused, then not":      {func(t *testing.T, dir string) { askAside(t, dir, me, 0) }, func(r *statusReport) { refuse(r); r.connected(nil) }, false},
 		"refused, and once then": {func(t *testing.T, dir string) { askAside(t, dir, me, 0) }, func(r *statusReport) { refuse(r); r.connected(nil); r.connectFailed(nil, 401, "", true) }, false},
-		"refused once":           {func(t *testing.T, dir string) { askAside(t, dir, me, 0) }, func(r *statusReport) { r.connectFailed(nil, 401, "", true) }, false},
+		"refused twice": {func(t *testing.T, dir string) { askAside(t, dir, me, 0) }, func(r *statusReport) {
+			r.connectFailed(nil, 401, "", true)
+			r.connectFailed(nil, 401, "", true)
+		}, false},
+		"refused three times": {func(t *testing.T, dir string) { askAside(t, dir, me, 0) }, func(r *statusReport) {
+			for range 3 {
+				r.connectFailed(nil, 401, "", true)
+			}
+		}, true},
+		"refused once": {func(t *testing.T, dir string) { askAside(t, dir, me, 0) }, func(r *statusReport) { r.connectFailed(nil, 401, "", true) }, false},
 		"another token refused": {func(t *testing.T, dir string) { askAside(t, dir, me, 0) }, func(r *statusReport) {
 			for range 5 {
 				r.connectFailed(nil, 401, "", false)
@@ -210,7 +219,7 @@ func TestStatesSetAsideStay(t *testing.T) {
 	var out bytes.Buffer
 	st.Print(&out, time.Now())
 	for _, path := range st.SetAside {
-		assert.Contains(t, out.String(), "credentials the server refused, in "+path)
+		assert.Contains(t, out.String(), "a saved state, with its credentials, in "+path)
 	}
 }
 

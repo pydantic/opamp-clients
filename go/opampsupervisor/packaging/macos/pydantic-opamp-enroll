@@ -467,7 +467,7 @@ new_aside() {
 # tell_aside says that the saved credentials are set aside in $1, and how to put them back (what is in their
 # place then is set aside instead).
 tell_aside() {
-	echo "the saved credentials the server refused, and the identity kept with them, are set aside in $1, and this host now enrolls as a new one. If the server refused them for a while only, put them back with: sudo sh -c 'launchctl bootout system/$label; n=0; while launchctl print system/$label >/dev/null 2>&1 && [ \$n -lt 30 ]; do sleep 1; n=\$((n+1)); done; launchctl print system/$label >/dev/null 2>&1 || { if [ -e $storage/opamp-state ]; then mv $storage/opamp-state $storage/opamp-state.refused-\$(date -u +%Y%m%dT%H%M%SZ)-\$\$; fi && mv $1 $storage/opamp-state; }; launchctl bootstrap system $plist'" >&2
+	echo "the saved credentials the server refused, and the identity kept with them, are set aside in $1, and this host now enrolls as a new one. If the server refused them for a while only, put them back with: sudo sh -c 'launchctl bootout system/$label; n=0; while launchctl print system/$label >/dev/null 2>&1 && [ \$n -lt 30 ]; do sleep 1; n=\$((n+1)); done; if launchctl print system/$label >/dev/null 2>&1; then echo still stopping, nothing is put back: run this again >&2; else n=$storage/opamp-state.refused-\$(date -u +%Y%m%dT%H%M%SZ)-\$\$; [ -f $1 ] && { [ ! -e $storage/opamp-state ] || mv $storage/opamp-state \$n; } && { mv $1 $storage/opamp-state || mv \$n $storage/opamp-state; }; fi; launchctl bootstrap system $plist'" >&2
 }
 
 # not_accepted fails the install when the Supervisor is connected but the server never answered
@@ -484,12 +484,6 @@ not_accepted() {
 	fi
 }
 
-# wait_connected waits up to 30 seconds for the Supervisor started at $1 (Unix seconds) to connect
-# and the server to answer it (--require-accepted).
-# An install that can't reach its server (an untrusted certificate, a refused key) fails here,
-# with what to check, instead of reporting success; the service keeps retrying.
-# not_saved is whether the state of the host enrolled as a new one isn't saved, a moment after the server took
-# it: a restart would lose it.
 not_saved() {
 	sleep 2
 	[ ! -f "$storage/opamp-state" ] || "$supervisor" status --storage "$storage" --json 2>/dev/null | grep -q '"save_error": "'
@@ -505,6 +499,12 @@ refused_saved() {
 	"$supervisor" status --storage "$storage" --wait 1s --since "$1" --require-accepted --json 2>/dev/null | grep -Eq '"issued_refused": ([3-9]|[1-9][0-9])'
 }
 
+# wait_connected waits up to 30 seconds for the Supervisor started at $1 (Unix seconds) to connect
+# and the server to answer it (--require-accepted).
+# An install that can't reach its server (an untrusted certificate, a refused key) fails here,
+# with what to check, instead of reporting success; the service keeps retrying.
+# not_saved is whether the state of the host enrolled as a new one isn't saved, a moment after the server took
+# it: a restart would lose it.
 wait_connected() {
 	if "$supervisor" status --storage "$storage" --wait 30s --since "$1" --require-accepted; then
 		return 0
@@ -538,7 +538,7 @@ wait_connected() {
 			if [ -n "$aside" ]; then
 				tell_aside "$aside"
 			else
-				echo "the saved credentials are not set aside: the Supervisor's log says why" >&2
+				echo "the saved credentials are not set aside: if the Supervisor started, its log says why" >&2
 			fi
 			exit "$code"
 		fi

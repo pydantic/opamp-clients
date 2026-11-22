@@ -110,8 +110,10 @@ func TestEnrollNamesItsOwnCopy(t *testing.T) {
 	require.NoError(t, os.WriteFile(state+".refused-29991122T000000Z-1", []byte("an older run's, by a clock ahead"), 0o600))
 	require.NoError(t, os.WriteFile(filepath.Join(e.tools, "wait"), []byte(`S=$OPAMP_ENROLL_ROOT/var/lib/pydantic-opamp/opamp-state
 : >"$S.refused-29991122T000001Z-2"
-: >"$S.refused-9\$(touch PWNED)-$PPID"
-[ -L "$S.refused-29991122T000002Z-$PPID" ] || ln -s x "$S.refused-29991122T000002Z-$PPID"
+# By the process ID of the copy, which the directory's owner can read, and sorted before it.
+for f in "$S".refused-20261*; do pid=${f##*-}; done
+: >"$S.refused-0\$(touch PWNED)-$pid"
+[ -L "$S.refused-00000000T000000Z-$pid" ] || ln -s x "$S.refused-00000000T000000Z-$pid"
 `), 0o600))
 	cmd := exec.Command("./pydantic-opamp-enroll", "--endpoint", "wss://opamp.example.com/v1/opamp")
 	cmd.Env = append(os.Environ(), "OPAMP_ENROLL_ROOT="+e.root, "SYSTEMD_CREDS="+e.creds, "SYSTEMCTL="+e.systemctl, "OPAMP_SUPERVISOR="+e.supervisor)
@@ -126,4 +128,5 @@ func TestEnrollNamesItsOwnCopy(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, "sealed", string(kept))
 	assert.NotContains(t, string(out), "PWNED")
+	assert.NotContains(t, string(out), "00000000T000000Z")
 }

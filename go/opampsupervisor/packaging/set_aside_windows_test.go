@@ -120,7 +120,7 @@ func TestWinEnrollSetsAside(t *testing.T) {
 			// The command, run: the old state is back, and what was there is set aside instead.
 			_, command, ok := strings.Cut(strings.NewReplacer("\r", "", "\n", " ").Replace(out), "put them back with: ")
 			require.True(t, ok, out)
-			command, _, _ = strings.Cut(command, " } finally {")
+			command, _, _ = strings.Cut(command, " } finally { Start-Service")
 			command = regexp.MustCompile(`Stop-Service \S+ -ErrorAction Stop; `).ReplaceAllString(command, "") + " } finally { }"
 			b, err = exec.Command("powershell", "-NoProfile", "-NonInteractive", "-Command", command).CombinedOutput()
 			require.NoError(t, err, "%s: %s", command, b)
@@ -133,6 +133,11 @@ func TestWinEnrollSetsAside(t *testing.T) {
 			kept, err = os.ReadFile(aside[0])
 			require.NoError(t, err)
 			assert.Equal(t, "new", string(kept))
+			// Run again: nothing changes.
+			_, _ = exec.Command("powershell", "-NoProfile", "-NonInteractive", "-Command", command).CombinedOutput()
+			kept, err = os.ReadFile(state)
+			require.NoError(t, err)
+			assert.Equal(t, "sealed", string(kept))
 		})
 	}
 }

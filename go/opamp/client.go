@@ -504,11 +504,13 @@ func (c *Client) Endpoint() string {
 
 // UsedIssued is whether the latest OpAMP request or WebSocket connection was made with credentials a server
 // issued (an offer of connection settings), rather than the configured ones: a configured header had another
-// value. It is false before any outcome, and in core mode, as Endpoint.
+// value (those the core sets itself aside). What is issued in other headers alone isn't seen, and with headers
+// an application sets on each request (collector.Config.AuthHeader) it says nothing. It is false before any
+// outcome, and in core mode, as Endpoint.
 func (c *Client) UsedIssued() bool { return c.usedIssued != nil && c.usedIssued.Load() }
 
 // Saves receives when a save of the state has ended, saved or not (several may be one): SaveError says how the
-// last did. The client saves again what isn't saved.
+// last did. The client saves again what isn't saved. For one receiver.
 func (c *Client) Saves() <-chan struct{} { return c.saves }
 
 // SaveError is why the last save of the state failed; "" if it was saved, or none was made.

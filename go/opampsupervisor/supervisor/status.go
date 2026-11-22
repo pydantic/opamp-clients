@@ -53,7 +53,7 @@ type Status struct {
 	// if it is. A host restarted so loses them.
 	SaveError string `json:"save_error,omitempty"`
 	// SetAside are the files of the saved states set aside, the oldest first, as the status is read: the
-	// credentials in them are ones the server refused (set_aside.go).
+	// credentials in them are ones the server refused, or a person set aside for those (set_aside.go).
 	SetAside []string `json:"set_aside,omitempty"`
 }
 
@@ -389,7 +389,7 @@ func (st *Status) Print(w io.Writer, now time.Time) {
 		line("Saved state", "can't be saved, and a restart loses it: %s", st.SaveError)
 	}
 	for _, path := range st.SetAside {
-		line("Set aside", "credentials the server refused, in %s", path)
+		line("Set aside", "a saved state, with its credentials, in %s", path)
 	}
 	switch rc := st.RemoteConfig; {
 	case rc == nil:
