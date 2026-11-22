@@ -26,7 +26,8 @@ import (
 // How long the client is held for, variables for the tests: holdTaken when the server said this
 // host's identity is another installation's, which waiting won't change soon; otherwise, for what
 // may pass, first holdClosed when it ended the connections made with its credentials and holdLost
-// when they were lost, doubling each time to holdTaken.
+// when they were lost, doubling each time to holdTaken. An endpoint it offered that can't be reached is
+// tried again as after a close, with the same credential: no other is taken meanwhile.
 var (
 	holdTaken  = time.Hour
 	holdClosed = time.Minute
@@ -47,6 +48,9 @@ type EnrollmentState struct {
 	// IdentityTaken: the server said this host's identity is bound to another installation.
 	Error         string `json:"error,omitempty"`
 	IdentityTaken bool   `json:"identity_taken,omitempty"`
+	// Unreachable is the host (and port) of the endpoint that the server offered this host a credential
+	// for, if it can't be reached: the credential was never tried.
+	Unreachable string `json:"unreachable,omitempty"`
 	// TokenRefused: the server closes the connection made with the enrollment token unanswered.
 	TokenRefused bool `json:"token_refused,omitempty"`
 	// RetryAt is when the host next tries, if it waits: the server asked it to, or the Supervisor
@@ -77,6 +81,9 @@ func (e *EnrollmentState) print(line func(label, format string, args ...any), in
 	}
 	if e.IdentityTaken {
 		line("", "The server holds this host's identity for another installation (a host it deleted, say): remove this host's data and enroll it again")
+	}
+	if e.Unreachable != "" {
+		line("", "This host must reach %s (its name, a firewall, a proxy, its certificate), where the server told it to connect", e.Unreachable)
 	}
 	if e.TokenRefused {
 		line("", "The enrollment key may be used up, expired or revoked, or the server may not take this host: check both in the server's UI")
@@ -173,7 +180,11 @@ func (c *coreClient) onStanding(cl *collector.Client, st opamp.Standing, quit <-
 	c.report.enrollmentHeld(c.logger, state)
 	c.mu.Unlock()
 
-	c.logger.Error("The OpAMP server doesn't take this host with the credentials it offers it: not trying again for now",
+	msg := "The OpAMP server doesn't take this host with the credentials it offers it: not trying again for now"
+	if state.Unreachable != "" {
+		msg = "The endpoint the OpAMP server offers this host a credential for can't be reached: not trying again for now"
+	}
+	c.logger.Error(msg,
 		zap.Int("credentials_offered", state.Offers), zap.String("reason", state.Error), zap.Time("retry_at", state.RetryAt))
 	go c.hold(cl, wait, quit)
 	return true
@@ -193,6 +204,10 @@ func enrollmentOf(st opamp.Standing, offeredBefore int) EnrollmentState {
 		if st.IdentityTaken {
 			state.Error = "the server says this host's identity is already bound to another installation: " + st.ClaimError
 		}
+	}
+	if st.Unreached != "" {
+		state.Unreachable = st.Unreached
+		state.Error = fmt.Sprintf("the server offers the credential for %s, which can't be reached: %s", st.Unreached, st.ClaimError)
 	}
 	if st.Refused != "" && state.Error == "" {
 		state.TokenRefused = true
@@ -218,6 +233,8 @@ func holdFor(st opamp.Standing, holds int, now time.Time) time.Duration {
 	switch {
 	case st.Accepted, st.RetryAt.After(now): // the core waits, as the server asked
 		return 0
+	case st.Unreached != "":
+		return backedOff(holdClosed, holds)
 	case !st.OfferedAgain && st.Rounds < roundsUnserved && (st.Offers < 2 || st.FailedClaims < 2):
 		return 0
 	case st.IdentityTaken:
@@ -304,6 +321,10 @@ func (r *statusReport) noEnrollment(logger *zap.Logger) {
 func (r *statusReport) enrollmentHeld(logger *zap.Logger, e EnrollmentState) {
 	r.enrollment(logger, e)
 	r.update(logger, func(st *Status, now time.Time) {
-		st.Server = &ServerStatus{Since: now, Error: "not connecting for now: the server doesn't take this host (enrollment)"}
+		why := "the server doesn't take this host"
+		if e.Unreachable != "" {
+			why = "the endpoint the server offers can't be reached"
+		}
+		st.Server = &ServerStatus{Since: now, Error: "not connecting for now: " + why + " (enrollment)"}
 	})
 }

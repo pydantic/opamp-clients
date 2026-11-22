@@ -74,7 +74,8 @@ and date. Tests, CI and docs alone don't need a line.
   status says it now, and the same refusal is logged at error once, then at debug (#150).
 - Go: `Client.Standing()` and `Client.StandingChanged()`: in platform mode, whether the server took
   the agent, the credentials it offered it and why none is in use, and its last error response and
-  wait. It tells a server that took the agent from one that took the connection and closed it
+  wait. `Config.KeepUnreached` keeps an agent on an offered credential whose endpoint couldn't be
+  reached. It tells a server that took the agent from one that took the connection and closed it
   unanswered, or that only offers credentials it then refuses (#159).
 - Supervisor: `opampsupervisor status` says how the enrollment of a host the server doesn't take
   goes (`enrollment` in `--json`): the credentials offered, why none is in use, and when the host
@@ -131,7 +132,9 @@ and date. Tests, CI and docs alone don't need a line.
   16), and read as accepted; `pydantic-opamp-enroll` said "Enrolled" and exited 0. A host is
   accepted once the server has answered it on the credential it issued. One the server doesn't
   take stops trying: for an hour if its identity is bound to another installation, else for a
-  minute (5 seconds after a lost connection), doubling to an hour. A host the server took and then
+  minute (5 seconds after a lost connection), doubling to an hour. One whose offered endpoint can't
+  be reached keeps that credential and tries it again, in a minute and then less often, and takes no
+  other (it took 16 in under 40 seconds); the status and the helper name the endpoint's host. A host the server took and then
   closed for policy isn't accepted any more, and one whose enrollment key is used up or revoked
   isn't well (`status` exits 1). The status says why, `--wait --require-accepted` has the host
   accepted and connected for 3 seconds (every enrollment takes that much longer), and

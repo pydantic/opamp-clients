@@ -519,6 +519,11 @@ not_accepted() {
 		echo "not enrolled: the server at $endpoint holds this host's identity for another installation (a host it deleted, say). $taken; check with: sudo $supervisor status --storage $storage" >&2
 		fail_wait
 	fi
+	host=$(printf '%s\n' "$st" | sed -n 's/.*"unreachable": "\([^"]*\)".*/\1/p')
+	if [ -n "$host" ]; then
+		echo "not enrolled: the server at $endpoint tells this host to connect to $host, which can't be reached from here (its name, a firewall, a proxy or its certificate). Once it can, the host enrolls by itself, or at once after a restart of the Supervisor; when it tries again is above; check with: sudo $supervisor status --storage $storage" >&2
+		fail_wait
+	fi
 	if printf '%s\n' "$st" | grep -q '"enrollment": {' && ! printf '%s\n' "$st" | grep -q '"token_refused": true'; then
 		echo "not enrolled: the server at $endpoint answered this host and hasn't taken it. Why, how many credentials it offered, and when the host tries again are above; check with: sudo $supervisor status --storage $storage" >&2
 		fail_wait

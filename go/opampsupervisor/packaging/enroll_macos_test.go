@@ -268,6 +268,13 @@ func TestMacEnrollWaitsForTheConnection(t *testing.T) {
 	assert.Contains(t, out, "not enrolled: the server at wss://opamp.example.com/v1/opamp answered this host and hasn't taken it")
 	assert.NotContains(t, out, "--purge")
 	assert.NotContains(t, out, "keeps retrying")
+	// It offered one for an endpoint that can't be reached.
+	require.NoError(t, os.WriteFile(filepath.Join(tools, "json"), []byte(strings.Replace(notTakenJSON, "\"identity_taken\": true", "\"unreachable\": \"other.example.com:8443\"", 1)), 0o600))
+	out, err = macEnroll(t, root, tools, "t", "--endpoint", "wss://opamp.example.com/v1/opamp")
+	require.Error(t, err)
+	assert.Contains(t, out, "not enrolled: the server at wss://opamp.example.com/v1/opamp tells this host to connect to other.example.com:8443, which can't be reached from here")
+	assert.NotContains(t, out, "--purge")
+	assert.NotContains(t, out, "hasn't taken it")
 	require.NoError(t, os.Remove(filepath.Join(tools, "json")))
 
 	// Not running, or running but started again since the bootstrap (caught between crashes).

@@ -233,7 +233,10 @@ agent:
   saved credential first: in an hour if the server said the host's identity is already bound to
   another installation (a Close of 1008 with that reason, matched to the letter: it needs a server
   that keeps the text); else, since servers close with 1008 for what passes too, in a minute, or 5
-  seconds when the connection was lost, doubling to an hour. A host the server serves (it answers its
+  seconds when the connection was lost, doubling to an hour. One whose offered endpoint can't be
+  reached (its name doesn't resolve, say) keeps the credential it was offered, takes no other, and
+  tries it again in a minute, doubling to an hour (go/opamp's `KeepUnreached`); a restart of the
+  Supervisor tries it at once, and may take one more. A host the server serves (it answers its
   token's connection with more than offers), or that is on a credential it issued before, isn't
   stopped. The Collector runs on meanwhile; a custom message
   for the server is dropped. A restart of the Supervisor tries at once. A server's "come back later"

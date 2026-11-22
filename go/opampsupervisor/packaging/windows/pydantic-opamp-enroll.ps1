@@ -470,6 +470,9 @@ if ($NoStart) {
                 else { "Remove this host's data (pydantic-opamp-uninstall.ps1 -Purge), then enroll it again with a new token" }
             Fail "not enrolled: the server at $Endpoint holds this host's identity for another installation (a host it deleted, say). $taken; check with: & '$supervisor' status --storage '$storage'"
         }
+        if ($st -and $st.enrollment -and $st.enrollment.unreachable) {
+            Fail "not enrolled: the server at $Endpoint tells this host to connect to $($st.enrollment.unreachable), which can't be reached from here (its name, a firewall, a proxy or its certificate). Once it can, the host enrolls by itself, or at once after a restart of the Supervisor; when it tries again is above; check with: & '$supervisor' status --storage '$storage'"
+        }
         if ($st -and $st.enrollment -and -not $st.enrollment.token_refused) {
             Fail "not enrolled: the server at $Endpoint answered this host and hasn't taken it. Why, how many credentials it offered, and when the host tries again are above; check with: & '$supervisor' status --storage '$storage'"
         }

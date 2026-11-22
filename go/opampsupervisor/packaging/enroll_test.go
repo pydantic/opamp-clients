@@ -549,6 +549,13 @@ func TestEnrollWaitsForTheConnection(t *testing.T) {
 	assert.Contains(t, out, "not enrolled: the server at wss://opamp.example.com/v1/opamp answered this host and hasn't taken it")
 	assert.NotContains(t, out, "--purge")
 	assert.NotContains(t, out, "keeps retrying")
+	// It offered one for an endpoint that can't be reached.
+	require.NoError(t, os.WriteFile(filepath.Join(e.tools, "json"), []byte(strings.Replace(notTakenJSON, "\"identity_taken\": true", "\"unreachable\": \"other.example.com:8443\"", 1)), 0o600))
+	out, err = e.run(t, "bootstrap-token", "--endpoint", "wss://opamp.example.com/v1/opamp")
+	require.Error(t, err)
+	assert.Contains(t, out, "not enrolled: the server at wss://opamp.example.com/v1/opamp tells this host to connect to other.example.com:8443, which can't be reached from here")
+	assert.NotContains(t, out, "--purge")
+	assert.NotContains(t, out, "hasn't taken it")
 	require.NoError(t, os.Remove(filepath.Join(e.tools, "json")))
 
 	// Enrolled again with the same token after the server revoked the host's own credentials (it

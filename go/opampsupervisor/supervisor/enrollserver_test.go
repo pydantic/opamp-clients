@@ -4,6 +4,7 @@
 package supervisor
 
 import (
+	"cmp"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -33,6 +34,8 @@ type enrollServer struct {
 	retryAfter  time.Duration
 	// refuseToken, if set, is the reason the token's connection is closed for, unanswered.
 	refuseToken string
+	// dest, if set, is the endpoint the offers are for, instead of the server's own.
+	dest string
 	// serveToken: the token is answered as any credential, with no offer.
 	serveToken bool
 
@@ -130,7 +133,7 @@ func (s *enrollServer) answer(token bool, m *protobufs.AgentToServer) (*protobuf
 	s.offers++
 	out.ConnectionSettings = &protobufs.ConnectionSettingsOffers{
 		Hash: []byte(fmt.Sprintf("offer-%d", s.offers)),
-		Opamp: &protobufs.OpAMPConnectionSettings{DestinationEndpoint: s.url(),
+		Opamp: &protobufs.OpAMPConnectionSettings{DestinationEndpoint: cmp.Or(s.dest, s.url()),
 			Headers: &protobufs.Headers{Headers: []*protobufs.Header{{Key: "Authorization", Value: fmt.Sprintf("Bearer key-%d", s.offers)}}}},
 	}
 	return out, websocket.CloseNormalClosure, ""

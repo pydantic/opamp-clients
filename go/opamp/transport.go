@@ -15,6 +15,7 @@ import (
 	"io"
 	"math"
 	"net/http"
+	"net/http/httptrace"
 	"net/url"
 	"os"
 	"path/filepath"
@@ -568,10 +569,20 @@ func (x *executor) post(ctx context.Context, r *corepb.HttpRequest) *corepb.Inpu
 	}
 	req.Header = toHTTP(r.Headers)
 	via := x.standing.on(false, r.Url, req.Header.Clone())
-	resp, err := x.conn.http.RoundTrip(req)
+	if via.heldBack() {
+		<-asked.Done()
+		return fail(errHeldBack)
+	}
+	connected := false
+	resp, err := x.conn.http.RoundTrip(req.WithContext(httptrace.WithClientTrace(ctx, &httptrace.ClientTrace{
+		GotConn: func(httptrace.GotConnInfo) { connected = true }})))
 	if err != nil {
-		if asked.Err() == nil {
+		switch {
+		case asked.Err() != nil:
+		case connected:
 			via.lost(err.Error())
+		default:
+			via.failedToConnect(err.Error())
 		}
 		return fail(err)
 	}
@@ -596,11 +607,20 @@ func (x *executor) post(ctx context.Context, r *corepb.HttpRequest) *corepb.Inpu
 		Id: r.Id, Status: uint32(resp.StatusCode), Headers: fromHTTP(resp.Header), Body: body, UnixMs: unixMs()}}}
 }
 
+// errHeldBack: a connection that isn't made (Config.KeepUnreached).
+var errHeldBack = errors.New("not made: the credential the server offered was never tried")
+
 // connect opens connection e, then carries out its sends and close until it ends. A cancel, at
 // any point, drops it: the dial is aborted, or the connection closed without a word.
 func (x *executor) connect(e *effect, o *corepb.WsOpen) {
 	header := toHTTP(o.Headers)
 	via := x.standing.on(true, o.Url, header.Clone())
+	if via.heldBack() {
+		<-e.ctx.Done()
+		x.emit(report{e: e, in: &corepb.Input{Kind: &corepb.Input_WsFailed{WsFailed: &corepb.WsFailed{
+			Id: o.Id, Detail: errHeldBack.Error(), UnixMs: unixMs()}}}, last: true})
+		return
+	}
 	conn, resp, err := x.conn.dialWebSocket(e.ctx, o.Url, header)
 	x.tried(o.Url, o.Headers)
 	if err != nil {
@@ -608,7 +628,7 @@ func (x *executor) connect(e *effect, o *corepb.WsOpen) {
 		case resp != nil:
 			via.status(resp.StatusCode, resp.Header)
 		case e.ctx.Err() == nil:
-			via.lost(err.Error())
+			via.failedToConnect(err.Error())
 		}
 		f := &corepb.WsFailed{Id: o.Id, Detail: lossy(err.Error()), UnixMs: unixMs()}
 		if resp != nil {

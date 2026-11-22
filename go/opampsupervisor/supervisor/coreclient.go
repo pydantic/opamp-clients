@@ -152,6 +152,8 @@ func (c *coreClient) openLocked(ctx context.Context, settings types.StartSetting
 			StateSealer: c.sealer,
 			// The capability is the switch: the core declares it, and the status bit, itself.
 			AcceptConnectionSettings: caps&protobufs.AgentCapabilities_AgentCapabilities_AcceptsOpAMPConnectionSettings != 0,
+			KeepUnreached:            true,
+			KeepUnreachedSaved:       c.enroll.holds > 0,
 		},
 		AuthHeader:     auth,
 		AcceptPackages: caps&protobufs.AgentCapabilities_AgentCapabilities_AcceptsPackages != 0 && c.installPackage != nil,

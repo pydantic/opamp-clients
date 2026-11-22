@@ -61,6 +61,9 @@ type Standing struct {
 	FailedClaims  int
 	// OfferedAgain: there was a round since ClaimError.
 	OfferedAgain bool
+	// Unreached is the host (and port) of the endpoint that the server offered a credential for and that
+	// couldn't be reached, once the agent makes no further connection for it (Config.KeepUnreached).
+	Unreached string
 	// Refused is how the server last closed, unanswered, a connection made with the configured
 	// credential (one it doesn't take, say): until it answers, or keeps a connection open.
 	Refused string
@@ -102,6 +105,10 @@ type standing struct {
 	offers      []offered
 	// taken is the credential the server last took the agent on.
 	taken digest
+	// keepUnreached and keepSaved are Config's, set before the client starts; unreached is the host of the
+	// last try with a credential the server issued, if it made no connection.
+	keepUnreached, keepSaved bool
+	unreached                string
 }
 
 // offered is an offer the server made: where to, and the headers (a digest of each value, so the
@@ -275,6 +282,7 @@ func (a *attempt) message(m *protobufs.ServerToAgent) {
 	a.s.mu.Lock()
 	defer a.s.mu.Unlock()
 	a.answered = true
+	a.reached()
 	o, isOffer := a.offer(m)
 	fresh := isOffer && a.s.keep(o)
 	a.offered = isOffer && !a.issued
@@ -370,6 +378,7 @@ func (a *attempt) unavailable(what string, wait time.Duration) {
 	a.s.mu.Lock()
 	defer a.s.mu.Unlock()
 	a.answered = true
+	a.reached()
 	a.s.set(func(st *Standing) {
 		st.Error, st.RetryAt, st.Refused = what, time.Time{}, ""
 		if wait > 0 {
@@ -381,6 +390,11 @@ func (a *attempt) unavailable(what string, wait time.Duration) {
 // status: the server's HTTP answer to the attempt wasn't an OpAMP message (a WebSocket upgrade
 // refused, say).
 func (a *attempt) status(code int, h http.Header) {
+	if a != nil {
+		a.s.mu.Lock()
+		a.reached()
+		a.s.mu.Unlock()
+	}
 	switch {
 	case a == nil || code == http.StatusServiceUnavailable || a.ws && code == http.StatusTooManyRequests:
 		// The connection reads failed, and will pass.
@@ -409,6 +423,9 @@ func (a *attempt) opened() (ended func()) {
 	if a == nil {
 		return func() {}
 	}
+	a.s.mu.Lock()
+	a.reached()
+	a.s.mu.Unlock()
 	t := time.AfterFunc(openFor, func() {
 		a.s.mu.Lock()
 		defer a.s.mu.Unlock()
@@ -463,6 +480,46 @@ func (a *attempt) closed(code int, reason string) {
 
 // lost: the attempt failed, or its connection did.
 func (a *attempt) lost(detail string) { a.ended(false, printable(detail)) }
+
+// reached: the attempt made a connection. With s.mu held.
+func (a *attempt) reached() {
+	if a.issued {
+		a.s.unreached = ""
+	}
+}
+
+// failedToConnect: the attempt made no connection.
+func (a *attempt) failedToConnect(detail string) {
+	if a == nil {
+		return
+	}
+	if a.issued {
+		host := a.url
+		if u, err := url.Parse(a.url); err == nil {
+			host = u.Host
+		}
+		a.s.mu.Lock()
+		a.s.unreached = printable(host)
+		a.s.mu.Unlock()
+	}
+	a.lost(detail)
+}
+
+// heldBack is whether the attempt, with the configured credential, is not to be made (Config.KeepUnreached):
+// the server would offer another, and the last was never tried.
+func (a *attempt) heldBack() bool {
+	if a == nil {
+		return false
+	}
+	s := a.s
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if a.issued || !s.keepUnreached || s.unreached == "" || s.st.Accepted || s.st.Rounds == 0 && !s.keepSaved {
+		return false
+	}
+	s.set(func(st *Standing) { st.Unreached = s.unreached })
+	return true
+}
 
 // ended: the attempt is over, by the server's word (closed) or not.
 func (a *attempt) ended(closed bool, detail string) {
