@@ -48,6 +48,9 @@ type Status struct {
 	// OwnTelemetry is what became of the server's last own telemetry settings: nil before it sent
 	// any.
 	OwnTelemetry *OwnTelemetryState `json:"own_telemetry,omitempty"`
+	// SetAside are the files of the saved states set aside, the oldest first: the credentials in them
+	// are ones the server refused before the host enrolled again (set_aside.go).
+	SetAside []string `json:"set_aside,omitempty"`
 }
 
 // OwnTelemetryState is the outcome of the server's last own telemetry settings (where the
@@ -138,6 +141,7 @@ func (r *statusReport) update(logger *zap.Logger, change func(*Status, time.Time
 func (r *statusReport) started(logger *zap.Logger, endpoint string, uid [16]byte) {
 	r.update(logger, func(st *Status, _ time.Time) {
 		st.Endpoint, st.InstanceUID, st.Stopped = endpoint, uuid.UUID(uid).String(), false
+		st.SetAside = statesSetAside(filepath.Dir(r.path))
 	})
 }
 
@@ -365,6 +369,9 @@ func (st *Status) Print(w io.Writer, now time.Time) {
 		line("Own telemetry", "%s since %s: %s", ot.Status, ago(ot.Since), ot.Error)
 	default:
 		line("Own telemetry", "%s since %s", ot.Status, ago(ot.Since))
+	}
+	for _, path := range st.SetAside {
+		line("Set aside", "credentials the server refused before this host enrolled again, in %s", path)
 	}
 	switch rc := st.RemoteConfig; {
 	case rc == nil:

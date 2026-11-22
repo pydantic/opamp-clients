@@ -35,7 +35,9 @@ echo "$@" >>"`+filepath.Join(tools, "launchctl.log")+`"
 loaded="`+filepath.Join(tools, "loaded")+`"
 case $1 in
 bootout) rm -f "$loaded" ;;
-bootstrap) : >"$loaded" ;;
+bootstrap)
+	: >"$loaded"
+	`+fakeSetAside(tools)+` ;;
 print)
 	# With LAUNCHCTL_STOPPING naming a file, launchd still holds the label (stopping) for that many prints.
 	left=$(cat "${LAUNCHCTL_STOPPING:-/dev/null}" 2>/dev/null)
@@ -131,7 +133,8 @@ func TestMacEnrollWaitsForTheConnection(t *testing.T) {
 	assert.NotContains(t, out, "running and connected")
 
 	// Enrolled again with the same token after the server revoked the host's own credentials: the
-	// saved state goes, and the daemon starts again from the token, once.
+	// Supervisor is asked to set the saved state aside as it starts again, once, and the command that puts
+	// it back is said.
 	state := filepath.Join(root, "opt/pydantic-opamp/var/opamp-state")
 	require.NoError(t, os.MkdirAll(filepath.Dir(state), 0o700))
 	require.NoError(t, os.WriteFile(state, []byte("sealed"), 0o600))
@@ -139,11 +142,13 @@ func TestMacEnrollWaitsForTheConnection(t *testing.T) {
 	out, err = macEnroll(t, root, tools, "t", "--endpoint", "wss://opamp.example.com/v1/opamp")
 	require.Error(t, err, "the fake status still fails after the second start")
 	assert.Equal(t, 1, strings.Count(out, "the server refused this host's saved credentials"))
-	assert.Contains(t, out, "put the saved credentials back")
-	kept, err := os.ReadFile(state)
+	aside, err := filepath.Glob(state + ".refused-*")
+	require.NoError(t, err)
+	require.Len(t, aside, 1)
+	kept, err := os.ReadFile(aside[0])
 	require.NoError(t, err)
 	assert.Equal(t, "sealed", string(kept))
-	assert.NoFileExists(t, filepath.Join(root, "opt/pydantic-opamp/etc/opamp-state.refused"))
+	assert.Contains(t, out, "sudo sh -c 'launchctl bootout system/dev.pydantic.opamp-supervisor; while launchctl print system/dev.pydantic.opamp-supervisor >/dev/null 2>&1; do sleep 1; done; mv -f "+aside[0]+" "+state+"; launchctl bootstrap system /Library/LaunchDaemons/dev.pydantic.opamp-supervisor.plist'")
 	require.NoError(t, os.Remove(filepath.Join(tools, "json")))
 
 	// Connected, and the server never answered: the token was refused.

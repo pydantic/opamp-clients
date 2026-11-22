@@ -40,22 +40,29 @@ case $1 in
 is-active) [ -e "`+filepath.Join(dir, "inactive")+`" ] && exit 3 ;;
 show) cat "$restarts" 2>/dev/null ;;
 restart)
+	[ ! -e "`+filepath.Join(dir, "fail-start")+`" ] || [ ! -d "$(echo "$OPAMP_ENROLL_ROOT"/var/lib/pydantic-opamp/opamp-state.set-aside-*)" ] || exit 1
+	`+fakeSetAside(dir)+`
 	crashes=$(cat "`+filepath.Join(dir, "crashes")+`" 2>/dev/null) || exit 0
 	echo $(($(cat "$restarts" 2>/dev/null || echo 0) + crashes)) >"$restarts" ;;
-stop)
-	# dir/fail-stop: the second stop fails.
-	if [ -e "`+filepath.Join(dir, "fail-stop")+`" ]; then
-		[ ! -e "`+filepath.Join(dir, "stopped")+`" ] || exit 1
-		: >"`+filepath.Join(dir, "stopped")+`"
-	fi ;;
-start)
-	[ ! -e "`+filepath.Join(dir, "fail-start")+`" ] || exit 1
-	: >"`+filepath.Join(dir, "started")+`"
-	[ -e "`+filepath.Join(dir, "heal")+`" ] && rm -f "`+filepath.Join(dir, "status")+`" "`+filepath.Join(dir, "json")+`" ;;
 esac
 exit 0
 `), 0o755))
 	return creds, systemctl
+}
+
+// fakeSetAside is what the Supervisor does when asked, as it starts (supervisor/set_aside.go), and, with
+// dir/heal, the server taking the host then.
+func fakeSetAside(dir string) string {
+	return `S=$OPAMP_ENROLL_ROOT/var/lib/pydantic-opamp
+	[ -d "$S" ] || S=$OPAMP_ENROLL_ROOT/opt/pydantic-opamp/var
+	for request in "$S"/opamp-state.set-aside-*; do
+		rmdir "$request" 2>/dev/null || continue
+		echo asked >>"` + filepath.Join(dir, "asked.log") + `"
+		[ -e "$S/opamp-state" ] || continue
+		mv "$S/opamp-state" "$S/opamp-state.refused-2026112$(wc -l <"` + filepath.Join(dir, "asked.log") + `" | tr -d ' ')T000000Z-${request##*-}"
+		echo new >"$S/opamp-state"
+		if [ -e "` + filepath.Join(dir, "heal") + `" ]; then rm -f "` + filepath.Join(dir, "status") + `" "` + filepath.Join(dir, "json") + `"; fi
+	done`
 }
 
 // fakeSupervisor stands in for `opampsupervisor status`: it logs its arguments to
@@ -72,8 +79,8 @@ case " $* " in *" --json "*)
 	exit "$code" ;;
 esac
 echo "$@" >>"`+filepath.Join(dir, "supervisor.log")+`"
-# dir/fail-term: the second wait is cut short.
-if [ -e "`+filepath.Join(dir, "fail-term")+`" ] && [ -e "`+filepath.Join(dir, "started")+`" ]; then kill -TERM "$PPID"; sleep 1; fi
+# dir/wait: what happens in the wait after the state was set aside.
+[ ! -e "`+filepath.Join(dir, "asked.log")+`" ] || [ ! -e "`+filepath.Join(dir, "wait")+`" ] || . "`+filepath.Join(dir, "wait")+`"
 [ "$code" = 0 ] || echo "OpAMP server   can't reach it: this host doesn't trust the server's certificate"
 exit "$code"
 `), 0o755))
@@ -507,23 +514,25 @@ func TestEnrollWaitsForTheConnection(t *testing.T) {
 	require.NoError(t, os.Remove(filepath.Join(e.tools, "json")))
 
 	// Enrolled again with the same token after the server revoked the host's own credentials (it
-	// deleted the host): the saved state goes, and the Supervisor starts again from the token, once.
+	// deleted the host): the Supervisor is asked to set the saved state aside as it starts again, once.
 	state := filepath.Join(e.root, "var/lib/pydantic-opamp/opamp-state")
+	aside := func() []string {
+		found, err := filepath.Glob(state + ".refused-*")
+		require.NoError(t, err)
+		return found
+	}
 	require.NoError(t, os.MkdirAll(filepath.Dir(state), 0o700))
 	require.NoError(t, os.WriteFile(state, []byte("sealed"), 0o600))
 	require.NoError(t, os.WriteFile(filepath.Join(e.tools, "json"), []byte(revokedJSON), 0o600))
 	require.NoError(t, os.WriteFile(filepath.Join(e.tools, "heal"), nil, 0o600))
-	require.NoError(t, os.Remove(filepath.Join(e.tools, "systemctl.log")))
 	out, err = e.run(t, "bootstrap-token", "--endpoint", "wss://opamp.example.com/v1/opamp")
 	require.NoError(t, err, out)
 	assert.Contains(t, out, "the server refused this host's saved credentials")
 	assert.Contains(t, out, "The Supervisor is running and connected")
-	assert.NoFileExists(t, state)
-	systemctlLog, err := os.ReadFile(filepath.Join(e.tools, "systemctl.log"))
+	require.Len(t, aside(), 1)
+	kept, err := os.ReadFile(aside()[0])
 	require.NoError(t, err)
-	assert.Contains(t, string(systemctlLog), "stop pydantic-opamp-supervisor.service\n")
-	aside := filepath.Join(e.root, "etc/pydantic-opamp/opamp-state.refused")
-	assert.NoFileExists(t, aside, "the credentials set aside go once it is enrolled")
+	assert.Equal(t, "sealed", string(kept))
 	// A 403 (a missing permission, say) is not a revoked credential: the state stays.
 	require.NoError(t, os.WriteFile(state, []byte("sealed"), 0o600))
 	require.NoError(t, os.WriteFile(filepath.Join(e.tools, "json"), []byte(strings.ReplaceAll(revokedJSON, "401", "403")), 0o600))
@@ -532,76 +541,47 @@ func TestEnrollWaitsForTheConnection(t *testing.T) {
 	require.Error(t, err)
 	assert.NotContains(t, out, "the server refused this host's saved credentials")
 	assert.FileExists(t, state)
-	require.NoError(t, os.Remove(filepath.Join(e.tools, "status")))
+	require.Len(t, aside(), 1)
 
-	// Refused again after that: no second try, what to check, and the credentials and identity are
-	// put back (a server that refused them for a while only, or a wrong token), the Supervisor
-	// started with them.
-	require.NoError(t, os.Remove(filepath.Join(e.tools, "systemctl.log")))
+	// Refused again after that: no second try, where the credentials are, and the command that puts them
+	// back.
 	require.NoError(t, os.Remove(filepath.Join(e.tools, "heal")))
-	require.NoError(t, os.WriteFile(state, []byte("sealed"), 0o600))
 	require.NoError(t, os.WriteFile(filepath.Join(e.tools, "json"), []byte(revokedJSON), 0o600))
-	require.NoError(t, os.WriteFile(filepath.Join(e.tools, "status"), []byte("1"), 0o600))
 	out, err = e.run(t, "bootstrap-token", "--endpoint", "wss://opamp.example.com/v1/opamp")
 	require.Error(t, err)
-	assert.Contains(t, out, "the server refused this host's saved credentials")
 	assert.Equal(t, 1, strings.Count(out, "the server refused this host's saved credentials"))
-	assert.Contains(t, out, "put the saved credentials back")
-	kept, err := os.ReadFile(state)
-	require.NoError(t, err)
-	assert.Equal(t, "sealed", string(kept))
-	assert.NoFileExists(t, aside)
-	systemctlLog, err = os.ReadFile(filepath.Join(e.tools, "systemctl.log"))
-	require.NoError(t, err)
-	assert.Regexp(t, `(?s)stop pydantic-opamp-supervisor.*start pydantic-opamp-supervisor.*stop pydantic-opamp-supervisor.*start pydantic-opamp-supervisor`, string(systemctlLog))
+	require.Len(t, aside(), 2)
+	assert.Contains(t, out, "are set aside in "+aside()[1])
+	assert.Contains(t, out, "sudo sh -c 'systemctl stop pydantic-opamp-supervisor.service && mv -fT "+aside()[1]+" "+state+"; systemctl start pydantic-opamp-supervisor.service'")
 
-	// Put back too when the new try is cut short: the start, or the stop after it, fails, or the run is
-	// stopped. And a copy a run cut short left aside is what is put back, never replaced.
-	for _, how := range []string{"start", "stop", "term"} {
-		require.NoError(t, os.WriteFile(state, []byte("sealed"), 0o600))
-		require.NoError(t, os.WriteFile(filepath.Join(e.tools, "fail-"+how), nil, 0o600))
-		_ = os.Remove(filepath.Join(e.tools, "started"))
-		out, err = e.run(t, "bootstrap-token", "--endpoint", "wss://opamp.example.com/v1/opamp")
-		require.Error(t, err, how)
-		kept, err = os.ReadFile(state)
-		require.NoError(t, err, "%s: %s", how, out)
-		assert.Equal(t, "sealed", string(kept), how)
-		assert.NoFileExists(t, aside, how)
-		require.NoError(t, os.Remove(filepath.Join(e.tools, "fail-"+how)))
-	}
-	require.NoError(t, os.WriteFile(aside, []byte("older"), 0o600))
+	// The new try's start fails: said so.
+	require.NoError(t, os.WriteFile(filepath.Join(e.tools, "fail-start"), nil, 0o600))
+	require.NoError(t, os.WriteFile(filepath.Join(e.tools, "inactive"), nil, 0o600))
 	out, err = e.run(t, "bootstrap-token", "--endpoint", "wss://opamp.example.com/v1/opamp")
 	require.Error(t, err)
-	kept, err = os.ReadFile(state)
+	assert.Contains(t, out, "failed to start")
+	assert.NotContains(t, out, "are set aside in")
+	require.Len(t, aside(), 2)
+	requests, err := filepath.Glob(state + ".set-aside-*")
 	require.NoError(t, err)
-	assert.Equal(t, "older", string(kept))
-	require.NoError(t, os.Remove(state))
-	require.NoError(t, os.WriteFile(aside, []byte("older"), 0o600))
-	out, err = e.run(t, "bootstrap-token", "--endpoint", "wss://opamp.example.com/v1/opamp")
+	assert.Empty(t, requests)
+	require.NoError(t, os.Remove(filepath.Join(e.tools, "fail-start")))
+	require.NoError(t, os.Remove(filepath.Join(e.tools, "inactive")))
+
+	// --refresh (a package upgrade) never asks, nor does a run with something else in the state's place.
+	out, err = e.run(t, "", "--refresh")
 	require.Error(t, err)
-	kept, err = os.ReadFile(state)
-	require.NoError(t, err, out)
-	assert.Equal(t, "older", string(kept), "left aside with nothing in its place: put back first")
-	// Enrolled, one left aside by an earlier run goes.
-	require.NoError(t, os.Remove(filepath.Join(e.tools, "status")))
-	require.NoError(t, os.WriteFile(aside, []byte("older"), 0o600))
-	out, err = e.run(t, "bootstrap-token", "--endpoint", "wss://opamp.example.com/v1/opamp")
-	require.NoError(t, err, out)
-	assert.NoFileExists(t, aside)
-	assert.FileExists(t, state)
-	require.NoError(t, os.WriteFile(filepath.Join(e.tools, "status"), []byte("1"), 0o600))
-	// Something else in its place isn't moved, or written into.
+	assert.NotContains(t, out, "the server refused this host's saved credentials")
 	for _, plant := range []func() error{func() error { return os.Mkdir(state, 0o700) }, func() error { return os.Symlink(t.TempDir(), state) }} {
 		require.NoError(t, os.Remove(state))
 		require.NoError(t, plant())
 		out, err = e.run(t, "bootstrap-token", "--endpoint", "wss://opamp.example.com/v1/opamp")
 		require.Error(t, err)
 		assert.NotContains(t, out, "the server refused this host's saved credentials")
-		assert.NoFileExists(t, aside)
 	}
 	require.NoError(t, os.Remove(state))
+	require.Len(t, aside(), 2)
 	require.NoError(t, os.Remove(filepath.Join(e.tools, "json")))
-	require.NoError(t, os.WriteFile(filepath.Join(e.tools, "status"), []byte("1"), 0o600))
 
 	// A service that failed to start (an unreadable credential, say) never tried to connect: the
 	// install says so and where its log is, not that it keeps retrying.
