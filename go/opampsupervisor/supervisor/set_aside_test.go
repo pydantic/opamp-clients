@@ -164,6 +164,18 @@ func TestAReusedProcessIDIsNotTheHelper(t *testing.T) {
 	} else {
 		assert.False(t, sameProcess(os.Getpid(), "", time.Now().Add(-24*time.Hour)))
 	}
+	if runtime.GOOS == "darwin" {
+		// A request from before its process started isn't that process's.
+		later := exec.Command("sleep", "60")
+		require.NoError(t, later.Start())
+		defer func() { _ = later.Process.Kill(); _ = later.Wait() }()
+		dir := t.TempDir()
+		require.NoError(t, os.WriteFile(filepath.Join(dir, coreClientStateFile), []byte("state"), 0o600))
+		refusedLast(t, dir)
+		askAside(t, dir, later.Process.Pid, time.Minute)
+		setStateAside(zaptest.NewLogger(t), dir, time.Now())
+		assert.Empty(t, statesSetAside(dir))
+	}
 	if runtime.GOOS != "windows" {
 		self, err := os.Executable()
 		require.NoError(t, err)
