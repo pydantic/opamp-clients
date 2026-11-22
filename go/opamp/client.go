@@ -263,6 +263,8 @@ type Client struct {
 	loopG atomic.Uint64
 	// used is where the latest OpAMP request or connection went (the executor's).
 	used *atomic.Pointer[string]
+	// usedIssued is whether it was made with headers other than the configured ones (the executor's).
+	usedIssued *atomic.Bool
 	// answered is the executor's, in platform mode; nil in core mode.
 	answered <-chan struct{}
 }
@@ -434,6 +436,8 @@ func (o *Opened) start(status Status, first []*corepb.Input, notify func(*Client
 	queue = append(queue, report{in: &corepb.Input{Kind: &corepb.Input_Start{Start: &corepb.Empty{}}}})
 	x := newExecutor(o.conn)
 	cl.used = &x.used
+	cl.usedIssued = &x.usedIssued
+	x.configure(cfg.Header)
 	if !o.coreMode {
 		cl.answered = x.answered
 	}
@@ -493,6 +497,11 @@ func (c *Client) Endpoint() string {
 	}
 	return ""
 }
+
+// UsedIssued is whether the latest OpAMP request or WebSocket connection was made with credentials a server
+// issued (an offer of connection settings), rather than the configured ones: a configured header had another
+// value. It is false before any outcome, and in core mode, as Endpoint.
+func (c *Client) UsedIssued() bool { return c.usedIssued != nil && c.usedIssued.Load() }
 
 // Answered is closed once an answer from the server has reached the client since Start: a
 // ServerToAgent that isn't an error response, in a WebSocket message or in an HTTP success (with

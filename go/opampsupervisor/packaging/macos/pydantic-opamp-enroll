@@ -435,13 +435,44 @@ if [ -z "$edited" ]; then
 	printf '%s' "$saved" >"$options"
 fi
 
+# states_aside prints the saved states set aside, one a line. Other names aren't the Supervisor's: whoever
+# made them, they go into no command.
+states_aside() {
+	for f in "$storage"/opamp-state.refused-*-*; do
+		case ${f#"$storage"/opamp-state.refused-} in *[!0-9TZ.-]*) continue ;; esac
+		if [ -f "$f" ] && [ ! -L "$f" ]; then echo "$f"; fi
+	done
+}
+
+# new_aside prints the saved state set aside since $1 (states_aside's): the one for this run, if another
+# run had one set aside meanwhile.
+new_aside() {
+	found=
+	for f in $(states_aside); do
+		case $nl$1$nl in
+		*"$nl$f$nl"*) continue ;;
+		esac
+		case $found in *-$$) ;; *) found=$f ;; esac
+	done
+	echo "$found"
+}
+
+# tell_aside says that the saved credentials are set aside in $1, and how to put them back (what is in their
+# place then is set aside instead).
+tell_aside() {
+	echo "the saved credentials the server refused, and the identity kept with them, are set aside in $1, and this host now enrolls as a new one. If the server refused them for a while only, put them back with: sudo sh -c 'launchctl bootout system/$label; n=0; while launchctl print system/$label >/dev/null 2>&1 && [ \$n -lt 30 ]; do sleep 1; n=\$((n+1)); done; launchctl print system/$label >/dev/null 2>&1 || { if [ -e $storage/opamp-state ]; then mv $storage/opamp-state $storage/opamp-state.refused-\$(date -u +%Y%m%dT%H%M%SZ)-\$\$; fi && mv $1 $storage/opamp-state; }; launchctl bootstrap system $plist'" >&2
+}
+
 # not_accepted fails the install when the Supervisor is connected but the server never answered
 # it: a server that takes the connection but not the credentials (a used-up, expired or revoked
 # enrollment token) closes it unanswered.
 not_accepted() {
 	st=$("$supervisor" status --storage "$storage" --json 2>/dev/null) || :
 	if printf '%s\n' "$st" | grep -q '"connected": true' && ! printf '%s\n' "$st" | grep -q '"accepted": {'; then
-		echo "enrolled, but the server at $endpoint took the connection and not the enrollment token: it may be used up, expired or revoked, or the server deleted this host, which keeps its identity. Enroll again with a new token, or for a deleted host remove its data first (sudo /opt/pydantic-opamp/bin/pydantic-opamp-uninstall --purge); check with: sudo $supervisor status --storage $storage" >&2
+		deleted=", or the server deleted this host, which keeps its identity"
+		purge=", or for a deleted host remove its data first (sudo /opt/pydantic-opamp/bin/pydantic-opamp-uninstall --purge)"
+		[ -z "$restarted_fresh" ] || deleted= purge=
+		echo "enrolled, but the server at $endpoint took the connection and not the enrollment token: it may be used up, expired or revoked$deleted. Enroll again with a new token$purge; check with: sudo $supervisor status --storage $storage" >&2
 		exit 1
 	fi
 }
@@ -450,29 +481,14 @@ not_accepted() {
 # and the server to answer it (--require-accepted).
 # An install that can't reach its server (an untrusted certificate, a refused key) fails here,
 # with what to check, instead of reporting success; the service keeps retrying.
-# last_aside prints the last of the saved states set aside for this run's process ID, if there is one.
-last_aside() {
-	found=
-	for f in "$storage"/opamp-state.refused-*-$$; do
-		[ ! -f "$f" ] || found=$f
-	done
-	echo "$found"
-}
-
-# tell_aside says that the saved credentials are set aside in $1, and how to put them back.
-tell_aside() {
-	echo "the saved credentials the server refused, and the identity kept with them, are set aside in $1, and this host now enrolls as a new one. If the server refused them for a while only, put them back with: sudo sh -c 'launchctl bootout system/$label; while launchctl print system/$label >/dev/null 2>&1; do sleep 1; done; mv -f $1 $storage/opamp-state; launchctl bootstrap system $plist'" >&2
-}
-
-# refused_saved is whether the server refused the credentials the Supervisor connects with as not
-# valid (HTTP 401; a 403 can mean a missing permission instead), with the client's saved state
-# there: the host's own issued credentials, which the client keeps while the configured token is
-# the same, and which the server revoked (it deleted the host, say). The client never falls back
-# from them to the token.
+# refused_saved is whether the server refused the credentials it issued this host as not valid (HTTP 401;
+# a 403 can mean a missing permission instead), three times or more in a row, with the client's saved
+# state there: the client keeps them while the configured token is the same, and never falls back from
+# them to the token; the server revoked them (it deleted the host, say).
 refused_saved() {
 	[ -z "$refresh" ] && [ -z "$restarted_fresh" ] && [ -f "$storage/opamp-state" ] && [ ! -L "$storage/opamp-state" ] || return 1
 	# Of the Supervisor started at $1: the status of one before it says nothing of this start.
-	"$supervisor" status --storage "$storage" --wait 1s --since "$1" --require-accepted --json 2>/dev/null | grep -q '"http_status": 401'
+	"$supervisor" status --storage "$storage" --wait 1s --since "$1" --require-accepted --json 2>/dev/null | grep -Eq '"issued_refused": ([3-9]|[1-9][0-9])'
 }
 
 wait_connected() {
@@ -486,20 +502,24 @@ wait_connected() {
 	# A healthy host enrolled again is never refused, and keeps its identity.
 	if refused_saved "$1"; then
 		restarted_fresh=1
-		before=$(last_aside)
+		before=$(states_aside)
 		code=0
 		request=$storage/opamp-state.set-aside-$$
 		rmdir "$request" 2>/dev/null || :
-		mkdir "$request"
-		echo "the server refused this host's saved credentials (it deleted the host, say), so pydantic-opamp-enroll has them set aside, with the identity kept with them, and enrolls it again with the enrollment token, as a new host" >&2
+		mkdir "$request" || fail "$request can't be made"
+		echo "the server refused this host's saved credentials (it deleted the host, say), so pydantic-opamp-enroll asks the Supervisor to set them aside, with the identity kept with them, and to enroll it again with the enrollment token, as a new host" >&2
 		started=$(date +%s)
 		unload
 		"$launchctl" bootstrap system "$plist" || :
 		(wait_connected "$started") || code=$?
 		rmdir "$request" 2>/dev/null || :
-		aside=$(last_aside)
+		aside=$(new_aside "$before")
 		if [ "$code" -ne 0 ]; then
-			[ "$aside" = "$before" ] || tell_aside "$aside"
+			if [ -n "$aside" ]; then
+				tell_aside "$aside"
+			else
+				echo "the saved credentials are not set aside: the Supervisor's log says why" >&2
+			fi
 			exit "$code"
 		fi
 		return 0

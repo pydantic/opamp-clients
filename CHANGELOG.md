@@ -75,6 +75,8 @@ and date. Tests, CI and docs alone don't need a line.
 - Go: `Client.Answered()`, closed once the server's first answer reaches a platform-mode client
   (a ServerToAgent that isn't an error response, over WebSocket or in an HTTP success): it tells a
   server that took the agent from one that took the connection and closed it unanswered (#150).
+- Go: `Client.UsedIssued()`, whether the latest request or connection was made with credentials a
+  server issued rather than the configured ones (platform mode) (#150).
 - Supervisor installers and container image: the Collector runs with
   `--feature-gates=telemetry.newPipelineTelemetry`, so its own metrics count the items every
   receiver, processor (`batch` too) and exporter takes in and passes on. A Prometheus reader of
@@ -119,12 +121,13 @@ and date. Tests, CI and docs alone don't need a line.
 - Supervisor installers: a host deleted on the server and enrolled again over its kept data with
   the same token could never connect: the client kept the host's own issued credentials, which
   the delete revoked, and doesn't fall back from them to the token. `pydantic-opamp-enroll` (not
-  `--refresh`) now asks the Supervisor, when the server refuses them as not valid for the whole wait
-  (HTTP 401; not a 403, which can mean a missing permission), to set them aside, and the instance UID
-  kept with them, and start again from the token, once, as a new host. They stay on the host, under a
-  name of their own, until its data is removed: `opampsupervisor status` lists them, and when the new
-  enrollment fails the helper says the command that puts them back (a server that refused them for a
-  while only). A new token already worked: it is used in their place (#150).
+  `--refresh`) now asks the Supervisor, when the server refuses them as not valid three times or more
+  in a row (HTTP 401; not a 403, which can mean a missing permission, nor a refusal of another token),
+  to set them aside, and the instance UID kept with them, and start again from the token, once, as a new
+  host. They stay on the host, under a name of their own, until its data is removed:
+  `opampsupervisor status` lists them, and when the new enrollment fails the helper says the command
+  that puts them back (a server that refused them for a while only). A new token already worked: it is
+  used in their place (#150).
 - Supervisor installers: `pydantic-opamp-enroll` (Linux, macOS, Windows) fails an install whose
   enrollment token the server refuses (used up, expired, revoked), saying so, where it reported
   "running and connected" and exited 0: it waits with `opampsupervisor status --require-accepted`.

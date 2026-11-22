@@ -288,7 +288,7 @@ func (c *coreClient) onNotification(cl *collector.Client, n collector.Notificati
 	case opamp.ConnectFailed:
 		// Changed here: the Supervisor hears the first failure of a run, with what to check in its
 		// config; the retries that follow go at debug, not an error each (reachability).
-		c.report.connectFailed(c.logger, n.Status, n.Detail)
+		c.report.connectFailed(c.logger, n.Status, n.Detail, cl != nil && cl.UsedIssued())
 		if err := c.reach.failed(n.Status, n.Detail); err != nil && cb.OnConnectFailed != nil {
 			cb.OnConnectFailed(ctx, err)
 		}

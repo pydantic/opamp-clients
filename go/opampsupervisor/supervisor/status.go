@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net/http"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -48,8 +49,8 @@ type Status struct {
 	// OwnTelemetry is what became of the server's last own telemetry settings: nil before it sent
 	// any.
 	OwnTelemetry *OwnTelemetryState `json:"own_telemetry,omitempty"`
-	// SetAside are the files of the saved states set aside, the oldest first: the credentials in them
-	// are ones the server refused before the host enrolled again (set_aside.go).
+	// SetAside are the files of the saved states set aside, the oldest first, as the status is read: the
+	// credentials in them are ones the server refused (set_aside.go).
 	SetAside []string `json:"set_aside,omitempty"`
 }
 
@@ -80,6 +81,9 @@ type ServerStatus struct {
 	Since      time.Time `json:"since"`
 	HTTPStatus int       `json:"http_status,omitempty"`
 	Error      string    `json:"error,omitempty"`
+	// IssuedRefused is how many of the last tries in a row the server refused as not valid (HTTP 401) with
+	// the credentials it issued this host.
+	IssuedRefused int `json:"issued_refused,omitempty"`
 }
 
 type CollectorStatus struct {
@@ -141,7 +145,6 @@ func (r *statusReport) update(logger *zap.Logger, change func(*Status, time.Time
 func (r *statusReport) started(logger *zap.Logger, endpoint string, uid [16]byte) {
 	r.update(logger, func(st *Status, _ time.Time) {
 		st.Endpoint, st.InstanceUID, st.Stopped = endpoint, uuid.UUID(uid).String(), false
-		st.SetAside = statesSetAside(filepath.Dir(r.path))
 	})
 }
 
@@ -158,13 +161,16 @@ func (r *statusReport) connected(logger *zap.Logger) {
 }
 
 // connectFailed keeps the time of the first failure of a run, and the latest failure's detail.
-func (r *statusReport) connectFailed(logger *zap.Logger, status int, detail string) {
+func (r *statusReport) connectFailed(logger *zap.Logger, status int, detail string, issued bool) {
 	r.update(logger, func(st *Status, now time.Time) {
-		since := now
+		since, refused := now, 0
 		if st.Server != nil && !st.Server.Connected {
-			since = st.Server.Since
+			since, refused = st.Server.Since, st.Server.IssuedRefused
 		}
-		st.Server = &ServerStatus{Since: since, HTTPStatus: status, Error: detail}
+		if refused++; status != http.StatusUnauthorized || !issued {
+			refused = 0
+		}
+		st.Server = &ServerStatus{Since: since, HTTPStatus: status, Error: detail, IssuedRefused: refused}
 	})
 }
 
@@ -282,6 +288,7 @@ func ReadStatus(dir string) (*Status, error) {
 	if err := json.Unmarshal(b, &st); err != nil {
 		return nil, fmt.Errorf("%s: %w", StatusFile, err)
 	}
+	st.SetAside = statesSetAside(dir)
 	return &st, nil
 }
 
@@ -371,7 +378,7 @@ func (st *Status) Print(w io.Writer, now time.Time) {
 		line("Own telemetry", "%s since %s", ot.Status, ago(ot.Since))
 	}
 	for _, path := range st.SetAside {
-		line("Set aside", "credentials the server refused before this host enrolled again, in %s", path)
+		line("Set aside", "credentials the server refused, in %s", path)
 	}
 	switch rc := st.RemoteConfig; {
 	case rc == nil:

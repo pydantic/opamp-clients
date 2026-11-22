@@ -7,9 +7,9 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
-	"net/http"
 	"os"
 	"path/filepath"
+	"regexp"
 	"runtime"
 	"strconv"
 	"strings"
@@ -38,7 +38,11 @@ const setAsideFor = 2 * time.Minute
 func setStateAside(logger *zap.Logger, dir string, now time.Time) {
 	state := filepath.Join(dir, coreClientStateFile)
 	by, ok := asked(logger, dir, now)
-	if !ok || !lastRunRefused(dir) || !isFile(state) {
+	if !ok {
+		return
+	}
+	if !lastRunRefused(dir) || !isFile(state) {
+		logger.Warn("Not setting the saved credentials aside, as asked: the server didn't refuse them in the last run")
 		return
 	}
 	// The first name that nothing has (a second set aside in the second, or the clock went back).
@@ -88,6 +92,8 @@ func asked(logger *zap.Logger, dir string, now time.Time) (by int, ok bool) {
 		age := now.Sub(st.ModTime())
 		if err == nil && st.IsDir() && age < setAsideFor && age > -setAsideFor && ranAt(pid, st.ModTime()) {
 			by, ok = pid, true
+		} else {
+			logger.Warn("A request to set the saved credentials aside isn't taken: nobody waits for it", zap.String("request", name), zap.Duration("age", age))
 		}
 	}
 	return by, ok
@@ -104,18 +110,24 @@ func ranAt(pid int, at time.Time) bool {
 	return !ok && runtime.GOOS != "windows" || ok && !started.After(at.Add(time.Second))
 }
 
-// lastRunRefused is whether the server refused what the Supervisor's last run connected with as not valid
-// (HTTP 401), by the status it left.
+// refusedTries is how many tries in a row the server refuses, in a run, before its answer is taken for it.
+const refusedTries = 3
+
+// lastRunRefused is whether the server refused the credentials it issued this host all along the last tries
+// of the Supervisor's last run, by the status it left: not those of a token just changed, or a try or two.
 func lastRunRefused(dir string) bool {
 	st, err := ReadStatus(dir)
-	return err == nil && st.Accepted == nil && st.Server != nil && !st.Server.Connected && st.Server.HTTPStatus == http.StatusUnauthorized
+	return err == nil && st.Accepted == nil && st.Server != nil && st.Server.IssuedRefused >= refusedTries
 }
+
+// asideName is what setStateAside names one: only such a file is a state set aside.
+var asideName = regexp.MustCompile("^" + regexp.QuoteMeta(setAsidePrefix) + `\d{8}T\d{6}Z(\.\d+)?-\d+$`)
 
 // statesSetAside are the states set aside in dir, the oldest first.
 func statesSetAside(dir string) []string {
 	var out []string
 	for _, name := range namesWith(dir, setAsidePrefix) {
-		if path := filepath.Join(dir, name); isFile(path) {
+		if path := filepath.Join(dir, name); asideName.MatchString(name) && isFile(path) {
 			out = append(out, path)
 		}
 	}

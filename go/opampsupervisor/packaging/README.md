@@ -100,6 +100,12 @@ Once the server issues the agent its own credentials, the Supervisor uses them f
 
 The enrollment token in the config is then only a fallback.
 
+If the server refuses those credentials (it deleted the host, say), enrolling again with the same token
+has the Supervisor set them aside, in `opamp-state.refused-` and the time beside `opamp-state`, and enrolls
+the host as a new one. They stay there until a purge removes the data, and `opampsupervisor status` lists
+them. If the new enrollment fails, the command says how to put them back: a server that refused good ones
+for a while only.
+
 Other options:
 - `--token-file PATH` reads the token from a file instead of standard input.
 - `--ca-file PATH` sets the CA bundle to trust for the server. On Linux it is copied to

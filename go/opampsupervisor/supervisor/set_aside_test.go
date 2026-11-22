@@ -38,8 +38,28 @@ func refusedLast(t *testing.T, dir string) {
 	t.Helper()
 	r := newStatusReport(dir)
 	r.started(nil, "wss://opamp.example.com", [16]byte{1})
-	r.connectFailed(nil, 401, "refused")
+	refuse(r)
 	r.close(nil)
+}
+
+// refuse is the server refusing the credentials it issued, for as many tries as it takes.
+func refuse(r *statusReport) {
+	for range refusedTries {
+		r.connectFailed(nil, 401, "refused", true)
+	}
+}
+
+// longRunning is a process that started well before a request that is too old.
+func longRunning(t *testing.T) int {
+	t.Helper()
+	for pid := os.Getppid(); ; pid = 1 {
+		if started, ok := processStarted(pid); ok && time.Since(started) > 2*setAsideFor && processAlive(pid) {
+			return pid
+		}
+		if pid == 1 {
+			t.Skip("no process has run for long enough")
+		}
+	}
 }
 
 // deadPID is a process that has ended.
@@ -57,26 +77,33 @@ func TestSetStateAside(t *testing.T) {
 		last func(r *statusReport) // nil: none
 		want bool
 	}{
-		"asked, and refused": {func(t *testing.T, dir string) { askAside(t, dir, me, 0) }, func(r *statusReport) { r.connectFailed(nil, 401, "") }, true},
+		"asked, and refused": {func(t *testing.T, dir string) { askAside(t, dir, me, 0) }, refuse, true},
 		"by two helpers": {func(t *testing.T, dir string) { askAside(t, dir, deadPID(t), 0); askAside(t, dir, me, 0) },
-			func(r *statusReport) { r.connectFailed(nil, 401, "") }, true},
-		"not asked":              {func(*testing.T, string) {}, func(r *statusReport) { r.connectFailed(nil, 401, "") }, false},
-		"by a helper that ended": {func(t *testing.T, dir string) { askAside(t, dir, deadPID(t), 0) }, func(r *statusReport) { r.connectFailed(nil, 401, "") }, false},
-		"a while ago":            {func(t *testing.T, dir string) { askAside(t, dir, me, setAsideFor+time.Second) }, func(r *statusReport) { r.connectFailed(nil, 401, "") }, false},
-		"later, by the clock":    {func(t *testing.T, dir string) { askAside(t, dir, me, -time.Hour) }, func(r *statusReport) { r.connectFailed(nil, 401, "") }, false},
+			refuse, true},
+		"not asked":              {func(*testing.T, string) {}, refuse, false},
+		"by a helper that ended": {func(t *testing.T, dir string) { askAside(t, dir, deadPID(t), 0) }, refuse, false},
+		"a while ago":            {func(t *testing.T, dir string) { askAside(t, dir, longRunning(t), setAsideFor+time.Second) }, refuse, false},
+		"later, by the clock":    {func(t *testing.T, dir string) { askAside(t, dir, me, -time.Hour) }, refuse, false},
 		"by no process": {func(t *testing.T, dir string) {
 			require.NoError(t, os.Mkdir(filepath.Join(dir, setAsideRequest+"x"), 0o700))
 		},
-			func(r *statusReport) { r.connectFailed(nil, 401, "") }, false},
+			refuse, false},
 		"a file": {func(t *testing.T, dir string) {
 			require.NoError(t, os.WriteFile(filepath.Join(dir, setAsideRequest+strconv.Itoa(me)), nil, 0o600))
-		}, func(r *statusReport) { r.connectFailed(nil, 401, "") }, false},
-		"no run":            {func(t *testing.T, dir string) { askAside(t, dir, me, 0) }, nil, false},
-		"accepted":          {func(t *testing.T, dir string) { askAside(t, dir, me, 0) }, func(r *statusReport) { r.connected(nil); r.accepted(nil) }, false},
-		"accepted before":   {func(t *testing.T, dir string) { askAside(t, dir, me, 0) }, func(r *statusReport) { r.accepted(nil); r.connectFailed(nil, 401, "") }, false},
-		"unreachable":       {func(t *testing.T, dir string) { askAside(t, dir, me, 0) }, func(r *statusReport) { r.connectFailed(nil, 0, "") }, false},
-		"not allowed":       {func(t *testing.T, dir string) { askAside(t, dir, me, 0) }, func(r *statusReport) { r.connectFailed(nil, 403, "") }, false},
-		"refused, then not": {func(t *testing.T, dir string) { askAside(t, dir, me, 0) }, func(r *statusReport) { r.connectFailed(nil, 401, ""); r.connected(nil) }, false},
+		}, refuse, false},
+		"no run":                 {func(t *testing.T, dir string) { askAside(t, dir, me, 0) }, nil, false},
+		"accepted":               {func(t *testing.T, dir string) { askAside(t, dir, me, 0) }, func(r *statusReport) { r.connected(nil); r.accepted(nil) }, false},
+		"accepted before":        {func(t *testing.T, dir string) { askAside(t, dir, me, 0) }, func(r *statusReport) { r.accepted(nil); refuse(r) }, false},
+		"unreachable":            {func(t *testing.T, dir string) { askAside(t, dir, me, 0) }, func(r *statusReport) { refuse(r); r.connectFailed(nil, 0, "", true) }, false},
+		"not allowed":            {func(t *testing.T, dir string) { askAside(t, dir, me, 0) }, func(r *statusReport) { refuse(r); r.connectFailed(nil, 403, "", true) }, false},
+		"refused, then not":      {func(t *testing.T, dir string) { askAside(t, dir, me, 0) }, func(r *statusReport) { refuse(r); r.connected(nil) }, false},
+		"refused, and once then": {func(t *testing.T, dir string) { askAside(t, dir, me, 0) }, func(r *statusReport) { refuse(r); r.connected(nil); r.connectFailed(nil, 401, "", true) }, false},
+		"refused once":           {func(t *testing.T, dir string) { askAside(t, dir, me, 0) }, func(r *statusReport) { r.connectFailed(nil, 401, "", true) }, false},
+		"another token refused": {func(t *testing.T, dir string) { askAside(t, dir, me, 0) }, func(r *statusReport) {
+			for range 5 {
+				r.connectFailed(nil, 401, "", false)
+			}
+		}, false},
 	} {
 		t.Run(name, func(t *testing.T) {
 			dir := t.TempDir()
@@ -114,6 +141,13 @@ func TestAReusedProcessIDIsNotTheHelper(t *testing.T) {
 	assert.True(t, ranAt(os.Getpid(), time.Now()))
 	assert.False(t, ranAt(os.Getpid(), started.Add(-time.Minute)))
 	assert.False(t, ranAt(deadPID(t), time.Now()))
+	if runtime.GOOS != "windows" {
+		// Ended, and not waited for.
+		cmd := exec.Command(os.Args[0], "-test.run=^$")
+		require.NoError(t, cmd.Start())
+		assert.Eventually(t, func() bool { return !ranAt(cmd.Process.Pid, time.Now()) }, 10*time.Second, 10*time.Millisecond)
+		require.NoError(t, cmd.Wait())
+	}
 	_, ok = processStarted(1 << 22)
 	assert.False(t, ok)
 }
@@ -151,13 +185,19 @@ func TestStatesSetAsideStay(t *testing.T) {
 	// The status lists them.
 	r := newStatusReport(dir)
 	r.started(nil, "wss://opamp.example.com", [16]byte{1})
+	// As they are when it is read, and only what is named as one.
+	require.NoError(t, os.WriteFile(filepath.Join(dir, setAsidePrefix+"20261122T150405Z$(touch x)-1"), nil, 0o600))
+	if runtime.GOOS != "windows" {
+		require.NoError(t, os.Symlink(state, filepath.Join(dir, setAsidePrefix+"20261122T150405Z-1")))
+	}
 	st, err := ReadStatus(dir)
 	require.NoError(t, err)
+	require.Len(t, st.SetAside, 4)
 	assert.Equal(t, statesSetAside(dir), st.SetAside)
 	var out bytes.Buffer
 	st.Print(&out, time.Now())
 	for _, path := range st.SetAside {
-		assert.Contains(t, out.String(), "credentials the server refused before this host enrolled again, in "+path)
+		assert.Contains(t, out.String(), "credentials the server refused, in "+path)
 	}
 }
 
@@ -213,6 +253,7 @@ func TestAHostEnrollsAgain(t *testing.T) {
 	for name := range newCoreTestServer(t).endpoints() {
 		for _, how := range []string{"stopped", "killed"} {
 			t.Run(name+" "+how, func(t *testing.T) {
+				t.Parallel()
 				ts := newCoreTestServer(t)
 				endpoint := ts.endpoints()[name]
 				// Under ts.mu, as refuse and respond run.
@@ -267,16 +308,20 @@ func TestAHostEnrollsAgain(t *testing.T) {
 				saved, err := os.ReadFile(state)
 				require.NoError(t, err)
 
-				// The server refuses everything for a while, twice asked: each state is kept, and put back by a
-				// person, the host is what it was.
+				// The server refuses everything for a while: the state is set aside, and no other after it (the
+				// new try has no credentials of its own), and once a person puts it back the host is what it was.
 				ts.record(func() { down = true })
-				for range 2 {
-					refusedRun()
-					askAside(t, dir, os.Getpid(), 0)
-					refusedRun()
-				}
+				refusedRun()
+				askAside(t, dir, os.Getpid(), 0)
+				ts.forget()
+				s, _ = start(dir)
+				require.Eventually(t, func() bool { return len(ts.seenAuths()) >= refusedTries }, 15*time.Second, 10*time.Millisecond)
+				require.NoError(t, s.stopOpAMPClient())
+				askAside(t, dir, os.Getpid(), 0)
+				s, _ = start(dir)
+				require.NoError(t, s.stopOpAMPClient())
 				aside := statesSetAside(dir)
-				require.Len(t, aside, 2)
+				require.Len(t, aside, 1)
 				kept, err := os.ReadFile(aside[0])
 				require.NoError(t, err)
 				assert.Equal(t, saved, kept)
@@ -323,13 +368,10 @@ func TestAHostEnrollsAgain(t *testing.T) {
 				assert.Equal(t, again, stays)
 				require.NoError(t, s.stopOpAMPClient())
 				aside = statesSetAside(dir)
-				require.Len(t, aside, 2)
-				// The name put back was free again: not by the order.
-				first, err := os.ReadFile(aside[0])
+				require.Len(t, aside, 1)
+				kept, err = os.ReadFile(aside[0])
 				require.NoError(t, err)
-				second, err := os.ReadFile(aside[1])
-				require.NoError(t, err)
-				assert.True(t, bytes.Equal(before, first) || bytes.Equal(before, second))
+				assert.Equal(t, before, kept)
 			})
 		}
 	}
@@ -360,4 +402,57 @@ func TestANewStateThatIsNotSavedLeavesTheOldOneAside(t *testing.T) {
 	require.NoError(t, err)
 	s.closeOpenedClient()
 	require.Len(t, statesSetAside(dir), 1)
+}
+
+// A host enrolled again with a wrong token is refused, and its own credentials aren't tried: they aren't what
+// the server refused, and stay, with its identity, for the right one.
+func TestAWrongTokenSetsNothingAside(t *testing.T) {
+	for name := range newCoreTestServer(t).endpoints() {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			ts := newCoreTestServer(t)
+			endpoint := ts.endpoints()[name]
+			ts.record(func() { ts.refuse = func(auth string) bool { return auth == "Bearer typo" } })
+			ts.setRespond(func(auth string, m *protobufs.AgentToServer) *protobufs.ServerToAgent {
+				if auth != "Bearer enroll" {
+					return nil
+				}
+				return &protobufs.ServerToAgent{ConnectionSettings: &protobufs.ConnectionSettingsOffers{
+					Hash: []byte("issued"),
+					Opamp: &protobufs.OpAMPConnectionSettings{DestinationEndpoint: endpoint,
+						Headers: &protobufs.Headers{Headers: []*protobufs.Header{{Key: "Authorization", Value: "Bearer issued"}}}},
+				}}
+			})
+			dir := t.TempDir()
+			start := func(token string) (*Supervisor, string) {
+				// A header's name in any case.
+				s := clientSupervisor(t, config.OpAMPServer{Endpoint: endpoint, Headers: http.Header{"authorization": {"Bearer " + token}}},
+					config.Capabilities{AcceptsOpAMPConnectionSettings: true}, config.Storage{Directory: dir})
+				var err error
+				s.persistentState, err = s.clientPersistentState()
+				require.NoError(t, err)
+				require.NoError(t, s.startOpAMPClient())
+				return s, s.persistentState.InstanceID.String()
+			}
+			s, uid := start("enroll")
+			ts.waitMsg("the issued settings applied", func(m *protobufs.AgentToServer) bool {
+				return m.ConnectionSettingsStatus.GetStatus() == protobufs.ConnectionSettingsStatuses_ConnectionSettingsStatuses_APPLIED
+			})
+			require.NoError(t, s.stopOpAMPClient())
+			ts.forget()
+			s, _ = start("typo")
+			require.Eventually(t, func() bool { return len(ts.seenAuths()) > refusedTries }, 20*time.Second, 10*time.Millisecond)
+			require.NoError(t, s.stopOpAMPClient())
+			askAside(t, dir, os.Getpid(), 0)
+			s, _ = start("typo")
+			require.NoError(t, s.stopOpAMPClient())
+			assert.Empty(t, statesSetAside(dir))
+			ts.forget()
+			s, back := start("enroll")
+			assert.Equal(t, uid, back)
+			require.Eventually(t, func() bool { return slices.Contains(ts.seenAuths(), "Bearer issued") }, 15*time.Second, 10*time.Millisecond)
+			assert.NotContains(t, ts.seenAuths(), "Bearer enroll")
+			require.NoError(t, s.stopOpAMPClient())
+		})
+	}
 }
