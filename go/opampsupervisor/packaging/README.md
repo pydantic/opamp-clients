@@ -321,8 +321,12 @@ service and keeps `ProgramData\pydantic-opamp`.
 
 Build it on Windows with WiX 5 (`dotnet tool install --global wix --version 5.0.2`):
 `go\opampsupervisor\packaging\windows\build.ps1 -Version 0.1.0`. The version is numbers only.
-`-CertificateThumbprint` signs the executables and the `.msi` with `signtool`, using that
-certificate from the machine's store.
+`-CertificateThumbprint` signs the executables, the two helper scripts and the `.msi` with
+`signtool`, using that certificate from the machine's store (`LocalMachine\My`), with a timestamp.
+With the scripts signed, a host whose execution policy is `AllSigned` runs
+`pydantic-opamp-enroll.ps1` and `pydantic-opamp-uninstall.ps1`, once it trusts the certificate's
+publisher; an unsigned or changed copy is refused. The installer's own run of the enroll script, at
+an upgrade, passes `-ExecutionPolicy Bypass`, as before.
 
 ## Container
 

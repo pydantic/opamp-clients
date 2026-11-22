@@ -74,6 +74,10 @@ and date. Tests, CI and docs alone don't need a line.
 
 ### Changed
 
+- Supervisor Windows installer: a build with `-CertificateThumbprint` also signs
+  `pydantic-opamp-enroll.ps1` and `pydantic-opamp-uninstall.ps1`, so a host whose execution policy
+  is `AllSigned` runs them. `signtool` now takes the certificate from the machine's store, as the
+  build script said; it looked in the user's store (#156).
 - Go, Python, Node.js, Java, .NET: every SDK runs the settings layer's agent flow, so what an
   SDK does around a policy is the same in each language: when debug mode ends, when export health
   is sent, and the lines it logs about reaching the server (#129).
