@@ -59,9 +59,11 @@ func fakeSetAside(dir string) string {
 		rmdir "$request" 2>/dev/null || continue
 		echo asked >>"` + filepath.Join(dir, "asked.log") + `"
 		[ -e "$S/opamp-state" ] || continue
-		mv "$S/opamp-state" "$S/opamp-state.refused-2026112$(wc -l <"` + filepath.Join(dir, "asked.log") + `" | tr -d ' ')T000000Z-${request##*-}"
+		mv "$S/opamp-state" "$S/opamp-state.refused-2026112$(wc -l <"` + filepath.Join(dir, "asked.log") + `" | tr -d ' ')T000000Z-$(echo "${request##*-}" | cut -d . -f 1)"
 		echo new >"$S/opamp-state"
 		if [ -e "` + filepath.Join(dir, "heal") + `" ]; then rm -f "` + filepath.Join(dir, "status") + `" "` + filepath.Join(dir, "json") + `"; fi
+		[ ! -e "` + filepath.Join(dir, "healed") + `" ] || . "` + filepath.Join(dir, "healed") + `"
+		[ ! -e "` + filepath.Join(dir, "healed-json") + `" ] || cp "` + filepath.Join(dir, "healed-json") + `" "` + filepath.Join(dir, "json") + `"
 	done`
 }
 
@@ -531,6 +533,27 @@ func TestEnrollWaitsForTheConnection(t *testing.T) {
 	assert.Contains(t, out, "the server refused this host's saved credentials")
 	assert.Contains(t, out, "The Supervisor is running and connected")
 	require.Len(t, aside(), 1)
+	// Taken, and its new state not saved, whichever way that shows: not enrolled, the way back said.
+	for _, how := range []string{"rm -f \"$S/opamp-state\"", "true"} {
+		require.NoError(t, os.WriteFile(state, []byte("sealed"), 0o600))
+		require.NoError(t, os.WriteFile(filepath.Join(e.tools, "json"), []byte(revokedJSON), 0o600))
+		require.NoError(t, os.WriteFile(filepath.Join(e.tools, "status"), []byte("1"), 0o600))
+		require.NoError(t, os.WriteFile(filepath.Join(e.tools, "healed"), []byte(how), 0o600))
+		if how == "true" {
+			require.NoError(t, os.WriteFile(filepath.Join(e.tools, "healed-json"), []byte("{\n  \"save_error\": \"no space left\"\n}\n"), 0o600))
+		}
+		out, err = e.run(t, "bootstrap-token", "--endpoint", "wss://opamp.example.com/v1/opamp")
+		require.Error(t, err, how)
+		assert.Contains(t, out, "its new credentials could not be saved")
+		assert.Contains(t, out, "put them back with: sudo ")
+		assert.NotContains(t, out, "Enrolled with")
+	}
+	require.NoError(t, os.Remove(filepath.Join(e.tools, "healed")))
+	require.NoError(t, os.Remove(filepath.Join(e.tools, "healed-json")))
+	_ = os.Remove(filepath.Join(e.tools, "json"))
+	for _, path := range aside()[1:] {
+		require.NoError(t, os.Remove(path))
+	}
 	kept, err := os.ReadFile(aside()[0])
 	require.NoError(t, err)
 	assert.Equal(t, "sealed", string(kept))

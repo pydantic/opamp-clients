@@ -435,6 +435,13 @@ if [ -z "$edited" ]; then
 	printf '%s' "$saved" >"$options"
 fi
 
+# run_count prints how many times launchd has started the daemon since it was loaded.
+run_count() {
+	n=$("$launchctl" print "system/$label" 2>/dev/null | awk '$1 == "runs" && $2 == "=" { print $3; exit }') || n=
+	case $n in '' | *[!0-9]*) n=0 ;; esac
+	echo "$n"
+}
+
 # states_aside prints the saved states set aside, one a line. Other names aren't the Supervisor's: whoever
 # made them, they go into no command.
 states_aside() {
@@ -481,6 +488,13 @@ not_accepted() {
 # and the server to answer it (--require-accepted).
 # An install that can't reach its server (an untrusted certificate, a refused key) fails here,
 # with what to check, instead of reporting success; the service keeps retrying.
+# not_saved is whether the state of the host enrolled as a new one isn't saved, a moment after the server took
+# it: a restart would lose it.
+not_saved() {
+	sleep 2
+	[ ! -f "$storage/opamp-state" ] || "$supervisor" status --storage "$storage" --json 2>/dev/null | grep -q '"save_error": "'
+}
+
 # refused_saved is whether the server refused the credentials it issued this host as not valid (HTTP 401;
 # a 403 can mean a missing permission instead), three times or more in a row, with the client's saved
 # state there: the client keeps them while the configured token is the same, and never falls back from
@@ -509,11 +523,17 @@ wait_connected() {
 		mkdir "$request" || fail "$request can't be made"
 		echo "the server refused this host's saved credentials (it deleted the host, say), so pydantic-opamp-enroll asks the Supervisor to set them aside, with the identity kept with them, and to enroll it again with the enrollment token, as a new host" >&2
 		started=$(date +%s)
-		unload
-		"$launchctl" bootstrap system "$plist" || :
-		(wait_connected "$started") || code=$?
+		runs=$(run_count)
+		# One step that launchd ends whatever becomes of this run, not an unload and a load: the daemon's
+		# config is the same.
+		"$launchctl" kickstart -k "system/$label" || :
+		(wait_connected "$started" "$((runs + 1))") || code=$?
 		rmdir "$request" 2>/dev/null || :
 		aside=$(new_aside "$before")
+		if [ "$code" -eq 0 ] && [ -n "$aside" ] && not_saved; then
+			code=1
+			echo "the server took this host as a new one, and its new credentials could not be saved: a restart loses them. Why: sudo $supervisor status --storage $storage" >&2
+		fi
 		if [ "$code" -ne 0 ]; then
 			if [ -n "$aside" ]; then
 				tell_aside "$aside"
@@ -524,13 +544,10 @@ wait_connected() {
 		fi
 		return 0
 	fi
-	# A daemon that isn't running, or that launchd has started more than once since the bootstrap
+	# A daemon that isn't running, or that launchd has started more than $2 times since the bootstrap
 	# (`runs`), never got to connect: say so, and where its log is, instead. The count catches one
 	# that crashes a few seconds in, which a single look can find briefly running.
-	info=$("$launchctl" print "system/$label" 2>/dev/null) || info=
-	runs=$(printf '%s\n' "$info" | awk '$1 == "runs" && $2 == "=" { print $3; exit }')
-	case $runs in '' | *[!0-9]*) runs=0 ;; esac
-	if ! printf '%s\n' "$info" | grep -q 'state = running' || [ "$runs" -gt 1 ]; then
+	if ! "$launchctl" print "system/$label" 2>/dev/null | grep -q 'state = running' || [ "$(run_count)" -gt "$2" ]; then
 		echo "the Supervisor service ($label) failed to start, so it never connected to $endpoint. Its log says why: sudo tail -n 50 $storage/log/supervisor.log" >&2
 		exit 1
 	fi
@@ -546,7 +563,7 @@ if [ -n "$start" ]; then
 	unload
 	started=$(date +%s)
 	"$launchctl" bootstrap system "$plist"
-	wait_connected "$started"
+	wait_connected "$started" 1
 	echo "$done with $endpoint. The Supervisor is running and connected ($label)."
 else
 	echo "$done with $endpoint. Start the Supervisor with: sudo launchctl bootstrap system $plist"

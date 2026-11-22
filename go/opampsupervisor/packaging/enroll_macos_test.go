@@ -34,9 +34,13 @@ func macEnroll(t *testing.T, root, tools, stdin string, args ...string) (string,
 echo "$@" >>"`+filepath.Join(tools, "launchctl.log")+`"
 loaded="`+filepath.Join(tools, "loaded")+`"
 case $1 in
-bootout) rm -f "$loaded" ;;
+bootout) rm -f "$loaded" "`+filepath.Join(tools, "kicks")+`" ;;
 bootstrap)
 	: >"$loaded"
+	`+fakeSetAside(tools)+` ;;
+kickstart)
+	[ -e "$loaded" ] || exit 113
+	echo $(($(cat "`+filepath.Join(tools, "kicks")+`" 2>/dev/null || echo 0) + 1)) >"`+filepath.Join(tools, "kicks")+`"
 	`+fakeSetAside(tools)+` ;;
 print)
 	# With LAUNCHCTL_STOPPING naming a file, launchd still holds the label (stopping) for that many prints.
@@ -49,7 +53,7 @@ print)
 	elif [ -e "`+filepath.Join(tools, "crashing")+`" ]; then
 		printf '\tstate = running\n\truns = 3\n'
 	else
-		printf '\tstate = running\n\truns = 1\n'
+		printf '\tstate = running\n\truns = %d\n' $(($(cat "`+filepath.Join(tools, "kicks")+`" 2>/dev/null || echo 0) + 1))
 	fi
 	;;
 esac
@@ -149,9 +153,10 @@ func TestMacEnrollWaitsForTheConnection(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, "sealed", string(kept))
 	assert.NotContains(t, out, "purge")
+	assert.NotContains(t, out, "failed to start", "its second start is the one asked for")
 	log, err := os.ReadFile(filepath.Join(tools, "launchctl.log"))
 	require.NoError(t, err)
-	assert.Regexp(t, `(?s)bootout.*bootstrap.*bootout.*bootstrap`, string(log))
+	assert.Regexp(t, `(?s)bootout.*bootstrap.*kickstart -k system/dev.pydantic.opamp-supervisor\n`, string(log))
 	_, command, ok := strings.Cut(out, "put them back with: sudo ")
 	require.True(t, ok, out)
 	command, _, _ = strings.Cut(command, "\n")

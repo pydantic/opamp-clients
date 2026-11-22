@@ -4,6 +4,7 @@
 package opamp
 
 import (
+	"errors"
 	"net/http"
 	"testing"
 
@@ -47,5 +48,30 @@ func TestUsedIssued(t *testing.T) {
 	}
 	if (&Client{}).UsedIssued() {
 		t.Fatal("in core mode")
+	}
+}
+
+// SaveError is how the last save ended, and Saves says that one did.
+func TestSaveError(t *testing.T) {
+	x := newExecutor(&connection{})
+	c := &Client{saveError: &x.saveError, saves: x.saves}
+	if c.SaveError() != "" {
+		t.Fatal("before any save")
+	}
+	x.saved(storeFailed(1, errors.New("no space left")))
+	x.saved(storeFailed(2, errors.New("no space left")))
+	<-c.Saves()
+	if c.SaveError() != "no space left" {
+		t.Fatal(c.SaveError())
+	}
+	x.saved(&corepb.Input{Kind: &corepb.Input_Stored{Stored: &corepb.Id{Id: 3}}})
+	<-c.Saves()
+	if c.SaveError() != "" {
+		t.Fatal(c.SaveError())
+	}
+	select {
+	case <-c.Saves():
+		t.Fatal("nothing ended since")
+	default:
 	}
 }

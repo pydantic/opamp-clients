@@ -76,7 +76,10 @@ and date. Tests, CI and docs alone don't need a line.
   (a ServerToAgent that isn't an error response, over WebSocket or in an HTTP success): it tells a
   server that took the agent from one that took the connection and closed it unanswered (#150).
 - Go: `Client.UsedIssued()`, whether the latest request or connection was made with credentials a
-  server issued rather than the configured ones (platform mode) (#150).
+  server issued rather than the configured ones (platform mode), and `Client.SaveError()` with
+  `Client.Saves()`, why the last save of the state failed (#150).
+- Supervisor: `opampsupervisor status` says when the client's state can't be saved (`save_error` in
+  `--json`), and exits 1: a restart would lose the host's credentials (#150).
 - Supervisor installers and container image: the Collector runs with
   `--feature-gates=telemetry.newPipelineTelemetry`, so its own metrics count the items every
   receiver, processor (`batch` too) and exporter takes in and passes on. A Prometheus reader of

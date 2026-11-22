@@ -501,6 +501,13 @@ not_accepted() {
 	fi
 }
 
+# not_saved is whether the state of the host enrolled as a new one isn't saved, a moment after the server took
+# it: a restart would lose it.
+not_saved() {
+	sleep 2
+	[ ! -f "$storage/opamp-state" ] || "$supervisor" status --storage "$storage" --json 2>/dev/null | grep -q '"save_error": "'
+}
+
 # refused_saved is whether the server refused the credentials it issued this host as not valid (HTTP 401;
 # a 403 can mean a missing permission instead), three times or more in a row, with the client's saved
 # state there: the client keeps them while the configured token is the same, and never falls back from
@@ -524,7 +531,9 @@ wait_connected() {
 		restarted_fresh=1
 		before=$(states_aside)
 		code=0
-		request=$storage/opamp-state.set-aside-$$
+		# When this process started, as /proc has it, so another with its ID since isn't taken for it.
+		mark=$(sed 's/.*) //' "/proc/$$/stat" 2>/dev/null | cut -d ' ' -f 20) || mark=
+		request=$storage/opamp-state.set-aside-$$${mark:+.$mark}
 		rmdir "$request" 2>/dev/null || :
 		mkdir "$request" || fail "$request can't be made"
 		echo "the server refused this host's saved credentials (it deleted the host, say), so pydantic-opamp-enroll asks the Supervisor to set them aside, with the identity kept with them, and to enroll it again with the enrollment token, as a new host" >&2
@@ -534,6 +543,10 @@ wait_connected() {
 		(wait_connected "$started" "$restarts") || code=$?
 		rmdir "$request" 2>/dev/null || :
 		aside=$(new_aside "$before")
+		if [ "$code" -eq 0 ] && [ -n "$aside" ] && not_saved; then
+			code=1
+			echo "the server took this host as a new one, and its new credentials could not be saved: a restart loses them. Why: sudo $supervisor status --storage $storage" >&2
+		fi
 		if [ "$code" -ne 0 ]; then
 			if [ -n "$aside" ]; then
 				tell_aside "$aside"

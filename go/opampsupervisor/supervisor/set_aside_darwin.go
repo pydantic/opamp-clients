@@ -12,15 +12,10 @@ import (
 // szomb is the state of a process that ended and wasn't waited for (sys/proc.h).
 const szomb = 5
 
-// processStarted is when the process started (never, if it ended and its parent hasn't noticed); false if
-// that can't be read.
-func processStarted(pid int) (time.Time, bool) {
+// sameProcess is whether the process with the ID is the one that made a request at the time, not one
+// started since.
+func sameProcess(pid int, _ string, at time.Time) bool {
 	p, err := unix.SysctlKinfoProc("kern.proc.pid", pid)
-	if err != nil || int(p.Proc.P_pid) != pid {
-		return time.Time{}, false
-	}
-	if p.Proc.P_stat == szomb {
-		return time.Now().Add(time.Hour), true
-	}
-	return time.Unix(p.Proc.P_starttime.Unix()), true
+	// To a second, as file times may be.
+	return err == nil && int(p.Proc.P_pid) == pid && p.Proc.P_stat != szomb && !time.Unix(p.Proc.P_starttime.Unix()).After(at.Add(time.Second))
 }

@@ -233,6 +233,20 @@ func (c *coreClient) Start(ctx context.Context, settings types.StartSettings) er
 	c.client = started
 	// The status says once the server has answered (it took this Supervisor), until Stop.
 	c.quit = make(chan struct{})
+	go func(quit <-chan struct{}) {
+		failed := ""
+		for {
+			select {
+			case <-started.Saves():
+				if e := started.SaveError(); e != failed {
+					failed = e
+					c.report.saved(c.logger, e)
+				}
+			case <-quit:
+				return
+			}
+		}
+	}(c.quit)
 	if answered := started.Answered(); answered != nil {
 		go func(quit <-chan struct{}) {
 			select {

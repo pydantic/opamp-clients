@@ -20,8 +20,8 @@ import (
 
 // The client never falls back from the credentials a server issued to the configured ones, so a host the
 // server deleted is refused for good. An enrollment helper that a person runs with a token asks for the
-// saved state to be set aside: it makes the directory setAsideRequest plus its process ID in the storage
-// directory, restarts the Supervisor, and waits. The Supervisor, as it starts and before its client opens
+// saved state to be set aside: it makes the directory setAsideRequest plus its process ID (and, on Linux, when
+// that process started, by /proc) in the storage directory, restarts the Supervisor, and waits. The Supervisor, as it starts and before its client opens
 // the state, renames it (setAsidePrefix, the time and the helper's process ID), and the client enrolls the
 // host anew with the configured credentials. Nothing puts a state set aside back, replaces it or removes it: a person does
 // (the helper says how), or a purge.
@@ -88,26 +88,16 @@ func asked(logger *zap.Logger, dir string, now time.Time) (by int, ok bool) {
 			logger.Error("A request to set the saved credentials aside can't be removed, and isn't taken", zap.Error(err))
 			continue
 		}
-		pid, err := strconv.Atoi(strings.TrimPrefix(name, setAsideRequest))
+		id, mark, _ := strings.Cut(strings.TrimPrefix(name, setAsideRequest), ".")
+		pid, err := strconv.Atoi(id)
 		age := now.Sub(st.ModTime())
-		if err == nil && st.IsDir() && age < setAsideFor && age > -setAsideFor && ranAt(pid, st.ModTime()) {
+		if err == nil && st.IsDir() && age < setAsideFor && age > -setAsideFor && processAlive(pid) && sameProcess(pid, mark, st.ModTime()) {
 			by, ok = pid, true
 		} else {
 			logger.Warn("A request to set the saved credentials aside isn't taken: nobody waits for it", zap.String("request", name), zap.Duration("age", age))
 		}
 	}
 	return by, ok
-}
-
-// ranAt is whether the process runs, and did at the time: not another one since, with its ID.
-func ranAt(pid int, at time.Time) bool {
-	if !processAlive(pid) {
-		return false
-	}
-	started, ok := processStarted(pid)
-	// Where it can't be read (another user's processes hidden, say), the ID has to do. To a second, as
-	// file times and a process's may be.
-	return !ok && runtime.GOOS != "windows" || ok && !started.After(at.Add(time.Second))
 }
 
 // refusedTries is how many tries in a row the server refuses, in a run, before its answer is taken for it.

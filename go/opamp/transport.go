@@ -63,6 +63,9 @@ type executor struct {
 	// configured are the configured headers, and usedIssued whether the last one was made with others.
 	configured http.Header
 	usedIssued atomic.Bool
+	// saveError is how the last save ended ("" if it was saved), and saves says that one did.
+	saveError atomic.Pointer[string]
+	saves     chan struct{}
 	// answered is closed when the first answer from the server arrives (heard; platform mode
 	// only, as used).
 	answered   chan struct{}
@@ -99,6 +102,19 @@ func isWSAnswer(data []byte) bool {
 	return n > 0 && header == 0 && isAnswer(data[n:])
 }
 
+// saved records how a save ended, before it reaches the core.
+func (x *executor) saved(in *corepb.Input) {
+	detail := ""
+	if f := in.GetStoreFailed(); f != nil {
+		detail = f.GetDetail()
+	}
+	x.saveError.Store(&detail)
+	select {
+	case x.saves <- struct{}{}:
+	default: // one is waiting already
+	}
+}
+
 // configure keeps the configured headers.
 func (x *executor) configure(header http.Header) {
 	x.configured = http.Header{}
@@ -127,7 +143,8 @@ func newExecutor(conn *connection) *executor {
 	b := make([]byte, 8)
 	_, _ = rand.Read(b)
 	return &executor{conn: conn, out: make(chan report, 16), done: make(chan struct{}), fl: newInFlight(),
-		instance: hex.EncodeToString(b), fs: osFS{}, answered: make(chan struct{})}
+		instance: hex.EncodeToString(b), fs: osFS{}, answered: make(chan struct{}),
+		saves: make(chan struct{}, 1)}
 }
 
 func (x *executor) reports() <-chan report { return x.out }
@@ -214,6 +231,7 @@ func (x *executor) do(eff *corepb.Effect) *report {
 				<-prev
 			}
 			if in := store(e.ctx, x.fs, x.stateFile, x.sealer, k.Store); in != nil {
+				x.saved(in)
 				x.emit(report{e: e, in: in, last: true})
 			}
 		})

@@ -13,6 +13,7 @@ import (
 	"runtime"
 	"slices"
 	"strconv"
+	"strings"
 	"testing"
 	"time"
 
@@ -52,14 +53,13 @@ func refuse(r *statusReport) {
 // longRunning is a process that started well before a request that is too old.
 func longRunning(t *testing.T) int {
 	t.Helper()
-	for pid := os.Getppid(); ; pid = 1 {
-		if started, ok := processStarted(pid); ok && time.Since(started) > 2*setAsideFor && processAlive(pid) {
+	for _, pid := range []int{os.Getppid(), 1} {
+		if processAlive(pid) && sameProcess(pid, "", time.Now().Add(-2*setAsideFor)) {
 			return pid
 		}
-		if pid == 1 {
-			t.Skip("no process has run for long enough")
-		}
 	}
+	t.Skip("no process has run for long enough")
+	return 0
 }
 
 // deadPID is a process that has ended.
@@ -135,25 +135,34 @@ func TestSetStateAside(t *testing.T) {
 	}
 }
 
-// A process that has another's ID, started since, isn't it.
+// A process that has another's ID, started since, isn't it, nor one that ended and wasn't waited for.
 func TestAReusedProcessIDIsNotTheHelper(t *testing.T) {
-	started, ok := processStarted(os.Getpid())
-	require.True(t, ok)
-	assert.WithinDuration(t, time.Now(), started, time.Hour)
-	assert.True(t, ranAt(os.Getpid(), time.Now()))
-	assert.False(t, ranAt(os.Getpid(), started.Add(-time.Minute)))
-	assert.False(t, ranAt(deadPID(t), time.Now()))
+	assert.True(t, sameProcess(os.Getpid(), "", time.Now()))
+	if runtime.GOOS == "linux" {
+		stat, err := os.ReadFile("/proc/self/stat")
+		require.NoError(t, err)
+		mark := strings.Fields(string(stat[bytes.LastIndexByte(stat, ')')+1:]))[19]
+		assert.True(t, sameProcess(os.Getpid(), mark, time.Now()))
+		assert.False(t, sameProcess(os.Getpid(), "1", time.Now()))
+		dir := t.TempDir()
+		require.NoError(t, os.WriteFile(filepath.Join(dir, coreClientStateFile), []byte("state"), 0o600))
+		for _, m := range []string{"1", mark} {
+			refusedLast(t, dir)
+			require.NoError(t, os.Mkdir(filepath.Join(dir, fmt.Sprintf("%s%d.%s", setAsideRequest, os.Getpid(), m)), 0o700))
+			setStateAside(zaptest.NewLogger(t), dir, time.Now())
+			assert.Len(t, statesSetAside(dir), map[string]int{"1": 0, mark: 1}[m])
+		}
+	} else {
+		assert.False(t, sameProcess(os.Getpid(), "", time.Now().Add(-24*time.Hour)))
+	}
 	if runtime.GOOS != "windows" {
-		// Ended, and not waited for.
 		self, err := os.Executable()
 		require.NoError(t, err)
 		cmd := exec.Command(self, "-test.run=^$")
 		require.NoError(t, cmd.Start())
-		assert.Eventually(t, func() bool { return !ranAt(cmd.Process.Pid, time.Now()) }, 10*time.Second, 10*time.Millisecond)
+		assert.Eventually(t, func() bool { return !sameProcess(cmd.Process.Pid, "", time.Now()) }, 10*time.Second, 10*time.Millisecond)
 		require.NoError(t, cmd.Wait())
 	}
-	_, ok = processStarted(1 << 22)
-	assert.False(t, ok)
 }
 
 // No state set aside is replaced by a later one (the state of a try that failed), or removed.
@@ -398,9 +407,25 @@ func TestANewStateThatIsNotSavedLeavesTheOldOneAside(t *testing.T) {
 	require.NoError(t, os.Chmod(dir, 0o500))
 	require.NoError(t, s.startOpAMPClient())
 	ts.waitMsg("a message", func(*protobufs.AgentToServer) bool { return true })
-	require.NoError(t, s.stopOpAMPClient())
+	// The status says so, once it can be written, and when it is saved at last.
+	client := s.opampClient.(*coreClient)
+	require.Eventually(t, func() bool {
+		client.report.mu.Lock()
+		defer client.report.mu.Unlock()
+		return client.report.st.SaveError != ""
+	}, 15*time.Second, 10*time.Millisecond)
 	require.NoError(t, os.Chmod(dir, 0o700))
 	require.Len(t, statesSetAside(dir), 1)
+	client.report.connected(nil)
+	require.NoError(t, client.SetHealth(&protobufs.ComponentHealth{Healthy: true}))
+	st, err := ReadStatus(dir)
+	require.NoError(t, err)
+	assert.Contains(t, st.SaveError, "opamp-state")
+	assert.False(t, st.OK())
+	var out bytes.Buffer
+	st.Print(&out, time.Now())
+	assert.Contains(t, out.String(), "Saved state    can't be saved, and a restart loses it: ")
+	require.NoError(t, s.stopOpAMPClient())
 	s = clientSupervisor(t, config.OpAMPServer{Endpoint: ts.endpoints()["ws"]}, config.Capabilities{}, config.Storage{Directory: dir})
 	_, err = s.clientPersistentState()
 	require.NoError(t, err)

@@ -34,6 +34,7 @@ function global:Restart-Service { [CmdletBinding()]param([string]$Name, [switch]
         $by = $r.Name.Substring('opamp-state.set-aside-'.Length)
         Move-Item -LiteralPath (Join-Path $global:Var 'opamp-state') -Destination (Join-Path $global:Var "opamp-state.refused-20261122T000000Z-$by")
         [IO.File]::WriteAllText((Join-Path $global:Var 'opamp-state'), 'new')
+        if ($global:Wait -eq 'unsaved') { [IO.File]::WriteAllText((Join-Path $env:OPAMP_ENROLL_ROOT '..\json'), '{ "save_error": "no space left" }') }
         if ($global:Wait -eq 'plant') { [IO.File]::WriteAllText((Join-Path $global:Var "opamp-state.refused-9x'; exit 7-$by"), '') }
     }
 }
@@ -48,7 +49,7 @@ exit $LASTEXITCODE
 // winSup is 'opampsupervisor status': ..\json, and 1, until the state is a new one and ..\heal is there.
 const winSup = `$d = Split-Path -Parent $MyInvocation.MyCommand.Path
 Add-Content -LiteralPath (Join-Path $d 'sup.log') -Value ($args -join ' ')
-if ((Test-Path (Join-Path $d 'heal')) -and [IO.File]::ReadAllText((Join-Path $d 'pydantic-opamp\var\opamp-state')) -eq 'new') { exit 0 }
+if ((Test-Path (Join-Path $d 'heal')) -and [IO.File]::ReadAllText((Join-Path $d 'pydantic-opamp\var\opamp-state')) -eq 'new' -and $args -notcontains '--json') { exit 0 }
 if ($args -contains '--json') { [IO.File]::ReadAllText((Join-Path $d 'json')) }
 exit 1
 `
@@ -63,6 +64,7 @@ func TestWinEnrollSetsAside(t *testing.T) {
 		"refused, then taken":      {json: revokedJSON, file: "heal", asked: true, ok: true},
 		"refused, and again":       {json: revokedJSON, asked: true},
 		"a name that isn't one":    {json: revokedJSON, wait: "plant", asked: true},
+		"taken, and not saved":     {json: revokedJSON, file: "heal", wait: "unsaved", asked: true},
 		"refused twice":            {json: strings.ReplaceAll(revokedJSON, ": 5", ": 2")},
 		"another token refused":    {json: strings.ReplaceAll(revokedJSON, ",\n    \"issued_refused\": 5", "")},
 		"the new start fails":      {json: revokedJSON, file: "fail-start"},
@@ -112,6 +114,7 @@ func TestWinEnrollSetsAside(t *testing.T) {
 				return
 			}
 			assert.Equal(t, 1, strings.Count(out, "the server refused this host's saved credentials"), out)
+			assert.Equal(t, tc.wait == "unsaved", strings.Contains(out, "could not be saved"), out)
 			assert.NotContains(t, out, "exit 7")
 			assert.NotContains(t, out, "-Purge")
 			// The command, run: the old state is back, and what was there is set aside instead.

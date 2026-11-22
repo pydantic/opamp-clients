@@ -49,6 +49,9 @@ type Status struct {
 	// OwnTelemetry is what became of the server's last own telemetry settings: nil before it sent
 	// any.
 	OwnTelemetry *OwnTelemetryState `json:"own_telemetry,omitempty"`
+	// SaveError is why the client's state (the credentials the server issued, the identity) can't be saved: ""
+	// if it is. A host restarted so loses them.
+	SaveError string `json:"save_error,omitempty"`
 	// SetAside are the files of the saved states set aside, the oldest first, as the status is read: the
 	// credentials in them are ones the server refused (set_aside.go).
 	SetAside []string `json:"set_aside,omitempty"`
@@ -158,6 +161,11 @@ func (r *statusReport) connected(logger *zap.Logger) {
 			st.Server = &ServerStatus{Connected: true, Since: now}
 		}
 	})
+}
+
+// saved keeps how the last save of the client's state ended.
+func (r *statusReport) saved(logger *zap.Logger, saveError string) {
+	r.update(logger, func(st *Status, _ time.Time) { st.SaveError = saveError })
 }
 
 // connectFailed keeps the time of the first failure of a run, and the latest failure's detail.
@@ -310,7 +318,7 @@ func (st *Status) Running() bool {
 func (st *Status) OK() bool {
 	return st.Running() && st.Server != nil && st.Server.Connected &&
 		st.Collector != nil && st.Collector.Healthy &&
-		(st.RemoteConfig == nil || st.RemoteConfig.Status != "FAILED")
+		(st.RemoteConfig == nil || st.RemoteConfig.Status != "FAILED") && st.SaveError == ""
 }
 
 // Print writes the status for a person, now being the time to count ages from.
@@ -376,6 +384,9 @@ func (st *Status) Print(w io.Writer, now time.Time) {
 		line("Own telemetry", "%s since %s: %s", ot.Status, ago(ot.Since), ot.Error)
 	default:
 		line("Own telemetry", "%s since %s", ot.Status, ago(ot.Since))
+	}
+	if st.SaveError != "" {
+		line("Saved state", "can't be saved, and a restart loses it: %s", st.SaveError)
 	}
 	for _, path := range st.SetAside {
 		line("Set aside", "credentials the server refused, in %s", path)

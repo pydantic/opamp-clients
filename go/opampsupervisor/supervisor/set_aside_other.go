@@ -7,5 +7,5 @@ package supervisor
 
 import "time"
 
-// processStarted is when the process started; false: it can't be read here.
-func processStarted(int) (time.Time, bool) { return time.Time{}, false }
+// sameProcess is whether the process with the ID is the one that made a request: it has to do here.
+func sameProcess(int, string, time.Time) bool { return true }

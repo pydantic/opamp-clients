@@ -265,6 +265,9 @@ type Client struct {
 	used *atomic.Pointer[string]
 	// usedIssued is whether it was made with headers other than the configured ones (the executor's).
 	usedIssued *atomic.Bool
+	// saveError is how the last save ended, and saves says that one did (the executor's).
+	saveError *atomic.Pointer[string]
+	saves     <-chan struct{}
 	// answered is the executor's, in platform mode; nil in core mode.
 	answered <-chan struct{}
 }
@@ -437,6 +440,7 @@ func (o *Opened) start(status Status, first []*corepb.Input, notify func(*Client
 	x := newExecutor(o.conn)
 	cl.used = &x.used
 	cl.usedIssued = &x.usedIssued
+	cl.saveError, cl.saves = &x.saveError, x.saves
 	x.configure(cfg.Header)
 	if !o.coreMode {
 		cl.answered = x.answered
@@ -502,6 +506,21 @@ func (c *Client) Endpoint() string {
 // issued (an offer of connection settings), rather than the configured ones: a configured header had another
 // value. It is false before any outcome, and in core mode, as Endpoint.
 func (c *Client) UsedIssued() bool { return c.usedIssued != nil && c.usedIssued.Load() }
+
+// Saves receives when a save of the state has ended, saved or not (several may be one): SaveError says how the
+// last did. The client saves again what isn't saved.
+func (c *Client) Saves() <-chan struct{} { return c.saves }
+
+// SaveError is why the last save of the state failed; "" if it was saved, or none was made.
+func (c *Client) SaveError() string {
+	if c.saveError == nil {
+		return ""
+	}
+	if e := c.saveError.Load(); e != nil {
+		return *e
+	}
+	return ""
+}
 
 // Answered is closed once an answer from the server has reached the client since Start: a
 // ServerToAgent that isn't an error response, in a WebSocket message or in an HTTP success (with

@@ -395,6 +395,7 @@ if ($NoStart) {
     $state = Join-Path $storage 'opamp-state'
     $aside = $null
     $tried = $false
+    $notSaved = $false
     # The saved states set aside. Other names aren't the Supervisor's: whoever made them, they go into no command.
     function Get-StatesAside {
         Get-ChildItem -LiteralPath $storage -Filter 'opamp-state.refused-*' -File -ErrorAction SilentlyContinue |
@@ -427,9 +428,18 @@ if ($NoStart) {
             $aside = @(Get-StatesAside) | Where-Object { $before -notcontains $_ } | Sort-Object { $_ -like "*-$PID" } | Select-Object -Last 1
         }
     }
-    if ($waited -ne 0) {
+    if ($waited -eq 0 -and $aside) {
+        # The state of the host enrolled as a new one isn't saved, a moment after the server took it.
+        Start-Sleep -Seconds 2
+        $st = $null
+        try { $st = (& $supervisor status --storage $storage --json 2>$null | Out-String) | ConvertFrom-Json } catch { }
+        if (-not (Test-Path -LiteralPath $state -PathType Leaf) -or ($st -and $st.save_error)) { $notSaved = $true }
+    }
+    if ($waited -ne 0 -or $notSaved) {
+        if ($notSaved) { Note "the server took this host as a new one, and its new credentials could not be saved: a restart loses them. Why: & '$supervisor' status --storage '$storage'" }
         if ($aside) { Note "the saved credentials the server refused, and the identity kept with them, are set aside in $aside, and this host now enrolls as a new one. If the server refused them for a while only, put them back with: try { Stop-Service $service -ErrorAction Stop; if (Test-Path -LiteralPath '$state') { Move-Item -LiteralPath '$state' -Destination ('$state.refused-' + [DateTime]::UtcNow.ToString('yyyyMMddTHHmmssZ') + '-' + `$PID) -ErrorAction Stop }; Move-Item -LiteralPath '$aside' -Destination '$state' -ErrorAction Stop } finally { Start-Service $service }" }
         elseif ($tried) { Note "the saved credentials are not set aside: the Supervisor's log says why" }
+        if ($notSaved) { exit 1 }
         # A service that isn't running never got to connect: say so, and where its log is, instead.
         if ((Get-Service -Name $service -ErrorAction SilentlyContinue).Status -ne 'Running') { Fail-Start }
         $st = $null
