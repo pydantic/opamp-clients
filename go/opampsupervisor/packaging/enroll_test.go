@@ -78,6 +78,8 @@ func fakeSupervisor(t *testing.T, dir string) string {
 code=$(cat "`+filepath.Join(dir, "status")+`" 2>/dev/null || echo 0)
 case " $* " in *" --json "*)
 	echo "$@" >>"`+filepath.Join(dir, "json-calls.log")+`"
+	# dir/stale: the status is of a start before --since.
+	[ ! -e "`+filepath.Join(dir, "stale")+`" ] || case " $* " in *" --since "*) exit 1 ;; esac
 	cat "`+filepath.Join(dir, "json")+`" 2>/dev/null || printf '{\n  "server": {\n    "connected": false\n  }\n}\n'
 	exit "$code" ;;
 esac

@@ -121,6 +121,7 @@ for f in "$S".refused-20261*; do pid=${f##*-}; done
 echo other >"$S.other"
 [ -L "$S.refused-00000000T000000Z-$pid" ] || ln -s "$S.other" "$S.refused-00000000T000000Z-$pid"
 : >"$S.refused-..-$pid"
+: >"$S.refused-00000000T000000Z\$(touch PWNED)-$pid"
 `), 0o600))
 	cmd := exec.Command("./pydantic-opamp-enroll", "--endpoint", "wss://opamp.example.com/v1/opamp")
 	cmd.Env = append(os.Environ(), "OPAMP_ENROLL_ROOT="+e.root, "SYSTEMD_CREDS="+e.creds, "SYSTEMCTL="+e.systemctl, "OPAMP_SUPERVISOR="+e.supervisor)
@@ -155,6 +156,7 @@ for f in "$S".refused-20261*; do pid=${f##*-}; done
 echo other >"$S.other"
 [ -L "$S.refused-00000000T000000Z-$pid" ] || ln -s "$S.other" "$S.refused-00000000T000000Z-$pid"
 : >"$S.refused-..-$pid"
+: >"$S.refused-00000000T000000Z\$(touch PWNED)-$pid"
 `), 0o600))
 	out, err := macEnroll(t, root, tools, "t", "--endpoint", "wss://opamp.example.com/v1/opamp")
 	require.Error(t, err)
@@ -206,4 +208,50 @@ func TestEnrollThatDoesNotAdviseAPurge(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, 1, strings.Count(string(log), "restart "))
 	})
+}
+
+// The same as on Linux, of what doesn't have a macOS host's state set aside: a refusal or two, one of another
+// token, a status from before this start, an upgrade, and something else in the state's place.
+func TestMacEnrollSetsAsideOnlyWhatWasRefused(t *testing.T) {
+	for name, tc := range map[string]struct {
+		json, link string
+		stale      bool
+		args       []string
+	}{
+		"refused twice":         {json: strings.ReplaceAll(revokedJSON, ": 5", ": 2")},
+		"another token refused": {json: strings.ReplaceAll(revokedJSON, ",\n    \"issued_refused\": 5", "")},
+		"a status before this":  {json: revokedJSON, stale: true},
+		"a link":                {json: revokedJSON, link: "to a file"},
+		"an upgrade":            {json: revokedJSON, args: []string{"--refresh"}},
+	} {
+		t.Run(name, func(t *testing.T) {
+			root, tools := t.TempDir(), t.TempDir()
+			if len(tc.args) > 0 {
+				out, err := macEnroll(t, root, tools, "t", "--endpoint", "wss://opamp.example.com/v1/opamp")
+				require.NoError(t, err, out)
+			}
+			storage := filepath.Join(root, "opt/pydantic-opamp/var")
+			state := filepath.Join(storage, "opamp-state")
+			require.NoError(t, os.MkdirAll(storage, 0o700))
+			target := state
+			if tc.link != "" {
+				target = filepath.Join(t.TempDir(), "elsewhere")
+				require.NoError(t, os.Symlink(target, state))
+			}
+			require.NoError(t, os.WriteFile(target, []byte("sealed"), 0o600))
+			require.NoError(t, os.WriteFile(filepath.Join(tools, "json"), []byte(tc.json), 0o600))
+			require.NoError(t, os.WriteFile(filepath.Join(tools, "status"), []byte("1"), 0o600))
+			if tc.stale {
+				require.NoError(t, os.WriteFile(filepath.Join(tools, "stale"), nil, 0o600))
+			}
+			args := tc.args
+			if args == nil {
+				args = []string{"--endpoint", "wss://opamp.example.com/v1/opamp"}
+			}
+			out, err := macEnroll(t, root, tools, "t", args...)
+			require.Error(t, err)
+			assert.NotContains(t, out, "the server refused this host's saved credentials")
+			assert.NoFileExists(t, filepath.Join(tools, "asked.log"))
+		})
+	}
 }
