@@ -130,3 +130,69 @@ for f in "$S".refused-20261*; do pid=${f##*-}; done
 	assert.NotContains(t, string(out), "PWNED")
 	assert.NotContains(t, string(out), "00000000T000000Z")
 }
+
+// The same on macOS: what is printed names no name that isn't the Supervisor's, nor another run's copy.
+func TestMacEnrollNamesItsOwnCopy(t *testing.T) {
+	root, tools := t.TempDir(), t.TempDir()
+	storage := filepath.Join(root, "opt/pydantic-opamp/var")
+	state := filepath.Join(storage, "opamp-state")
+	require.NoError(t, os.MkdirAll(storage, 0o700))
+	require.NoError(t, os.WriteFile(state, []byte("sealed"), 0o600))
+	require.NoError(t, os.WriteFile(filepath.Join(tools, "json"), []byte(revokedJSON), 0o600))
+	require.NoError(t, os.WriteFile(filepath.Join(tools, "status"), []byte("1"), 0o600))
+	require.NoError(t, os.WriteFile(filepath.Join(tools, "wait"), []byte(`S=$OPAMP_ENROLL_ROOT/opt/pydantic-opamp/var/opamp-state
+: >"$S.refused-29991122T000001Z-2"
+for f in "$S".refused-20261*; do pid=${f##*-}; done
+: >"$S.refused-0\$(touch PWNED)-$pid"
+[ -L "$S.refused-00000000T000000Z-$pid" ] || ln -s x "$S.refused-00000000T000000Z-$pid"
+`), 0o600))
+	out, err := macEnroll(t, root, tools, "t", "--endpoint", "wss://opamp.example.com/v1/opamp")
+	require.Error(t, err)
+	_, named, ok := strings.Cut(out, "are set aside in ")
+	require.True(t, ok, out)
+	named, _, _ = strings.Cut(named, ". If")
+	kept, err := os.ReadFile(named)
+	require.NoError(t, err)
+	assert.Equal(t, "sealed", string(kept))
+	assert.NotContains(t, out, "PWNED")
+	assert.NotContains(t, out, "00000000T000000Z")
+}
+
+// A retry that ends connected and unanswered doesn't advise removing the data its copy is in; and a request
+// that can't be made ends the run, with nothing changed.
+func TestEnrollThatDoesNotAdviseAPurge(t *testing.T) {
+	setUp := func(t *testing.T) (enrollment, string) {
+		e := newEnrollment(t)
+		storage := filepath.Join(e.root, "var/lib/pydantic-opamp")
+		require.NoError(t, os.MkdirAll(storage, 0o700))
+		require.NoError(t, os.WriteFile(filepath.Join(storage, "opamp-state"), []byte("sealed"), 0o600))
+		require.NoError(t, os.WriteFile(filepath.Join(e.tools, "json"), []byte(revokedJSON), 0o600))
+		require.NoError(t, os.WriteFile(filepath.Join(e.tools, "status"), []byte("1"), 0o600))
+		return e, storage
+	}
+	t.Run("unanswered", func(t *testing.T) {
+		e, _ := setUp(t)
+		require.NoError(t, os.WriteFile(filepath.Join(e.tools, "next"), []byte(refusedJSON), 0o600))
+		require.NoError(t, os.WriteFile(filepath.Join(e.tools, "wait"), []byte("cp '"+filepath.Join(e.tools, "next")+"' '"+filepath.Join(e.tools, "json")+"'\n"), 0o600))
+		out, err := e.run(t, "bootstrap-token", "--endpoint", "wss://opamp.example.com/v1/opamp")
+		require.Error(t, err)
+		assert.Contains(t, out, "took the connection and not the enrollment token")
+		assert.Contains(t, out, "put them back with: sudo ")
+		assert.NotContains(t, out, "purge")
+		assert.NotContains(t, out, "deleted this host, which keeps")
+	})
+	t.Run("no request", func(t *testing.T) {
+		if os.Getuid() == 0 {
+			t.Skip("needs a user who can't write everywhere")
+		}
+		e, storage := setUp(t)
+		require.NoError(t, os.Chmod(storage, 0o500))
+		out, err := e.run(t, "bootstrap-token", "--endpoint", "wss://opamp.example.com/v1/opamp")
+		require.NoError(t, os.Chmod(storage, 0o700))
+		require.Error(t, err)
+		assert.Contains(t, out, "can't be made")
+		log, err := os.ReadFile(filepath.Join(e.tools, "systemctl.log"))
+		require.NoError(t, err)
+		assert.Equal(t, 1, strings.Count(string(log), "restart "))
+	})
+}
