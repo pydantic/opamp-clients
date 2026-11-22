@@ -465,13 +465,13 @@ if ($NoStart) {
         $purge = if ($kept) { '' } else { ', or for a deleted host remove its data first (pydantic-opamp-uninstall.ps1 -Purge)' }
         # The server answered the host and didn't take it ("enrollment" in the status, gone once it
         # does). A refused token is told below.
+        $taken = if ($kept) { "Copy what is set aside in $storage elsewhere, remove this host's data (pydantic-opamp-uninstall.ps1 -Purge), then enroll it again with a new token" }
+            else { "Remove this host's data (pydantic-opamp-uninstall.ps1 -Purge), then enroll it again with a new token" }
         if ($st -and $st.enrollment -and $st.enrollment.identity_taken) {
-            $taken = if ($kept) { "Copy what is set aside in $storage elsewhere, remove this host's data (pydantic-opamp-uninstall.ps1 -Purge), then enroll it again with a new token" }
-                else { "Remove this host's data (pydantic-opamp-uninstall.ps1 -Purge), then enroll it again with a new token" }
             Fail "not enrolled: the server at $Endpoint holds this host's identity for another installation (a host it deleted, say). $taken; check with: & '$supervisor' status --storage '$storage'"
         }
         if ($st -and $st.enrollment -and $st.enrollment.unreachable) {
-            Fail "not enrolled: the server at $Endpoint tells this host to connect to $($st.enrollment.unreachable), which can't be reached from here (its name, a firewall, a proxy or its certificate). Once it can, the host enrolls by itself, or at once after a restart of the Supervisor; when it tries again is above; check with: & '$supervisor' status --storage '$storage'"
+            Fail "not enrolled: the server at $Endpoint tells this host to connect to $($st.enrollment.unreachable), which can't be reached from here (its name, a firewall, a proxy or its certificate). Once it can, the host enrolls by itself, or at once after a restart of the Supervisor; when it tries again is above. If the server was wrong to, once it is corrected there: $taken; check with: & '$supervisor' status --storage '$storage'"
         }
         if ($st -and $st.enrollment -and -not $st.enrollment.token_refused) {
             Fail "not enrolled: the server at $Endpoint answered this host and hasn't taken it. Why, how many credentials it offered, and when the host tries again are above; check with: & '$supervisor' status --storage '$storage'"

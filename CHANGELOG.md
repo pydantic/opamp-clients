@@ -134,8 +134,8 @@ and date. Tests, CI and docs alone don't need a line.
   take stops trying: for an hour if its identity is bound to another installation, else for a
   minute (5 seconds after a lost connection), doubling to an hour. One whose offered endpoint can't
   be reached keeps that credential and tries it again, in a minute and then less often, and takes no
-  other (it took 16 in under 40 seconds); the status and the helper name the endpoint's host. A host the server took and then
-  closed for policy isn't accepted any more, and one whose enrollment key is used up or revoked
+  other, a restart or not (it took 16 in under 40 seconds); the status and the helper name the endpoint's
+  host. A host the server took and then closed for policy isn't accepted any more, and one whose enrollment key is used up or revoked
   isn't well (`status` exits 1). The status says why, `--wait --require-accepted` has the host
   accepted and connected for 3 seconds (every enrollment takes that much longer), and
   `pydantic-opamp-enroll` (Linux, macOS, Windows) fails with it (#159).

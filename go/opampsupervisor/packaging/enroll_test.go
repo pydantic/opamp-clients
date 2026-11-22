@@ -554,7 +554,8 @@ func TestEnrollWaitsForTheConnection(t *testing.T) {
 	out, err = e.run(t, "bootstrap-token", "--endpoint", "wss://opamp.example.com/v1/opamp")
 	require.Error(t, err)
 	assert.Contains(t, out, "not enrolled: the server at wss://opamp.example.com/v1/opamp tells this host to connect to other.example.com:8443, which can't be reached from here")
-	assert.NotContains(t, out, "--purge")
+	assert.Contains(t, out, "If the server was wrong to, once it is corrected there: Remove this host's data (sudo ")
+	assert.Contains(t, out, "pydantic-opamp-uninstall --purge)")
 	assert.NotContains(t, out, "hasn't taken it")
 	require.NoError(t, os.Remove(filepath.Join(e.tools, "json")))
 

@@ -84,6 +84,7 @@ func (e *EnrollmentState) print(line func(label, format string, args ...any), in
 	}
 	if e.Unreachable != "" {
 		line("", "This host must reach %s (its name, a firewall, a proxy, its certificate), where the server told it to connect", e.Unreachable)
+		line("", "If the server was wrong to: once it is corrected there, remove this host's data and enroll it again")
 	}
 	if e.TokenRefused {
 		line("", "The enrollment key may be used up, expired or revoked, or the server may not take this host: check both in the server's UI")
@@ -100,8 +101,26 @@ type enrollment struct {
 	// holds counts the holds in a row; offers is the credentials offered before the last one.
 	holds  int
 	offers int
+	// unreached is the host of the endpoint offered that couldn't be reached, at the last hold.
+	unreached string
 	// uid is the instance UID in use when the client was held.
 	uid [16]byte
+}
+
+// carryUnreached takes up from the status the last run left that the endpoint its server offered this host a
+// credential for couldn't be reached: a restart takes no other either. With c.mu held.
+func (c *coreClient) carryUnreached(endpoint string) {
+	last := c.last
+	c.last = nil
+	if last == nil || last.Endpoint != endpoint || last.Enrollment == nil || last.Enrollment.Unreachable == "" {
+		return
+	}
+	e := *last.Enrollment
+	e.RetryAt = time.Time{}
+	c.enroll.holds, c.enroll.offers, c.enroll.unreached = 1, e.Offers, e.Unreachable
+	c.report.mu.Lock()
+	defer c.report.mu.Unlock()
+	c.report.st.Enrollment = &e
 }
 
 // holding is whether the client is held.
@@ -152,13 +171,16 @@ func (c *coreClient) onStanding(cl *collector.Client, st opamp.Standing, quit <-
 		return true
 	}
 	if st.Accepted {
-		c.enroll.holds, c.enroll.offers = 0, 0
+		c.enroll.holds, c.enroll.offers, c.enroll.unreached = 0, 0, ""
 		c.mu.Unlock()
 		c.report.accepted(c.logger, st.Takes)
 		return false
 	}
 	state := enrollmentOf(st, c.enroll.offers)
 	wait := holdFor(st, c.enroll.holds, time.Now())
+	if wait == 0 && !st.ClaimClosed && st.Offers == 0 && !state.TokenRefused {
+		state.Unreachable = c.enroll.unreached // until something else is known
+	}
 	if wait == 0 {
 		c.mu.Unlock()
 		if state == (EnrollmentState{}) {
@@ -174,7 +196,7 @@ func (c *coreClient) onStanding(cl *collector.Client, st opamp.Standing, quit <-
 	state.RetryAt = time.Now().Add(wait)
 	c.enroll.held = make(chan struct{})
 	c.enroll.holds++
-	c.enroll.offers = state.Offers
+	c.enroll.offers, c.enroll.unreached = state.Offers, state.Unreachable
 	c.enroll.uid = cl.InstanceUID()
 	c.client, c.opened = nil, nil
 	c.report.enrollmentHeld(c.logger, state)

@@ -236,7 +236,8 @@ agent:
   seconds when the connection was lost, doubling to an hour. One whose offered endpoint can't be
   reached (its name doesn't resolve, say) keeps the credential it was offered, takes no other, and
   tries it again in a minute, doubling to an hour (go/opamp's `KeepUnreached`); a restart of the
-  Supervisor tries it at once, and may take one more. A host the server serves (it answers its
+  Supervisor tries it at once, and takes no other either. One whose server offered a wrong endpoint doesn't
+  learn of the right one: its data is to be removed, and the host enrolled again. A host the server serves (it answers its
   token's connection with more than offers), or that is on a credential it issued before, isn't
   stopped. The Collector runs on meanwhile; a custom message
   for the server is dropped. A restart of the Supervisor tries at once. A server's "come back later"

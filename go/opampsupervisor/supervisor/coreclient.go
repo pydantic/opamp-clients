@@ -76,6 +76,8 @@ type coreClient struct {
 	reach *reachability
 	// report keeps the status file `opampsupervisor status` reads (set in newCoreClient).
 	report *statusReport
+	// last is the status the last run left, until the client opens.
+	last *Status
 	// quit is closed by Stop: what watches the server's answers, or holds the client, ends.
 	quit chan struct{}
 	// enroll is how the Supervisor's enrollment goes (enrollment.go).
@@ -88,7 +90,11 @@ var _ client.OpAMPClient = (*coreClient)(nil)
 // directory: two clients on one state file would overwrite each other's), sealed with sealer
 // unless it is nil.
 func newCoreClient(logger *zap.Logger, stateFile string, sealer opamp.StateSealer) *coreClient {
-	return &coreClient{logger: logger, stateFile: stateFile, sealer: sealer, report: newStatusReport(filepath.Dir(stateFile))}
+	c := &coreClient{logger: logger, stateFile: stateFile, sealer: sealer, report: newStatusReport(filepath.Dir(stateFile))}
+	if last, err := ReadStatus(filepath.Dir(stateFile)); err == nil {
+		c.last = last
+	}
+	return c
 }
 
 // errNotRunning: a call that needs the client running, before Start or after Stop.
@@ -118,6 +124,7 @@ func (c *coreClient) Open(ctx context.Context, settings types.StartSettings) err
 
 // openLocked is Open, with c.mu held.
 func (c *coreClient) openLocked(ctx context.Context, settings types.StartSettings) error {
+	c.carryUnreached(settings.OpAMPServerURL)
 	header := settings.Header.Clone()
 	if header == nil {
 		header = http.Header{}

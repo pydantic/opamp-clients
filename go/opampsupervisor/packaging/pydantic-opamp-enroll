@@ -534,7 +534,7 @@ not_accepted() {
 	fi
 	host=$(printf '%s\n' "$st" | sed -n 's/.*"unreachable": "\([^"]*\)".*/\1/p')
 	if [ -n "$host" ]; then
-		echo "not enrolled: the server at $endpoint tells this host to connect to $host, which can't be reached from here (its name, a firewall, a proxy or its certificate). Once it can, the host enrolls by itself, or at once after a restart of the Supervisor; when it tries again is above; check with: sudo $supervisor status --storage $storage" >&2
+		echo "not enrolled: the server at $endpoint tells this host to connect to $host, which can't be reached from here (its name, a firewall, a proxy or its certificate). Once it can, the host enrolls by itself, or at once after a restart of the Supervisor; when it tries again is above. If the server was wrong to, once it is corrected there: $taken; check with: sudo $supervisor status --storage $storage" >&2
 		fail_wait
 	fi
 	if printf '%s\n' "$st" | grep -q '"enrollment": {' && ! printf '%s\n' "$st" | grep -q '"token_refused": true'; then

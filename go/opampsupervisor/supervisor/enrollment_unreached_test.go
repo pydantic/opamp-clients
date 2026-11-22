@@ -59,6 +59,7 @@ func TestAnOfferedEndpointThatCannotBeReachedTakesOneCredential(t *testing.T) {
 			var out bytes.Buffer
 			st.Print(&out, time.Now())
 			require.Contains(t, out.String(), "This host must reach "+host)
+			require.Contains(t, out.String(), "remove this host's data and enroll it again")
 			require.Contains(t, st.Server.Error, "the endpoint the server offers can't be reached")
 		})
 	}
@@ -140,7 +141,7 @@ func TestAnOfferedEndpointThatComesBackAndRefuses(t *testing.T) {
 	require.Positive(t, keys)
 }
 
-// A restart of the Supervisor tries the kept credential again, and takes at most one more.
+// A restart of the Supervisor tries the kept credential again at once, and takes no other.
 func TestAnOfferedEndpointAfterARestart(t *testing.T) {
 	setHolds(t, 6*time.Second, 100*time.Millisecond, 8*time.Millisecond)
 	s := newEnrollServer(t)
@@ -151,9 +152,43 @@ func TestAnOfferedEndpointAfterARestart(t *testing.T) {
 		require.Eventually(t, func() bool { return c.holdsInARow() >= 3 }, 30*time.Second, 20*time.Millisecond)
 		require.NoError(t, c.Stop(context.Background()))
 		offers, tokens, _ := s.seen()
-		require.LessOrEqual(t, offers, n)
-		require.LessOrEqual(t, tokens, n)
+		require.Equal(t, []int{1, 1}, []int{offers, tokens}, "run %d", n)
+		_, e := hostStatus(t, dir)
+		require.Equal(t, "no-such-host.invalid", e["unreachable"])
+		require.EqualValues(t, 1, e["offers"])
 	}
+}
+
+// What a run left of another server's endpoint says nothing of this one's.
+func TestAnUnreachedEndpointIsTheServersOfTheLastRun(t *testing.T) {
+	setHolds(t, 6*time.Second, 100*time.Millisecond, 8*time.Millisecond)
+	s := newEnrollServer(t)
+	s.set(func(s *enrollServer) { s.dest = "ws://no-such-host.invalid/v1/opamp" })
+	dir := t.TempDir()
+	c := enrollHost(t, s, dir)
+	require.Eventually(t, func() bool { return c.holdsInARow() >= 2 }, 30*time.Second, 20*time.Millisecond)
+	require.NoError(t, c.Stop(context.Background()))
+	other := newEnrollServer(t)
+	enrollHost(t, other, dir)
+	require.Eventually(t, func() bool { st, _ := hostStatus(t, dir); return st.IsAccepted() }, 30*time.Second, 50*time.Millisecond)
+	_, e := hostStatus(t, dir)
+	require.Nil(t, e)
+}
+
+// With the data removed, the host learns of the endpoint the server was corrected to.
+func TestACorrectedEndpointAfterARemoval(t *testing.T) {
+	setHolds(t, 6*time.Second, 100*time.Millisecond, 8*time.Millisecond)
+	s := newEnrollServer(t)
+	s.set(func(s *enrollServer) { s.dest = "ws://no-such-host.invalid/v1/opamp" })
+	c := enrollHost(t, s, t.TempDir())
+	require.Eventually(t, func() bool { return c.holdsInARow() >= 2 }, 30*time.Second, 20*time.Millisecond)
+	require.NoError(t, c.Stop(context.Background()))
+	s.set(func(s *enrollServer) { s.dest = "" })
+	dir := t.TempDir()
+	enrollHost(t, s, dir)
+	require.Eventually(t, func() bool { st, _ := hostStatus(t, dir); return st.IsAccepted() }, 30*time.Second, 50*time.Millisecond)
+	offers, _, _ := s.seen()
+	require.Equal(t, 2, offers)
 }
 
 const identityTakenText = "The OpAMP instance UID is already bound to another Fleet installation."
