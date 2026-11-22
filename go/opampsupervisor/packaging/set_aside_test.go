@@ -87,7 +87,7 @@ func TestEnrollSetsAsideOnlyForThisStart(t *testing.T) {
 	require.NoError(t, os.WriteFile(filepath.Join(storage, "opamp-state"), []byte("sealed"), 0o600))
 	require.NoError(t, os.WriteFile(e.supervisor, []byte("#!/bin/sh\necho \"$@\" >>'"+filepath.Join(e.tools, "supervisor.log")+`'
 case " $* " in *" --since "*) exit 1 ;; esac
-printf '{\n  "stopped": true,\n  "server": {\n    "http_status": 401\n  }\n}\n'
+printf '{\n  "stopped": true,\n  "server": {\n    "http_status": 401,\n    "issued_refused": 5\n  }\n}\n'
 `), 0o755))
 	out, err := e.run(t, "bootstrap-token", "--endpoint", "wss://opamp.example.com/v1/opamp")
 	require.Error(t, err)
