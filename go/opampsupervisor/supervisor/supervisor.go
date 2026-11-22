@@ -2733,7 +2733,7 @@ func (s *Supervisor) Shutdown() {
 		}
 	}
 
-	waitNotice() // Changed here: the uninstall notice ends before the client does (uninstall_notice.go).
+	told := waitNotice() // Changed here: the uninstall notice ends before the client does (uninstall_notice.go).
 	if s.opampClient != nil {
 		err := s.SetHealth(
 			&protobufs.ComponentHealth{
@@ -2750,6 +2750,10 @@ func (s *Supervisor) Shutdown() {
 		}
 	}
 	s.closeOpenedClient() // Changed here: one opened to read its state, and never started.
+	// Changed here: a host the server ended enrolls as a new one (uninstall_notice.go).
+	if told {
+		s.forgetClient()
+	}
 
 	// Stop extensions after the OpAMP client (which may use their HeaderFunc)
 	// and before self-telemetry shuts down (extensions may log on shutdown).

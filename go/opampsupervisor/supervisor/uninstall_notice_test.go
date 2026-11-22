@@ -190,11 +190,36 @@ func TestTheUninstallNoticeThroughTheClient(t *testing.T) {
 	s := &Supervisor{config: config.Supervisor{Storage: config.Storage{Directory: dir}}, opampClient: c}
 	s.telemetrySettings.Logger = zap.NewNop()
 	require.NoError(t, os.Mkdir(filepath.Join(dir, uninstallRequestFile), 0o700))
-	s.noticeUninstall()()
+	assert.True(t, s.noticeUninstall()(), "told")
 	b, err := os.ReadFile(filepath.Join(dir, uninstallNoticeFile))
 	require.NoError(t, err)
 	assert.Equal(t, "told\n", string(b))
 	mu.Lock()
 	defer mu.Unlock()
 	assert.Equal(t, []string{"Bearer the-host-key"}, auths)
+}
+
+// A host the server was told about forgets its identity and credentials: they are the uninstalled
+// host's, and the server refuses another token that comes with them. One it wasn't told about keeps
+// them: they still work.
+func TestAToldUninstallForgetsTheClientsState(t *testing.T) {
+	setup := func(t *testing.T) (*Supervisor, string, func() bool) {
+		dir := t.TempDir()
+		s := &Supervisor{config: config.Supervisor{Storage: config.Storage{Directory: dir}}}
+		s.telemetrySettings.Logger = zap.NewNop()
+		state := filepath.Join(dir, coreClientStateFile)
+		require.NoError(t, os.WriteFile(state, []byte("sealed"), 0o600))
+		return s, dir, func() bool { _, err := os.Stat(state); return err == nil }
+	}
+	s, _, kept := setup(t)
+	s.forgetClient()
+	assert.False(t, kept(), "gone")
+	s.forgetClient() // nothing left to forget
+
+	s, dir, kept := setup(t)
+	require.NoError(t, os.Mkdir(filepath.Join(dir, uninstallRequestFile), 0o700))
+	if s.noticeUninstall()() { // not connected: not told
+		s.forgetClient()
+	}
+	assert.True(t, kept(), "not told: kept")
 }

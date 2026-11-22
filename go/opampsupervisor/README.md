@@ -191,8 +191,9 @@ agent:
   sends `POST /v1/fleet/installations/self/uninstall/` to its server's origin, with the credentials
   it connects with (over the client's own connection: go/opamp's `Client.Do`), for at most 10
   seconds and while its collector stops, and writes `told` or `not told: why` to
-  `uninstall-notice` for the helper to say. Without the request file nothing is sent
-  (`uninstall_notice.go`, and two lines in `Shutdown`).
+  `uninstall-notice` for the helper to say. Told, it removes its saved client state, whose identity
+  and credentials the server has ended. Without the request file nothing is sent
+  (`uninstall_notice.go`, and a few lines in `Shutdown`).
 - **`opampsupervisor status` says how it is.** The running Supervisor keeps
   `supervisor-status.json` in its storage directory: the OpAMP connection (and, when it can't
   connect, the error and what to check), the collector's health, and the last remote config's

@@ -628,9 +628,11 @@ came of it; the Supervisor, stopping, sends `POST /v1/fleet/installations/self/u
 server's origin with the credentials it connects with (the helper never reads them). Best effort: a
 server that refuses or doesn't answer within 10 seconds, a Supervisor that isn't running, or a
 custom storage directory, means Fleet isn't told, and the removal goes on. The server then ends the
-host's credentials, so a reinstall over the kept data enrolls again: run `pydantic-opamp-enroll` with
-a new enrollment token (the one the host used may be spent). Fleet is told before the package is removed, so a removal that then fails leaves
-a host Fleet lists as uninstalled. A later `--purge` finds no Supervisor running and makes no call,
+host's credentials, and the Supervisor removes the saved state that holds its identity and them, so
+a reinstall enrolls as a new host: run `pydantic-opamp-enroll` with a new enrollment token (the one
+the host used may be spent). When Fleet isn't told, the saved state stays, and a reinstall over the
+kept data goes on as the same host. Fleet is told before the package is removed, so a removal that
+then fails leaves a host Fleet lists as uninstalled. A later `--purge` finds no Supervisor running and makes no call,
 and neither do other ways of removing the package (`apt remove`, `rpm --erase`, uninstalling the
 `.msi` directly).
 

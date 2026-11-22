@@ -32,6 +32,8 @@ const (
 	uninstallNoticeFile    = "uninstall-notice"
 	uninstallPath          = "/v1/fleet/installations/self/uninstall/"
 	uninstallNoticeTimeout = 10 * time.Second
+	// uninstallTold is the result line when the server was told, and the one word the uninstaller reads.
+	uninstallTold = "told"
 	// uninstallRequestMaxAge bounds how old a request may be: the uninstaller makes it and stops the
 	// service at once, so an older one is an uninstall that failed, and this stop an ordinary one.
 	uninstallRequestMaxAge = 2 * time.Minute
@@ -45,39 +47,54 @@ type uninstallSender interface {
 }
 
 // noticeUninstall starts telling the server this host is being removed, when the uninstaller asked
-// for it, and returns what waits for it to end (at most uninstallNoticeTimeout after the start).
-func (s *Supervisor) noticeUninstall() (wait func()) {
+// for it, and returns what waits for it to end (at most uninstallNoticeTimeout after the start) and
+// says whether the server was told.
+func (s *Supervisor) noticeUninstall() (wait func() (told bool)) {
 	dir := s.config.Storage.Directory
 	request := filepath.Join(dir, uninstallRequestFile)
+	notAsked := func() bool { return false }
 	info, err := os.Lstat(request)
 	if err != nil {
-		return func() {}
+		return notAsked
 	}
 	if err := os.Remove(request); err != nil {
 		// It would ask again at every later stop.
 		s.telemetrySettings.Logger.Warn("The uninstall request can't be removed: the OpAMP server isn't told", zap.Error(err))
-		return func() {}
+		return notAsked
 	}
 	if age := time.Since(info.ModTime()); age > uninstallRequestMaxAge || age < -uninstallRequestMaxAge {
 		s.telemetrySettings.Logger.Warn("An uninstall was asked for and not made: the OpAMP server isn't told", zap.Duration("asked", age))
-		return func() {}
+		return notAsked
 	}
 	var sender uninstallSender
 	if c, ok := s.opampClient.(*coreClient); ok {
 		sender = c.uninstallSender()
 	}
-	done := make(chan struct{})
+	done := make(chan bool, 1)
 	go func() {
-		defer close(done)
+		told := false
+		defer func() { done <- told }()
 		ctx, cancel := context.WithTimeout(context.Background(), uninstallNoticeTimeout)
 		defer cancel()
 		result := sendUninstallNotice(ctx, sender)
+		told = result == uninstallTold
 		s.telemetrySettings.Logger.Info("This host is being removed: the notice to the OpAMP server", zap.String("result", result))
 		if err := writeNotice(filepath.Join(dir, uninstallNoticeFile), result); err != nil {
 			s.telemetrySettings.Logger.Warn("Could not write the uninstall notice's result", zap.Error(err))
 		}
 	}()
-	return func() { <-done }
+	return func() bool { return <-done }
+}
+
+// forgetClient removes the OpAMP client's saved state (the host's identity and the credentials the
+// server issued it), once the client has stopped. The server has ended them with the uninstall, and
+// it refuses a reinstall that comes with that identity and another token (it belongs to the
+// uninstalled host): without the state, the reinstall enrolls as a new host.
+func (s *Supervisor) forgetClient() {
+	err := os.Remove(filepath.Join(s.config.Storage.Directory, coreClientStateFile))
+	if err != nil && !errors.Is(err, os.ErrNotExist) {
+		s.telemetrySettings.Logger.Warn("The saved state of the uninstalled host can't be removed: a reinstall with another token is refused until it is", zap.Error(err))
+	}
 }
 
 // sendUninstallNotice sends the notice and says what came of it: "told", or "not told: why". The
@@ -106,7 +123,7 @@ func sendUninstallNotice(ctx context.Context, sender uninstallSender) string {
 	_ = resp.Body.Close()
 	switch resp.StatusCode {
 	case http.StatusNoContent, http.StatusOK:
-		return "told"
+		return uninstallTold
 	case http.StatusUnauthorized:
 		return "not told: the server didn't take this host's credentials (HTTP 401)"
 	case http.StatusNotFound:
