@@ -49,12 +49,12 @@ func TestTheHostKeyIsDerivedFromTheMachineID(t *testing.T) {
 	// Fixed, and systemd's: what `systemd-id128 machine-id --app-specific=c8fe2a9e-5d40-4615-8f88-fd606391a0ca --uuid`
 	// printed on the Linux host whose machine ID this is (systemd 255).
 	assert.Equal(t, "4805ee72-bc31-42c6-8529-affc6d73868e", hostKeyFrom("2f65b672a3c448a88da7f5e695eb9659"))
-	// A machine ID that isn't 16 bytes keys the HMAC as its text, and still gives a key.
-	_, err := uuid.Parse(hostKeyFrom("a1b2c3"))
-	assert.NoError(t, err)
-	assert.Empty(t, hostKeyFrom(""))
-	assert.Empty(t, hostKeyFrom(" \n"))
-	assert.Empty(t, hostKeyFrom("<unknown>"), "the SDK's word for a system it can't read")
+	// No host's own, so shared by others: none.
+	for _, id := range []string{"", " \n", "<unknown>", "uninitialized\n", "a1b2c3", "not a machine ID at all, though long",
+		"00000000000000000000000000000000", "00000000-0000-0000-0000-000000000000", "FFFFFFFF-FFFF-FFFF-FFFF-FFFFFFFFFFFF",
+		"2f65b672a3c448a88da7f5e695eb965", "2f65b672a3c448a88da7f5e695eb96590", "2f65b672a3c448a88da7f5e695eb965900"} {
+		assert.Empty(t, hostKeyFrom(id), id)
+	}
 }
 
 // The agent description the Supervisor reports carries the host key, before and after the

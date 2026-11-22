@@ -4,6 +4,7 @@
 package supervisor
 
 import (
+	"bytes"
 	"context"
 	"crypto/hmac"
 	"crypto/sha256"
@@ -31,17 +32,13 @@ var hostKeyApp = uuid.MustParse("c8fe2a9e-5d40-4615-8f88-fd606391a0ca")
 // machine ID's 16 bytes over hostKeyApp's, its first 16 bytes as a version 4 UUID. On Linux the
 // key is then what `systemd-id128 machine-id --app-specific=<hostKeyApp>` prints. Every system's
 // machine ID is 16 bytes written as hex or as a UUID (Linux machine-id, macOS IOPlatformUUID,
-// Windows MachineGuid); one that isn't keys the HMAC as its text. It reveals nothing about the
-// machine ID. "" for no machine ID: no key is made up.
+// Windows MachineGuid). It reveals nothing about the machine ID. "" for anything else, and for 16 bytes
+// that are all the same: no key is made up of what other hosts have too (systemd's "uninitialized", the
+// SDK's "<unknown>", the zeros of an image or a firmware that has no ID).
 func hostKeyFrom(machineID string) string {
-	machineID = strings.TrimSpace(machineID)
-	// The SDK says "<unknown>" on a system it can't read one from: no machine's own.
-	if machineID == "" || machineID == "<unknown>" {
+	key, err := hex.DecodeString(strings.ReplaceAll(strings.TrimSpace(machineID), "-", ""))
+	if err != nil || len(key) != 16 || bytes.Count(key, key[:1]) == len(key) {
 		return ""
-	}
-	key := []byte(machineID)
-	if b, err := hex.DecodeString(strings.ReplaceAll(machineID, "-", "")); err == nil && len(b) == 16 {
-		key = b
 	}
 	mac := hmac.New(sha256.New, key)
 	mac.Write(hostKeyApp[:])

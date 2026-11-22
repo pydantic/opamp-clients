@@ -208,7 +208,8 @@ agent:
   nothing about the machine ID, which isn't reported. It is not `host.id`, which is the raw machine
   ID the `resourcedetection` processor exports. One set in
   `agent::description::non_identifying_attributes` wins, and set to `""` there none is reported; a
-  host with no machine ID (a container, say) reports none. Like the other attributes of the agent
+  host with no machine ID (a container, say), or with one that isn't a host's own (text that isn't 16
+  bytes, as systemd's `uninitialized`, or all zeros), reports none. Like the other attributes of the agent
   description, it is also a resource attribute of the Collector's own telemetry. Hosts cloned from
   one image share the key unless the image makes a new machine ID.
   The Collector is given the same key in its environment, as `pydantic.fleet.host_key` in
