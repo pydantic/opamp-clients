@@ -116,7 +116,7 @@ keep_legacy() {
 	rm -f "$migrated" "$etc/supervisor.yaml.tmp" "$etc/settings.tmp"
 	echo "pydantic-opamp-enroll: $etc/supervisor.yaml was written by an older package with --restricted, or edited, and is kept; run pydantic-opamp-enroll again with its options to add this version's settings" >&2
 	unload
-	"$launchctl" bootstrap system "$plist"
+	load
 	echo "restarted the Supervisor ($label)"
 	exit 0
 }
@@ -124,15 +124,34 @@ keep_legacy() {
 # unload stops the daemon, if it is loaded, and waits for launchd to let go of it. bootout can
 # return while launchd still holds the label (the Supervisor is stopping its Collector), and a
 # bootstrap then fails with "Bootstrap failed: 5: Input/output error" and leaves it unloaded.
+# A signal from here on waits for load: one that ended this script in between would leave the daemon
+# unloaded until the Mac starts again.
 unload() {
-	"$launchctl" bootout "system/$label" 2>/dev/null || true
+	ended=
+	trap 'ended=129' HUP
+	trap 'ended=130' INT
+	trap 'ended=143' TERM
+	unsignaled "$launchctl" bootout "system/$label" 2>/dev/null || true
 	remaining=30
-	while "$launchctl" print "system/$label" >/dev/null 2>&1; do
+	while unsignaled "$launchctl" print "system/$label" >/dev/null 2>&1; do
 		[ "$remaining" -gt 0 ] || fail "$label is still stopping after 30 seconds; once it has stopped, start it with: sudo launchctl bootstrap system $plist"
-		sleep 1
+		unsignaled sleep 1
 		remaining=$((remaining - 1))
 	done
 }
+
+# load loads the daemon that unload unloaded, and then ends on a signal that came meanwhile.
+load() {
+	unsignaled "$launchctl" bootstrap system "$plist"
+	trap - HUP INT TERM
+	[ -z "$ended" ] || exit "$ended"
+}
+
+# unsignaled runs a command that the signals (a Ctrl-C reaches the commands here too) don't end.
+unsignaled() (
+	trap '' HUP INT TERM
+	exec "$@"
+)
 
 # settings prints a config's settings: its lines but comments and blank ones, sorted.
 settings() {
@@ -461,7 +480,7 @@ if [ -n "$start" ]; then
 	# Loaded already (enrolling again, or --refresh): unload it first, so it reads the new config.
 	unload
 	started=$(date +%s)
-	"$launchctl" bootstrap system "$plist"
+	load
 	wait_connected "$started"
 	echo "$done with $endpoint. The Supervisor is running and connected ($label)."
 else
