@@ -34,8 +34,15 @@ func macEnroll(t *testing.T, root, tools, stdin string, args ...string) (string,
 echo "$@" >>"`+filepath.Join(tools, "launchctl.log")+`"
 loaded="`+filepath.Join(tools, "loaded")+`"
 case $1 in
-bootout) rm -f "$loaded" ;;
-bootstrap) : >"$loaded" ;;
+bootout) rm -f "$loaded" "`+filepath.Join(tools, "kicks")+`" ;;
+bootstrap)
+	: >"$loaded"
+	`+fakeSetAside(tools)+` ;;
+kickstart)
+	[ -e "$loaded" ] || exit 113
+	[ ! -e "`+filepath.Join(tools, "fail-kick")+`" ] || exit 1
+	echo $(($(cat "`+filepath.Join(tools, "kicks")+`" 2>/dev/null || echo 0) + 1)) >"`+filepath.Join(tools, "kicks")+`"
+	`+fakeSetAside(tools)+` ;;
 print)
 	# With LAUNCHCTL_STOPPING naming a file, launchd still holds the label (stopping) for that many prints.
 	left=$(cat "${LAUNCHCTL_STOPPING:-/dev/null}" 2>/dev/null)
@@ -47,7 +54,7 @@ print)
 	elif [ -e "`+filepath.Join(tools, "crashing")+`" ]; then
 		printf '\tstate = running\n\truns = 3\n'
 	else
-		printf '\tstate = running\n\truns = 1\n'
+		printf '\tstate = running\n\truns = %d\n' $(($(cat "`+filepath.Join(tools, "kicks")+`" 2>/dev/null || echo 0) + 1))
 	fi
 	;;
 esac
@@ -131,7 +138,8 @@ func TestMacEnrollWaitsForTheConnection(t *testing.T) {
 	assert.NotContains(t, out, "running and connected")
 
 	// Enrolled again with the same token after the server revoked the host's own credentials: the
-	// saved state goes, and the daemon starts again from the token, once.
+	// Supervisor is asked to set the saved state aside as it starts again, once, and the command that puts
+	// it back is said.
 	state := filepath.Join(root, "opt/pydantic-opamp/var/opamp-state")
 	require.NoError(t, os.MkdirAll(filepath.Dir(state), 0o700))
 	require.NoError(t, os.WriteFile(state, []byte("sealed"), 0o600))
@@ -139,7 +147,95 @@ func TestMacEnrollWaitsForTheConnection(t *testing.T) {
 	out, err = macEnroll(t, root, tools, "t", "--endpoint", "wss://opamp.example.com/v1/opamp")
 	require.Error(t, err, "the fake status still fails after the second start")
 	assert.Equal(t, 1, strings.Count(out, "the server refused this host's saved credentials"))
-	assert.NoFileExists(t, state)
+	aside, err := filepath.Glob(state + ".refused-*")
+	require.NoError(t, err)
+	require.Len(t, aside, 1)
+	kept, err := os.ReadFile(aside[0])
+	require.NoError(t, err)
+	assert.Equal(t, "sealed", string(kept))
+	assert.NotContains(t, out, "purge")
+	assert.NotContains(t, out, "failed to start", "its second start is the one asked for")
+	log, err := os.ReadFile(filepath.Join(tools, "launchctl.log"))
+	require.NoError(t, err)
+	assert.Regexp(t, `(?s)bootout.*bootstrap.*kickstart -k system/dev.pydantic.opamp-supervisor\n`, string(log))
+	_, command, ok := strings.Cut(out, "put them back with: sudo ")
+	require.True(t, ok, out)
+	command, _, _ = strings.Cut(command, "\n")
+	// The command, run: the old state is back, and what was there is set aside instead.
+	run := exec.Command("/bin/sh", "-c", strings.ReplaceAll(command, "launchctl ", filepath.Join(tools, "launchctl")+" "))
+	run.Env = append(os.Environ(), "OPAMP_ENROLL_ROOT="+root)
+	b, err := run.CombinedOutput()
+	require.NoError(t, err, string(b))
+	kept, err = os.ReadFile(state)
+	require.NoError(t, err)
+	assert.Equal(t, "sealed", string(kept))
+	aside, err = filepath.Glob(state + ".replaced-*")
+	require.NoError(t, err)
+	require.Len(t, aside, 1)
+	kept, err = os.ReadFile(aside[0])
+	require.NoError(t, err)
+	assert.Equal(t, "new\n", string(kept))
+	assert.FileExists(t, filepath.Join(tools, "loaded"))
+	// Run again: nothing changes.
+	run = exec.Command("/bin/sh", "-c", strings.ReplaceAll(command, "launchctl ", filepath.Join(tools, "launchctl")+" "))
+	run.Env = append(os.Environ(), "OPAMP_ENROLL_ROOT="+root)
+	b, _ = run.CombinedOutput()
+	assert.Contains(t, string(b), "nothing is put back, the copy is not there")
+	kept, err = os.ReadFile(state)
+	require.NoError(t, err)
+	assert.Equal(t, "sealed", string(kept))
+	assert.FileExists(t, filepath.Join(tools, "loaded"))
+	// What fails later for another reason is nothing to put credentials back for, nor is a name that isn't
+	// the Supervisor's.
+	require.NoError(t, os.WriteFile(state+".refused-20261122T000000Z-1", []byte("older"), 0o600))
+	require.NoError(t, os.WriteFile(state+".refused-..-1", []byte("x"), 0o600))
+	require.NoError(t, os.Remove(filepath.Join(tools, "json")))
+	out, err = macEnroll(t, root, tools, "t", "--endpoint", "wss://opamp.example.com/v1/opamp")
+	require.Error(t, err)
+	assert.NotContains(t, out, "put them back with")
+	require.NoError(t, os.WriteFile(filepath.Join(tools, "json"), []byte(refusedJSON), 0o600))
+	out, err = macEnroll(t, root, tools, "t", "--endpoint", "wss://opamp.example.com/v1/opamp")
+	require.Error(t, err)
+	assert.Contains(t, out, "in an earlier run, at 2026-11-22 00:00:00 UTC, and the identity kept with them, are set aside in "+state+".refused-20261122T000000Z-1.")
+	require.NoError(t, os.WriteFile(state+".refused-20261121T000000Z-1", []byte("oldest"), 0o600))
+	out, err = macEnroll(t, root, tools, "t", "--endpoint", "wss://opamp.example.com/v1/opamp")
+	require.Error(t, err)
+	assert.Contains(t, out, "are set aside in "+state+".refused-20261122T000000Z-1.")
+	assert.Contains(t, out, "there are more set aside than these, the last: ")
+	require.NoError(t, os.Remove(state+".refused-20261121T000000Z-1"))
+	out, err = macEnroll(t, root, tools, "", "--refresh")
+	require.Error(t, err)
+	assert.NotContains(t, out, "put them back with", "an upgrade")
+	assert.NotContains(t, out, "there are more set aside")
+	// Taken, and its new state not saved: not enrolled, and the way back said.
+	for _, how := range []string{`rm -f "$S/opamp-state"`, "true"} {
+		require.NoError(t, os.WriteFile(filepath.Join(tools, "heal"), nil, 0o600))
+		require.NoError(t, os.WriteFile(filepath.Join(tools, "healed"), []byte(how), 0o600))
+		require.NoError(t, os.WriteFile(filepath.Join(tools, "json"), []byte(revokedJSON), 0o600))
+		require.NoError(t, os.WriteFile(filepath.Join(tools, "status"), []byte("1"), 0o600))
+		require.NoError(t, os.WriteFile(state, []byte("sealed"), 0o600))
+		if how == "true" {
+			require.NoError(t, os.WriteFile(filepath.Join(tools, "healed-json"), []byte("{\n  \"save_error\": \"no space left\"\n}\n"), 0o600))
+		}
+		out, err = macEnroll(t, root, tools, "t", "--endpoint", "wss://opamp.example.com/v1/opamp")
+		require.Error(t, err, how)
+		assert.Contains(t, out, "its new credentials could not be saved")
+		assert.Contains(t, out, "put them back with: sudo ")
+		assert.NotContains(t, out, "Enrolled with")
+		for _, name := range []string{"heal", "healed"} {
+			require.NoError(t, os.Remove(filepath.Join(tools, name)))
+		}
+	}
+	require.NoError(t, os.Remove(filepath.Join(tools, "healed-json")))
+	require.NoError(t, os.WriteFile(filepath.Join(tools, "json"), []byte(revokedJSON), 0o600))
+	require.NoError(t, os.WriteFile(filepath.Join(tools, "status"), []byte("1"), 0o600))
+	// Of a status before this start, or --refresh: not asked.
+	out, err = macEnroll(t, root, tools, "", "--refresh")
+	require.Error(t, err)
+	assert.NotContains(t, out, "the server refused this host's saved credentials")
+	calls, err = os.ReadFile(filepath.Join(tools, "json-calls.log"))
+	require.NoError(t, err)
+	assert.Regexp(t, `(?m)^status .* --wait 1s --since \d+ --require-accepted --json$`, string(calls))
 	require.NoError(t, os.Remove(filepath.Join(tools, "json")))
 
 	// Connected, and the server never answered: the token was refused.

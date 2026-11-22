@@ -61,6 +61,8 @@ type coreTestServer struct {
 	changed chan struct{}
 	// respond, if set, answers a message (the instance UID is filled in).
 	respond func(auth string, msg *protobufs.AgentToServer) *protobufs.ServerToAgent
+	// refuse, if set, is whether the connections with these credentials are refused (401).
+	refuse func(auth string) bool
 }
 
 func newCoreTestServer(t *testing.T) *coreTestServer {
@@ -76,7 +78,14 @@ func newCoreTestServerTLS(t *testing.T, useTLS bool) (*coreTestServer, *httptest
 	handler, connContext, err := server.New(nil).Attach(server.Settings{Callbacks: serverTypes.Callbacks{
 		OnConnecting: func(r *http.Request) serverTypes.ConnectionResponse {
 			auth := r.Header.Get("Authorization")
-			ts.record(func() { ts.auths = append(ts.auths, auth) })
+			refused := false
+			ts.record(func() {
+				ts.auths = append(ts.auths, auth)
+				refused = ts.refuse != nil && ts.refuse(auth)
+			})
+			if refused {
+				return serverTypes.ConnectionResponse{HTTPStatusCode: http.StatusUnauthorized}
+			}
 			return serverTypes.ConnectionResponse{Accept: true, ConnectionCallbacks: serverTypes.ConnectionCallbacks{
 				OnMessage: func(_ context.Context, _ serverTypes.Connection, msg *protobufs.AgentToServer) *protobufs.ServerToAgent {
 					ts.record(func() { ts.msgs = append(ts.msgs, msg) })

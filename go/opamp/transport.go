@@ -5,6 +5,7 @@ package opamp
 
 import (
 	"bytes"
+	"cmp"
 	"context"
 	"crypto/rand"
 	"crypto/sha256"
@@ -17,6 +18,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -59,6 +61,12 @@ type executor struct {
 	// used is the OpAMP request or connection whose outcome came last: its URL and headers (platform
 	// mode only: in core mode the core makes them itself).
 	used atomic.Pointer[usedRequest]
+	// configured are the configured headers, and usedIssued whether the last one was made with others.
+	configured http.Header
+	usedIssued atomic.Bool
+	// saveError is how the last save ended ("" if it was saved), and saves says that one did.
+	saveError atomic.Pointer[string]
+	saves     chan struct{}
 	// answered is closed when the first answer from the server arrives (heard; platform mode
 	// only, as used).
 	answered   chan struct{}
@@ -95,10 +103,42 @@ func isWSAnswer(data []byte) bool {
 	return n > 0 && header == 0 && isAnswer(data[n:])
 }
 
-// tried records url as the one the latest request or connection went to, before its outcome
-// reaches the core: a notification of that outcome finds it in place.
-func (x *executor) tried(url string, header http.Header) {
-	x.used.Store(&usedRequest{url: url, header: header})
+// saved records how a save ended, before it reaches the core.
+func (x *executor) saved(in *corepb.Input) {
+	detail := ""
+	if f := in.GetStoreFailed(); f != nil {
+		detail = cmp.Or(f.GetDetail(), "the save failed")
+	}
+	x.saveError.Store(&detail)
+	select {
+	case x.saves <- struct{}{}:
+	default: // one is waiting already
+	}
+}
+
+// configure keeps the configured headers, but those the core sets itself.
+func (x *executor) configure(header http.Header) {
+	x.configured = http.Header{}
+	for name, values := range header {
+		for _, v := range values {
+			x.configured.Add(name, v)
+		}
+	}
+	for _, name := range []string{"User-Agent", "Content-Type", "Accept-Encoding", "OpAMP-Instance-UID"} {
+		x.configured.Del(name)
+	}
+}
+
+// tried records url as the one the latest request or connection went to, its headers, and whether they are
+// other than the configured ones, before its outcome reaches the core: a notification of that outcome
+// finds it in place.
+func (x *executor) tried(url string, headers []*corepb.Header) {
+	sent, issued := toHTTP(headers), false
+	x.used.Store(&usedRequest{url: url, header: sent})
+	for name := range x.configured {
+		issued = issued || !slices.Equal(sent.Values(name), x.configured.Values(name))
+	}
+	x.usedIssued.Store(issued)
 }
 
 // usedRequest is where an OpAMP request or connection went, with the headers it sent.
@@ -113,7 +153,8 @@ func newExecutor(conn *connection) *executor {
 	b := make([]byte, 8)
 	_, _ = rand.Read(b)
 	return &executor{conn: conn, out: make(chan report, 16), done: make(chan struct{}), fl: newInFlight(),
-		instance: hex.EncodeToString(b), fs: osFS{}, answered: make(chan struct{})}
+		instance: hex.EncodeToString(b), fs: osFS{}, answered: make(chan struct{}),
+		saves: make(chan struct{}, 1)}
 }
 
 func (x *executor) reports() <-chan report { return x.out }
@@ -150,7 +191,7 @@ func (x *executor) do(eff *corepb.Effect) *report {
 		e := x.fl.add(k.HttpRequest.Id)
 		x.fl.spawn(func() {
 			in := x.post(e.ctx, k.HttpRequest)
-			x.tried(k.HttpRequest.Url, toHTTP(k.HttpRequest.Headers))
+			x.tried(k.HttpRequest.Url, k.HttpRequest.Headers)
 			x.emit(report{e: e, in: in, last: true})
 		})
 	case *corepb.Effect_WsOpen:
@@ -200,6 +241,7 @@ func (x *executor) do(eff *corepb.Effect) *report {
 				<-prev
 			}
 			if in := store(e.ctx, x.fs, x.stateFile, x.sealer, k.Store); in != nil {
+				x.saved(in)
 				x.emit(report{e: e, in: in, last: true})
 			}
 		})
@@ -588,7 +630,7 @@ func (x *executor) post(ctx context.Context, r *corepb.HttpRequest) *corepb.Inpu
 // any point, drops it: the dial is aborted, or the connection closed without a word.
 func (x *executor) connect(e *effect, o *corepb.WsOpen) {
 	conn, resp, err := x.conn.dialWebSocket(e.ctx, o.Url, toHTTP(o.Headers))
-	x.tried(o.Url, toHTTP(o.Headers))
+	x.tried(o.Url, o.Headers)
 	if err != nil {
 		f := &corepb.WsFailed{Id: o.Id, Detail: lossy(err.Error()), UnixMs: unixMs()}
 		if resp != nil {

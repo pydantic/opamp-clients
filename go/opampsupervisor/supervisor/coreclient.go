@@ -233,6 +233,20 @@ func (c *coreClient) Start(ctx context.Context, settings types.StartSettings) er
 	c.client = started
 	// The status says once the server has answered (it took this Supervisor), until Stop.
 	c.quit = make(chan struct{})
+	go func(quit <-chan struct{}) {
+		failed := ""
+		for {
+			select {
+			case <-started.Saves():
+				if e := started.SaveError(); e != failed {
+					failed = e
+					c.report.saved(c.logger, e)
+				}
+			case <-quit:
+				return
+			}
+		}
+	}(c.quit)
 	if answered := started.Answered(); answered != nil {
 		go func(quit <-chan struct{}) {
 			select {
@@ -288,7 +302,7 @@ func (c *coreClient) onNotification(cl *collector.Client, n collector.Notificati
 	case opamp.ConnectFailed:
 		// Changed here: the Supervisor hears the first failure of a run, with what to check in its
 		// config; the retries that follow go at debug, not an error each (reachability).
-		c.report.connectFailed(c.logger, n.Status, n.Detail)
+		c.report.connectFailed(c.logger, n.Status, n.Detail, cl != nil && cl.UsedIssued())
 		if err := c.reach.failed(n.Status, n.Detail); err != nil && cb.OnConnectFailed != nil {
 			cb.OnConnectFailed(ctx, err)
 		}

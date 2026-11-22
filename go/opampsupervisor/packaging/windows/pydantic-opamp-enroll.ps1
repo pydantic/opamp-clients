@@ -388,32 +388,83 @@ if ($NoStart) {
     $waited = $LASTEXITCODE
     # Enrolling (not -Refresh) with the token this host enrolled with before, after the server
     # revoked its own credentials (it deleted the host, say): the client keeps them while the
-    # token is the same and never falls back to it, so they are forgotten, with the instance UID
-    # kept with them, and the Supervisor starts again from the token, once; a token the server
-    # refuses too fails as below. A healthy host enrolled again is never refused, and keeps its
-    # identity.
+    # token is the same and never falls back to it, so the Supervisor is asked to set them aside, with
+    # the instance UID kept with them, as it starts again (supervisor/set_aside.go), once, from the token;
+    # a token the server refuses too fails as below. Nothing puts them back but a person, and nothing
+    # removes them. A healthy host enrolled again is never refused, and keeps its identity.
     $state = Join-Path $storage 'opamp-state'
-    if ($waited -ne 0 -and -not $Refresh -and (Test-Path -LiteralPath $state)) {
+    $aside = $null
+    $tried = $false
+    $notSaved = $false
+    $more = $null
+    # The saved states set aside. Other names aren't the Supervisor's: whoever made them, they go into no command.
+    function Get-StatesAside {
+        Get-ChildItem -LiteralPath $storage -Filter 'opamp-state.refused-*' -File -ErrorAction SilentlyContinue |
+            Where-Object { $_.Name -cmatch '^opamp-state\.refused-[0-9TZ.]+-[0-9]+$' -and -not ($_.Attributes -band [IO.FileAttributes]::ReparsePoint) } |
+            Select-Object -ExpandProperty FullName
+    }
+    if ($waited -ne 0 -and -not $Refresh -and (Test-Path -LiteralPath $state -PathType Leaf)) {
         $st = $null
-        try { $st = (& $supervisor status --storage $storage --json 2>$null | Out-String) | ConvertFrom-Json } catch { }
-        # 401: not valid. A 403 can mean a missing permission instead, and is left alone.
-        if ($st -and $st.server -and $st.server.http_status -eq 401) {
-            Note "the server refused this host's saved credentials (it deleted the host, say), so pydantic-opamp-enroll removed them, with the identity kept with them, and enrolls it again with the enrollment token, as a new host"
-            Stop-Service -Name $service -Force -ErrorAction SilentlyContinue
-            Remove-Item -LiteralPath $state -Force
-            $started = [DateTimeOffset]::UtcNow.ToUnixTimeSeconds()
-            Restart-Supervisor
-            & $supervisor status --storage $storage --wait 30s --since $started --require-accepted
-            $waited = $LASTEXITCODE
+        # Of the Supervisor just started: the status of one before it says nothing of this start.
+        try { $st = (& $supervisor status --storage $storage --wait 1s --since $started --require-accepted --json 2>$null | Out-String) | ConvertFrom-Json } catch { }
+        # The credentials it issued this host refused as not valid (HTTP 401; a 403 can mean a missing
+        # permission instead), three times or more in a row.
+        if ($st -and $st.server -and $st.server.issued_refused -ge 3) {
+            $before = @(Get-StatesAside)
+            $request = Join-Path $storage "opamp-state.set-aside-$PID"
+            try {
+                $null = [IO.Directory]::CreateDirectory($request)
+                [IO.Directory]::SetLastWriteTimeUtc($request, [DateTime]::UtcNow)
+                Note "the server refused this host's saved credentials (it deleted the host, say), so pydantic-opamp-enroll asks the Supervisor to set them aside, with the identity kept with them, and to enroll it again with the enrollment token, as a new host"
+                $started = [DateTimeOffset]::UtcNow.ToUnixTimeSeconds()
+                try { Restart-Service -Name $service -ErrorAction Stop } catch { } # said below
+                & $supervisor status --storage $storage --wait 30s --since $started --require-accepted
+                $waited = $LASTEXITCODE
+            } finally {
+                # This process may run on once the script ends: nobody waits for the request then.
+                try { [IO.Directory]::Delete($request) } catch { }
+            }
+            $tried = $true
+            # This run's, if another run had one set aside meanwhile.
+            $aside = @(Get-StatesAside) | Where-Object { $before -notcontains $_ } | Sort-Object { $_ -like "*-$PID" } | Select-Object -Last 1
         }
     }
-    if ($waited -ne 0) {
+    if ($waited -eq 0 -and $aside) {
+        # The state of the host enrolled as a new one isn't saved, a moment after the server took it.
+        Start-Sleep -Seconds 2
+        $st = $null
+        try { $st = (& $supervisor status --storage $storage --json 2>$null | Out-String) | ConvertFrom-Json } catch { }
+        if (-not (Test-Path -LiteralPath $state -PathType Leaf) -or ($st -and $st.save_error)) { $notSaved = $true }
+        $global:LASTEXITCODE = 0 # a caller's, if this run succeeds
+    }
+    if ($waited -ne 0 -or $notSaved) {
+        if ($notSaved) { Note "the server took this host as a new one, and its new credentials could not be saved: a restart loses them. Why: & '$supervisor' status --storage '$storage'" }
+        $which = 'this host now enrolls as a new one: the saved credentials the server refused'
+        if ($tried -and -not $aside) { Note "the saved credentials are not set aside: if the Supervisor started, its log says why" }
+        $st = $null
+        if (-not $aside -and -not $Refresh) { try { $st = (& $supervisor status --storage $storage --wait 1s --since $started --require-accepted --json 2>$null | Out-String) | ConvertFrom-Json } catch { } }
+        if ($st -and $st.server -and ($st.server.http_status -eq 401 -or ($st.server.connected -and -not $st.accepted))) {
+            # The last that an earlier run had set aside, if there is one, and the server refuses this host
+            # now, too: an outage, or an upgrade, is nothing to put credentials back for.
+            $all = @(Get-StatesAside)
+            $aside = $all | Sort-Object | Select-Object -Last 1
+            $which = 'saved credentials the server refused in an earlier run, at ' + ("$aside" -replace '^.*refused-(....)(..)(..)T(..)(..)(..)Z.*$', '$1-$2-$3 $4:$5:$6 UTC')
+            if ($all.Count -gt 1) { $more = "there are more set aside than these, the last: & '$supervisor' status --storage '$storage' lists them" }
+        }
+        if ($aside -and $which -match 'earlier') { Note 'if this run had another token than the host enrolled with, enroll again with that one first' }
+        if ($aside) { Note "$which, and the identity kept with them, are set aside in $aside. If the server refused them for a while only, put them back with: try { Stop-Service $service -ErrorAction Stop; if (Test-Path -LiteralPath '$aside') { `$n = '$state.replaced-' + [DateTime]::UtcNow.ToString('yyyyMMddTHHmmssZ') + '-' + `$PID; if (Test-Path -LiteralPath '$state') { Move-Item -LiteralPath '$state' -Destination `$n -ErrorAction Stop }; try { Move-Item -LiteralPath '$aside' -Destination '$state' -ErrorAction Stop } catch { Move-Item -LiteralPath `$n -Destination '$state'; throw } } else { 'nothing is put back, the copy is not there' } } finally { Start-Service $service }" }
+        if ($more) { Note $more }
+        if ($notSaved) { exit 1 }
         # A service that isn't running never got to connect: say so, and where its log is, instead.
         if ((Get-Service -Name $service -ErrorAction SilentlyContinue).Status -ne 'Running') { Fail-Start }
         $st = $null
         try { $st = (& $supervisor status --storage $storage --json 2>$null | Out-String) | ConvertFrom-Json } catch { }
         if ($st -and $st.server -and $st.server.connected -and -not $st.accepted) {
-            Fail "enrolled, but the server at $Endpoint took the connection and not the enrollment token: it may be used up, expired or revoked, or the server deleted this host, which keeps its identity. Enroll again with a new token, or for a deleted host remove its data first (pydantic-opamp-uninstall.ps1 -Purge); check with: & '$supervisor' status --storage '$storage'"
+            # Not with credentials set aside: a purge removes them.
+            $kept = $tried -or @(Get-StatesAside).Count -or (Test-Path -Path "$state.replaced-*")
+            $deleted = if ($kept) { '' } else { ', or the server deleted this host, which keeps its identity' }
+            $purge = if ($kept) { '' } else { ', or for a deleted host remove its data first (pydantic-opamp-uninstall.ps1 -Purge)' }
+            Fail "enrolled, but the server at $Endpoint took the connection and not the enrollment token: it may be used up, expired or revoked$deleted. Enroll again with a new token$purge; check with: & '$supervisor' status --storage '$storage'"
         }
         Fail "enrolled, but the Supervisor can't connect to $Endpoint yet; it keeps retrying. Fix what is above, then check with: & '$supervisor' status --storage '$storage'"
     }

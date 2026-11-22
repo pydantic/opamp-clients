@@ -218,6 +218,18 @@ agent:
   reason, then at debug.
   The command is taken in a file of its own (`status_command.go`) before `main` runs, so
   upstream's `main.go` is unchanged.
+- **A saved state the server refuses is set aside when asked** (a new file, `set_aside.go`). The client
+  never falls back from the credentials a server issued to the configured ones, so a host the server
+  deleted is refused for good. An enrollment helper that a person runs with a token asks, by making the
+  directory `opamp-state.set-aside-PID` (its own process ID; on Linux with when it started, as /proc
+  has it) in the storage directory, restarting the
+  Supervisor and waiting. If the server refused the credentials it issued this host as not valid (HTTP
+  401) in the last tries of the Supervisor's last run, three or more, that helper still runs and the
+  request is not older than 2 minutes, the Supervisor renames `opamp-state` to `opamp-state.refused-`,
+  the time (UTC) and the process ID as it starts, before its client opens it, and the client starts from
+  the configured credentials, as a new host. Nothing puts one set aside back, replaces it or removes it
+  but a person, or a purge. `opampsupervisor status` lists them (`set_aside` in `--json`), and says when
+  the client's state can't be saved (`save_error`; it exits 1 then): a restart would lose it.
 - **On macOS the Collector's own log is sampled by default.** Upstream's macOS unified log
   receiver logs "Running log command" at info for each poll, and polls again 100 ms after any poll
   that found logs: about one line a second on a busy Mac, into `agent.log` and the Collector's own
@@ -263,7 +275,7 @@ Every file from upstream keeps its license header (Apache-2.0, [LICENSE](LICENSE
 paths were rewritten to this module's. The files changed beyond that say what changed in their
 header. These files are new, and are this repository's:
 
-- `supervisor/coreclient.go`, `agent_update.go`, `apply_step.go`, `client_state.go`, `startup.go`, `sealed_storage.go`, `telemetry_env.go`, `idle_telemetry.go`, `reachability.go`, `status.go`, `uninstall_notice.go`, `own_telemetry_status.go`, `instance_uid_change.go`, `log_sampling.go`,
+- `supervisor/coreclient.go`, `agent_update.go`, `apply_step.go`, `client_state.go`, `startup.go`, `sealed_storage.go`, `telemetry_env.go`, `idle_telemetry.go`, `reachability.go`, `status.go`, `uninstall_notice.go`, `set_aside.go`, `set_aside_darwin.go`, `set_aside_linux.go`, `set_aside_other.go`, `set_aside_windows.go`, `own_telemetry_status.go`, `instance_uid_change.go`, `log_sampling.go`,
   `localserver.go`, `service_log.go`, `config/remote_config_policy.go`, `commander/collector_env.go`,
   `commander/agent_log.go` and `verifier/cosign.go`, and the tests
   beside them (with `supervisor/remote_config_refusal_test.go`, `restart_command_test.go` and
