@@ -122,7 +122,7 @@ for f in "$S".refused-20261*; do pid=${f##*-}; done
 	require.Error(t, err)
 	_, named, ok := strings.Cut(string(out), "are set aside in ")
 	require.True(t, ok, string(out))
-	named, _, _ = strings.Cut(named, ",")
+	named, _, _ = strings.Cut(named, ". If")
 	assert.True(t, strings.HasSuffix(named, fmt.Sprintf("-%d", cmd.Process.Pid)), named)
 	kept, err := os.ReadFile(named)
 	require.NoError(t, err)

@@ -464,10 +464,22 @@ new_aside() {
 	echo "$found"
 }
 
-# tell_aside says that the saved credentials are set aside in $1, and how to put them back (what is in their
-# place then is set aside instead).
+# tell_aside says what $2 are, set aside in $1, and how to put them back (what is in their place then is set
+# aside instead).
 tell_aside() {
-	echo "the saved credentials the server refused, and the identity kept with them, are set aside in $1, and this host now enrolls as a new one. If the server refused them for a while only, put them back with: sudo sh -c 'launchctl bootout system/$label; n=0; while launchctl print system/$label >/dev/null 2>&1 && [ \$n -lt 30 ]; do sleep 1; n=\$((n+1)); done; if launchctl print system/$label >/dev/null 2>&1; then echo still stopping, nothing is put back: run this again >&2; else n=$storage/opamp-state.refused-\$(date -u +%Y%m%dT%H%M%SZ)-\$\$; [ -f $1 ] && { [ ! -e $storage/opamp-state ] || mv $storage/opamp-state \$n; } && { mv $1 $storage/opamp-state || mv \$n $storage/opamp-state; }; fi; launchctl bootstrap system $plist'" >&2
+	echo "$2, and the identity kept with them, are set aside in $1. If the server refused them for a while only, put them back with: sudo sh -c 'launchctl bootout system/$label; n=0; while launchctl print system/$label >/dev/null 2>&1 && [ \$n -lt 30 ]; do sleep 1; n=\$((n+1)); done; if launchctl print system/$label >/dev/null 2>&1; then echo still stopping, nothing is put back: run this again >&2; else n=$storage/opamp-state.refused-\$(date -u +%Y%m%dT%H%M%SZ)-\$\$; [ -f $1 ] && { [ ! -e $storage/opamp-state ] || mv $storage/opamp-state \$n; } && { mv $1 $storage/opamp-state || mv \$n $storage/opamp-state; }; fi; launchctl bootstrap system $plist'" >&2
+}
+
+# tell_earlier is tell_aside of the last that an earlier run had set aside, if there is one.
+tell_earlier() {
+	earlier=$(states_aside | tail -n 1)
+	[ -z "$earlier" ] || tell_aside "$earlier" "saved credentials the server refused before this run"
+}
+
+# fail_wait ends a run whose wait failed.
+fail_wait() {
+	[ -n "$restarted_fresh" ] || tell_earlier
+	exit 1
 }
 
 # not_accepted fails the install when the Supervisor is connected but the server never answered
@@ -480,10 +492,12 @@ not_accepted() {
 		purge=", or for a deleted host remove its data first (sudo /opt/pydantic-opamp/bin/pydantic-opamp-uninstall --purge)"
 		[ -z "$restarted_fresh" ] || deleted= purge=
 		echo "enrolled, but the server at $endpoint took the connection and not the enrollment token: it may be used up, expired or revoked$deleted. Enroll again with a new token$purge; check with: sudo $supervisor status --storage $storage" >&2
-		exit 1
+		fail_wait
 	fi
 }
 
+# not_saved is whether the state of the host enrolled as a new one isn't saved, a moment after the server took
+# it: a restart would lose it.
 not_saved() {
 	sleep 2
 	[ ! -f "$storage/opamp-state" ] || "$supervisor" status --storage "$storage" --json 2>/dev/null | grep -q '"save_error": "'
@@ -503,8 +517,6 @@ refused_saved() {
 # and the server to answer it (--require-accepted).
 # An install that can't reach its server (an untrusted certificate, a refused key) fails here,
 # with what to check, instead of reporting success; the service keeps retrying.
-# not_saved is whether the state of the host enrolled as a new one isn't saved, a moment after the server took
-# it: a restart would lose it.
 wait_connected() {
 	if "$supervisor" status --storage "$storage" --wait 30s --since "$1" --require-accepted; then
 		return 0
@@ -536,9 +548,10 @@ wait_connected() {
 		fi
 		if [ "$code" -ne 0 ]; then
 			if [ -n "$aside" ]; then
-				tell_aside "$aside"
+				tell_aside "$aside" "this host now enrolls as a new one: the saved credentials the server refused"
 			else
 				echo "the saved credentials are not set aside: if the Supervisor started, its log says why" >&2
+				tell_earlier
 			fi
 			exit "$code"
 		fi
@@ -549,11 +562,11 @@ wait_connected() {
 	# that crashes a few seconds in, which a single look can find briefly running.
 	if ! "$launchctl" print "system/$label" 2>/dev/null | grep -q 'state = running' || [ "$(run_count)" -gt "$2" ]; then
 		echo "the Supervisor service ($label) failed to start, so it never connected to $endpoint. Its log says why: sudo tail -n 50 $storage/log/supervisor.log" >&2
-		exit 1
+		fail_wait
 	fi
 	not_accepted
 	echo "enrolled, but the Supervisor can't connect to $endpoint yet; it keeps retrying. Fix what is above, then check with: sudo $supervisor status --storage $storage" >&2
-	exit 1
+	fail_wait
 }
 
 done=Enrolled

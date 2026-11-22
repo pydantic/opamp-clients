@@ -477,12 +477,27 @@ new_aside() {
 	echo "$found"
 }
 
-# tell_aside says that the saved credentials are set aside in $1, and how to put them back (what is in their
-# place then is set aside instead).
+# tell_aside says what $2 are, set aside in $1, and how to put them back (what is in their place then is set
+# aside instead).
 tell_aside() {
-	echo "the saved credentials the server refused, and the identity kept with them, are set aside in $1, and this host now enrolls as a new one. If the server refused them for a while only, put them back with: sudo sh -c 'systemctl stop $unit && { n=$storage/opamp-state.refused-\$(date -u +%Y%m%dT%H%M%SZ)-\$\$; [ -f $1 ] && { [ ! -e $storage/opamp-state ] || mv -T $storage/opamp-state \$n; } && { mv -T $1 $storage/opamp-state || mv -T \$n $storage/opamp-state; }; }; systemctl start $unit'" >&2
+	echo "$2, and the identity kept with them, are set aside in $1. If the server refused them for a while only, put them back with: sudo sh -c 'systemctl stop $unit && { n=$storage/opamp-state.refused-\$(date -u +%Y%m%dT%H%M%SZ)-\$\$; [ -f $1 ] && { [ ! -e $storage/opamp-state ] || mv -T $storage/opamp-state \$n; } && { mv -T $1 $storage/opamp-state || mv -T \$n $storage/opamp-state; }; }; systemctl start $unit'" >&2
 }
 
+# tell_earlier is tell_aside of the last that an earlier run had set aside, if there is one.
+tell_earlier() {
+	earlier=$(states_aside | tail -n 1)
+	[ -z "$earlier" ] || tell_aside "$earlier" "saved credentials the server refused before this run"
+}
+
+# fail_wait ends a run whose wait failed.
+fail_wait() {
+	[ -n "$restarted_fresh" ] || tell_earlier
+	exit 1
+}
+
+# not_accepted fails the install when the Supervisor is connected but the server never answered
+# it: a server that takes the connection but not the credentials (a used-up, expired or revoked
+# enrollment token) closes it unanswered.
 not_accepted() {
 	st=$("$supervisor" status --storage "$storage" --json 2>/dev/null) || :
 	if printf '%s\n' "$st" | grep -q '"connected": true' && ! printf '%s\n' "$st" | grep -q '"accepted": {'; then
@@ -490,7 +505,7 @@ not_accepted() {
 		purge=", or for a deleted host remove its data first (sudo pydantic-opamp-uninstall --purge)"
 		[ -z "$restarted_fresh" ] || deleted= purge=
 		echo "enrolled, but the server at $endpoint took the connection and not the enrollment token: it may be used up, expired or revoked$deleted. Enroll again with a new token$purge; check with: sudo $supervisor status --storage $storage" >&2
-		exit 1
+		fail_wait
 	fi
 }
 
@@ -515,9 +530,6 @@ refused_saved() {
 # restarts counted before, to connect and the server to answer it (--require-accepted).
 # An install that can't reach its server (an untrusted certificate, a refused key) fails here,
 # with what to check, instead of reporting success; the service keeps retrying.
-# not_accepted fails the install when the Supervisor is connected but the server never answered
-# it: a server that takes the connection but not the credentials (a used-up, expired or revoked
-# enrollment token) closes it unanswered.
 wait_connected() {
 	if "$supervisor" status --storage "$storage" --wait 30s --since "$1" --require-accepted; then
 		return 0
@@ -549,9 +561,10 @@ wait_connected() {
 		fi
 		if [ "$code" -ne 0 ]; then
 			if [ -n "$aside" ]; then
-				tell_aside "$aside"
+				tell_aside "$aside" "this host now enrolls as a new one: the saved credentials the server refused"
 			else
 				echo "the saved credentials are not set aside: if the Supervisor started, its log says why" >&2
+				tell_earlier
 			fi
 			exit "$code"
 		fi
@@ -564,11 +577,11 @@ wait_connected() {
 	restarts=$(restart_count)
 	if ! "$systemctl" is-active --quiet "$unit" || { [ "$restarts" -ne "$2" ] && [ "$restarts" -gt 0 ]; }; then
 		echo "the Supervisor service ($unit) failed to start, so it never connected to $endpoint. Its log says why: sudo journalctl -u $unit -n 50 --no-pager" >&2
-		exit 1
+		fail_wait
 	fi
 	not_accepted
 	echo "enrolled, but the Supervisor can't connect to $endpoint yet; it keeps retrying. Fix what is above, then check with: sudo $supervisor status --storage $storage" >&2
-	exit 1
+	fail_wait
 }
 
 done=Enrolled
