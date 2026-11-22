@@ -183,6 +183,28 @@ func TestMacEnrollWaitsForTheConnection(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, "sealed", string(kept))
 	assert.FileExists(t, filepath.Join(tools, "loaded"))
+	// Taken, and its new state not saved: not enrolled, and the way back said.
+	for _, how := range []string{`rm -f "$S/opamp-state"`, "true"} {
+		require.NoError(t, os.WriteFile(filepath.Join(tools, "heal"), nil, 0o600))
+		require.NoError(t, os.WriteFile(filepath.Join(tools, "healed"), []byte(how), 0o600))
+		require.NoError(t, os.WriteFile(filepath.Join(tools, "json"), []byte(revokedJSON), 0o600))
+		require.NoError(t, os.WriteFile(filepath.Join(tools, "status"), []byte("1"), 0o600))
+		require.NoError(t, os.WriteFile(state, []byte("sealed"), 0o600))
+		if how == "true" {
+			require.NoError(t, os.WriteFile(filepath.Join(tools, "healed-json"), []byte("{\n  \"save_error\": \"no space left\"\n}\n"), 0o600))
+		}
+		out, err = macEnroll(t, root, tools, "t", "--endpoint", "wss://opamp.example.com/v1/opamp")
+		require.Error(t, err, how)
+		assert.Contains(t, out, "its new credentials could not be saved")
+		assert.Contains(t, out, "put them back with: sudo ")
+		assert.NotContains(t, out, "Enrolled with")
+		for _, name := range []string{"heal", "healed"} {
+			require.NoError(t, os.Remove(filepath.Join(tools, name)))
+		}
+	}
+	require.NoError(t, os.Remove(filepath.Join(tools, "healed-json")))
+	require.NoError(t, os.WriteFile(filepath.Join(tools, "json"), []byte(revokedJSON), 0o600))
+	require.NoError(t, os.WriteFile(filepath.Join(tools, "status"), []byte("1"), 0o600))
 	// Of a status before this start, or --refresh: not asked.
 	out, err = macEnroll(t, root, tools, "", "--refresh")
 	require.Error(t, err)

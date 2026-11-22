@@ -138,7 +138,8 @@ func TestWinEnrollSetsAside(t *testing.T) {
 			b, err = exec.Command("powershell", "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-File", filepath.Join(dir, "fakes.ps1"), "-Helper", helper, "-Root", root).CombinedOutput()
 			require.Error(t, err, string(b))
 			again := strings.NewReplacer("\r", "", "\n", " ").Replace(string(b))
-			assert.Contains(t, again, "saved credentials the server refused before this run")
+			assert.Contains(t, again, "saved credentials the server refused in an earlier run, at 20")
+			assert.Regexp(t, `at 20\d\d-\d\d-\d\d \d\d:\d\d:\d\d UTC`, again)
 			assert.Contains(t, again, filepath.Base(aside[0]))
 			// Run again: nothing changes.
 			_, _ = exec.Command("powershell", "-NoProfile", "-NonInteractive", "-Command", command).CombinedOutput()

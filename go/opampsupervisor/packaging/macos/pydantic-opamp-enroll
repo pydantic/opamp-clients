@@ -474,7 +474,8 @@ tell_aside() {
 tell_earlier() {
 	earlier=$(states_aside | tail -n 1)
 	[ -n "$earlier" ] || return 0
-	tell_aside "$earlier" "saved credentials the server refused before this run"
+	at=$(echo "${earlier##*refused-}" | sed 's/^\(....\)\(..\)\(..\)T\(..\)\(..\)\(..\)Z.*/\1-\2-\3 \4:\5:\6 UTC/')
+	tell_aside "$earlier" "saved credentials the server refused in an earlier run, at $at"
 	[ "$(states_aside | wc -l)" -eq 1 ] || echo "there are more set aside than these, the last: sudo $supervisor status --storage $storage lists them" >&2
 }
 
