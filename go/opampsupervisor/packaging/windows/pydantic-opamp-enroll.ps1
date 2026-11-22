@@ -53,9 +53,17 @@ param(
 )
 $ErrorActionPreference = 'Stop'
 $service = 'pydantic-opamp-supervisor'
+# The copies of the enrollment the host had (Keep-Enrollment), and the same while they are made; the Supervisor
+# was stopped for them; its process ID then; the saved credentials were set aside.
+$kept = $null
+$keptTmp = $null
+$stopped = $false
+$oldPid = 0
+$tried = $false
 
 function Fail([string]$message) {
     [Console]::Error.WriteLine("pydantic-opamp-enroll: $message")
+    if ($script:kept -and -not $script:tried) { exit (Put-Back) }
     exit 1
 }
 
@@ -238,6 +246,118 @@ function Write-Atomically([string]$path, [string]$content) {
     Move-Item -LiteralPath "$path.tmp" -Destination $path -Force
 }
 
+# An enrollment that another run was cut short in (killed, or the host lost power) is a person's to put back:
+# this run neither does it nor removes it.
+Get-ChildItem -LiteralPath $root -Directory -Filter 'enrollment-before-*' -ErrorAction SilentlyContinue |
+    Where-Object { $_.Name -cmatch '^enrollment-before-[0-9]+T[0-9]+Z-[0-9]+$' -and -not ($_.Attributes -band [IO.FileAttributes]::ReparsePoint) -and
+        (Test-Path -LiteralPath (Join-Path $_.FullName 'put-back.ps1') -PathType Leaf) } |
+    ForEach-Object { Note "an earlier pydantic-opamp-enroll was cut short: the enrollment this host had before it (token, config and credentials) is kept in $($_.FullName). Put it back with: powershell -NoProfile -ExecutionPolicy Bypass -File `"$($_.FullName)\put-back.ps1`"    Or, if this host works as it is, remove it with: Remove-Item -Recurse -Force -LiteralPath '$($_.FullName)'" }
+
+$supervisor = if ($env:OPAMP_SUPERVISOR) { $env:OPAMP_SUPERVISOR } else { Join-Path (Join-Path $env:ProgramFiles 'pydantic-opamp') 'opampsupervisor.exe' }
+$storage = Join-Path $root 'var'
+function Get-Now { try { (& $supervisor status --storage $storage --json 2>$null | Out-String) | ConvertFrom-Json } catch { $null } }
+function Test-Stopped { (Get-Service -Name $service -ErrorAction SilentlyContinue).Status -eq 'Stopped' }
+function Remove-Copies { Remove-Item -LiteralPath $script:kept -Recurse -Force; $script:kept = $null }
+
+# Keeps the enrollment of a host its server takes, until the server takes the new one: the core uses the
+# credentials the server issued only with the token they were issued for, and one offered for another token takes
+# their place. The Supervisor is stopped for it. What the directory has is SYSTEM's and Administrators' alone.
+function Keep-Enrollment {
+    $state = Join-Path $storage 'opamp-state'
+    if ($Refresh -or $NoStart) { return }
+    foreach ($f in $state, (Join-Path $root 'enroll-token'), (Join-Path $root 'supervisor.yaml')) { if (-not (Test-Path -LiteralPath $f -PathType Leaf)) { return } }
+    if ((Get-Item -LiteralPath $state -Force).Attributes -band [IO.FileAttributes]::ReparsePoint) { return }
+    if ((Get-Service -Name $service -ErrorAction SilentlyContinue).Status -ne 'Running') { return }
+    $st = Get-Now
+    if (-not $st -or -not $st.accepted) { return }
+    $script:oldPid = $st.pid
+    $script:stopped = $true
+    try { Stop-Service -Name $service -Force -ErrorAction Stop } catch { }
+    if (-not (Test-Stopped)) { Fail "the Supervisor ($service) can't be stopped: nothing is changed" }
+    $to = Join-Path $root ('enrollment-before-' + [DateTime]::UtcNow.ToString('yyyyMMddTHHmmssZ') + "-$PID")
+    Get-ChildItem -LiteralPath $root -Directory -Filter 'enrollment-before-*.tmp' | Remove-Item -Recurse -Force
+    $script:keptTmp = "$to.tmp"
+    $null = New-Item -ItemType Directory -Path $script:keptTmp
+    foreach ($f in 'enroll-token', 'telemetry-token', 'supervisor.yaml', 'enroll.options', 'supervisor.yaml.sha256') {
+        $from = Join-Path $root $f
+        if (Test-Path -LiteralPath $from -PathType Leaf) { Copy-Item -LiteralPath $from -Destination (Join-Path $script:keptTmp $f) }
+    }
+    Copy-Item -LiteralPath $state -Destination (Join-Path $script:keptTmp 'opamp-state')
+    [IO.File]::WriteAllText((Join-Path $script:keptTmp 'put-back.ps1'), @'
+# Puts this host back on the enrollment it had before pydantic-opamp-enroll was run: run it as an administrator.
+param([switch]$Replace)
+$ErrorActionPreference = 'Stop'
+$kept = Split-Path -Parent $MyInvocation.MyCommand.Path
+$root = Split-Path -Parent $kept
+$state = Join-Path $root 'var\opamp-state'
+$service = 'pydantic-opamp-supervisor'
+if (-not (Test-Path -LiteralPath (Join-Path $kept 'opamp-state') -PathType Leaf)) { throw "nothing is put back: $kept is not there" }
+try { Stop-Service -Name $service -Force -ErrorAction Stop } catch { }
+if ((Get-Service -Name $service).Status -ne 'Stopped') { throw "the Supervisor ($service) can't be stopped: nothing is put back" }
+try {
+    # Whole again if it is cut short: the copies go last. (A file that wasn't there goes.)
+    foreach ($f in 'enroll-token', 'telemetry-token', 'supervisor.yaml', 'enroll.options', 'supervisor.yaml.sha256') {
+        $from = Join-Path $kept $f
+        $to = Join-Path $root $f
+        if (Test-Path -LiteralPath $from -PathType Leaf) {
+            Copy-Item -LiteralPath $from -Destination "$to.put-back" -Force
+            Move-Item -LiteralPath "$to.put-back" -Destination $to -Force
+        } elseif (Test-Path -LiteralPath $to -PathType Leaf) { Remove-Item -LiteralPath $to -Force }
+    }
+    Copy-Item -LiteralPath (Join-Path $kept 'opamp-state') -Destination "$state.put-back" -Force
+    # What the server offered since, if this isn't the run that tried it.
+    if (-not $Replace -and (Test-Path -LiteralPath $state)) { Move-Item -LiteralPath $state -Destination ("$state.replaced-" + [DateTime]::UtcNow.ToString('yyyyMMddTHHmmssZ') + "-$PID") }
+    Move-Item -LiteralPath "$state.put-back" -Destination $state -Force
+    Remove-Item -LiteralPath $kept -Recurse -Force
+} finally {
+    Start-Service -Name $service
+}
+'@)
+    Move-Item -LiteralPath $script:keptTmp -Destination $to
+    $script:kept = $to
+    $script:keptTmp = $null
+    $script:stopped = $false
+}
+
+# Ends a run that failed, however it did, with the host back on the enrollment it had; its value is the exit
+# code. Once, and only with the Supervisor stopped and the server not having taken the host meanwhile.
+function Put-Back {
+    $copies = $script:kept
+    $script:kept = $null
+    $back = "powershell -NoProfile -ExecutionPolicy Bypass -File `"$copies\put-back.ps1`""
+    try { Stop-Service -Name $service -Force -ErrorAction Stop } catch { }
+    if (-not (Test-Stopped)) {
+        Note "not enrolled with this token, and the Supervisor ($service) can't be stopped to put the earlier enrollment back. It is kept in $copies; put it back with: $back"
+        return 1
+    }
+    $st = Get-Now
+    $since = [DateTimeOffset]::UtcNow.ToUnixTimeSeconds()
+    # Of the Supervisor this run started, not of the one before.
+    if ($st -and $st.accepted -and $st.pid -and $st.pid -ne $script:oldPid) {
+        Remove-Item -LiteralPath $copies -Recurse -Force
+        try { Start-Service -Name $service -ErrorAction Stop } catch { }
+        $null = & $supervisor status --storage $storage --wait 30s --since $since --require-accepted
+        if ($LASTEXITCODE -eq 0) {
+            [Console]::Out.WriteLine("Enrolled with $Endpoint, late. The Supervisor is running and connected ($service).")
+            return 0
+        }
+        Note "the server at $Endpoint took this host with this token, and the Supervisor isn't connected now: it keeps retrying; check with: & '$supervisor' status --storage '$storage'"
+        return 1
+    }
+    try { $null = & (Join-Path $copies 'put-back.ps1') -Replace } catch { Note "$($_.Exception.Message)" }
+    if (Test-Path -LiteralPath $copies) {
+        Note "not enrolled with this token, and the earlier enrollment could not be put back (why is above). It is kept in $copies; put it back with: $back"
+        return 1
+    }
+    $null = & $supervisor status --storage $storage --wait 30s --since $since --require-accepted
+    if ($LASTEXITCODE -eq 0) { Note 'not enrolled with this token: this host is back on the enrollment it had, and connected' }
+    else { Note "not enrolled with this token, and with the enrollment it had, which is back, this host isn't accepted now either; check with: & '$supervisor' status --storage '$storage'" }
+    1
+}
+
+try {
+Keep-Enrollment
+
 # The config's paths, with forward slashes: Go opens them, and confmap's ${file:...} takes them.
 function Slashed([string]$path) { $path -replace '\\', '/' }
 $programs = Join-Path $env:ProgramFiles 'pydantic-opamp'
@@ -394,7 +514,6 @@ if ($NoStart) {
     # removes them. A healthy host enrolled again is never refused, and keeps its identity.
     $state = Join-Path $storage 'opamp-state'
     $aside = $null
-    $tried = $false
     $notSaved = $false
     $more = $null
     # The saved states set aside. Other names aren't the Supervisor's: whoever made them, they go into no command.
@@ -467,6 +586,14 @@ if ($NoStart) {
         # does). A refused token is told below.
         $taken = if ($kept) { "Copy what is set aside in $storage elsewhere, remove this host's data (pydantic-opamp-uninstall.ps1 -Purge), then enroll it again with a new token" }
             else { "Remove this host's data (pydantic-opamp-uninstall.ps1 -Purge), then enroll it again with a new token" }
+        # The host goes back to the enrollment it had (Put-Back): nothing more is to be done with this one.
+        if ($kept -and -not $tried) {
+            if ($st -and $st.enrollment -and $st.enrollment.identity_taken) { Fail "not enrolled: the server at $Endpoint holds this host's identity for another installation" }
+            if ($st -and $st.enrollment -and $st.enrollment.unreachable) { Fail "not enrolled: the server at $Endpoint tells this host to connect to $($st.enrollment.unreachable), which can't be reached from here (its name, a firewall, a proxy or its certificate)" }
+            if ($st -and $st.enrollment -and -not $st.enrollment.token_refused) { Fail "not enrolled: the server at $Endpoint answered this host and hasn't taken it. Why is above" }
+            if ($st -and ($st.enrollment.token_refused -or ($st.server -and $st.server.connected -and -not $st.accepted))) { Fail "not enrolled: the server at $Endpoint took the connection and not the enrollment token: it may be used up, expired or revoked. Enroll again with a new token" }
+            Fail "not enrolled: the Supervisor can't connect to $Endpoint. Fix what is above, then enroll again"
+        }
         if ($st -and $st.enrollment -and $st.enrollment.identity_taken) {
             Fail "not enrolled: the server at $Endpoint holds this host's identity for another installation (a host it deleted, say). $taken; check with: & '$supervisor' status --storage '$storage'"
         }
@@ -481,5 +608,15 @@ if ($NoStart) {
         }
         Fail "enrolled, but the Supervisor can't connect to $Endpoint yet; it keeps retrying. Fix what is above, then check with: & '$supervisor' status --storage '$storage'"
     }
+    if ($kept) { Remove-Copies }
     Write-Output "$done with $Endpoint. The Supervisor is running and connected ($service)."
+}
+} finally {
+    # Fail has put it back already; this is for what ends the run otherwise (Ctrl+C, an error).
+    if ($kept -and $tried) { Remove-Copies }
+    elseif ($kept) { $null = Put-Back }
+    elseif ($stopped) {
+        if ($keptTmp) { Remove-Item -LiteralPath $keptTmp -Recurse -Force -ErrorAction SilentlyContinue }
+        Start-Service -Name $service
+    }
 }
