@@ -249,3 +249,46 @@ func TestUninstallWaitsForTheMacServiceToUnload(t *testing.T) {
 		t.Fatalf("%v: %s", err, out)
 	}
 }
+
+// A purge takes what enrolling with a telemetry token put outside the package's directories: the
+// unit's drop-in names a credential that goes with the configuration, and the next start failed on
+// it (243/CREDENTIALS). Another drop-in of the unit's stays, and without --purge both do.
+func TestUninstallPurgeRemovesTheTelemetryDropIn(t *testing.T) {
+	config, _, _, invoke := uninstallFixture(t, "Linux")
+	root := filepath.Dir(filepath.Dir(config))
+	dropins := filepath.Join(root, "etc/systemd/system/pydantic-opamp-supervisor.service.d")
+	telemetry, other := filepath.Join(dropins, "telemetry.conf"), filepath.Join(dropins, "operator.conf")
+	write := func(paths ...string) {
+		if err := os.MkdirAll(dropins, 0755); err != nil {
+			t.Fatal(err)
+		}
+		for _, path := range paths {
+			if err := os.WriteFile(path, []byte("[Service]\n"), 0644); err != nil {
+				t.Fatal(err)
+			}
+		}
+	}
+	there := func(path string) bool { _, err := os.Stat(path); return err == nil }
+	reloads := func() int {
+		log, _ := os.ReadFile(filepath.Join(root, "calls"))
+		return strings.Count(string(log), "systemctl daemon-reload")
+	}
+	write(telemetry, other)
+	if out, err := invoke(); err != nil || !there(telemetry) || !there(other) {
+		t.Fatalf("%v: %s", err, out)
+	}
+	if out, err := invoke("--purge"); err != nil || there(telemetry) || !there(other) || reloads() != 1 {
+		t.Fatalf("telemetry.conf left %v, operator.conf left %v, reloads %d: %v: %s", there(telemetry), there(other), reloads(), err, out)
+	}
+	// Alone, its directory goes too; with nothing there, nothing is done.
+	if err := os.Remove(other); err != nil {
+		t.Fatal(err)
+	}
+	write(telemetry)
+	if out, err := invoke("--purge"); err != nil || there(dropins) || reloads() != 2 {
+		t.Fatalf("%s left %v, reloads %d: %v: %s", dropins, there(dropins), reloads(), err, out)
+	}
+	if out, err := invoke("--purge"); err != nil || reloads() != 2 {
+		t.Fatalf("reloads %d: %v: %s", reloads(), err, out)
+	}
+}

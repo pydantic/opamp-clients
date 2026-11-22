@@ -281,13 +281,17 @@ if [ -z "$refresh" ]; then
 	mv -f "$etc/enroll-token.cred.tmp" "$etc/enroll-token.cred"
 fi
 
+dropin=$root/etc/systemd/system/$unit.d
 if [ -n "$telemetry_stdin" ]; then
 	printf '%s' "$telemetry_token" | "$creds" encrypt --name=opamp-telemetry-token - "$etc/telemetry-token.cred.tmp"
 	chmod 0600 "$etc/telemetry-token.cred.tmp"
 	mv -f "$etc/telemetry-token.cred.tmp" "$etc/telemetry-token.cred"
-	dropin=$root/etc/systemd/system/$unit.d
 	mkdir -p "$dropin"
 	printf '[Service]\nLoadCredentialEncrypted=opamp-telemetry-token:/etc/pydantic-opamp/telemetry-token.cred\n' >"$dropin/telemetry.conf"
+	"$systemctl" daemon-reload
+elif [ ! -f "$etc/telemetry-token.cred" ] && [ -e "$dropin/telemetry.conf" ]; then
+	# Left by an older package's purge: without the credential it names, the service can't start.
+	rm -f "$dropin/telemetry.conf"
 	"$systemctl" daemon-reload
 fi
 

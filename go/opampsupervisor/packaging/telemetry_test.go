@@ -34,6 +34,24 @@ func TestEnrollTelemetryCredentials(t *testing.T) {
 	assert.Equal(t, "SEALED:--name=opamp-telemetry-token:write-token", e.read(t, "telemetry-token.cred"))
 }
 
+// A drop-in an older package's purge left names a credential that is gone: enrolling without a
+// telemetry token removes it, or the service can't start. Another drop-in stays.
+func TestEnrollRemovesATelemetryDropInWithoutItsCredential(t *testing.T) {
+	e := newEnrollment(t)
+	dropins := filepath.Join(e.root, "etc/systemd/system/pydantic-opamp-supervisor.service.d")
+	require.NoError(t, os.MkdirAll(dropins, 0o755))
+	for _, name := range []string{"telemetry.conf", "operator.conf"} {
+		require.NoError(t, os.WriteFile(filepath.Join(dropins, name), []byte("[Service]\n"), 0o600))
+	}
+	out, err := e.run(t, "runtime-token", "--endpoint", "wss://opamp.example.com", "--no-start")
+	require.NoError(t, err, out)
+	assert.NoFileExists(t, filepath.Join(dropins, "telemetry.conf"))
+	assert.FileExists(t, filepath.Join(dropins, "operator.conf"))
+	log, err := os.ReadFile(filepath.Join(e.tools, "systemctl.log"))
+	require.NoError(t, err)
+	assert.Contains(t, string(log), "daemon-reload")
+}
+
 func TestMacEnrollTelemetryCredentials(t *testing.T) {
 	root, tools := t.TempDir(), t.TempDir()
 	out, err := macEnroll(t, root, tools, "runtime-token\nwrite-token\n", "--endpoint", "wss://opamp.example.com", "--telemetry-token-stdin", "--no-start")

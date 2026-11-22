@@ -30,6 +30,7 @@ case $os in
         state=$root/var/lib/pydantic-opamp
         extra_state=$root/var/lib/pydantic-otelcol
         programs=$root/usr/lib/pydantic-opamp
+        dropins=$root/etc/systemd/system/pydantic-opamp-supervisor.service.d
         ;;
     Darwin)
         config=$root/opt/pydantic-opamp/etc
@@ -149,6 +150,15 @@ uninstall() {
             case $code in 0|44) ;; *) fail "could not delete the installation state key (security $code)" ;; esac
         fi
         rm -rf "$config" "$state"
+        # Enrolled with a telemetry token, the unit has a drop-in that names its credential, gone
+        # with the configuration: the next start would fail on it. Another drop-in stays.
+        if [ "$os" = Linux ] && [ -e "$dropins/telemetry.conf" ]; then
+            rm -f "$dropins/telemetry.conf"
+            rmdir "$dropins" 2>/dev/null || :
+            if [ -d "$root/run/systemd/system" ]; then
+                systemctl daemon-reload || echo 'pydantic-opamp-uninstall: systemctl daemon-reload failed' >&2
+            fi
+        fi
         if [ -n "$extra_state" ]; then rm -rf "$extra_state"; fi
         if [ "$os" = Darwin ]; then
             # The package's own directories, once empty. Anything else put there stays.
