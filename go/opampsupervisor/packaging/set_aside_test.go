@@ -255,3 +255,40 @@ func TestMacEnrollSetsAsideOnlyWhatWasRefused(t *testing.T) {
 		})
 	}
 }
+
+// On macOS too: asked and not done is said, not as a copy of this run's, and leaves no request; a retry that
+// ends connected and unanswered doesn't advise removing the data its copy is in.
+func TestMacEnrollThatFailsSaysWhatItHas(t *testing.T) {
+	setUp := func(t *testing.T) (root, tools, state string) {
+		root, tools = t.TempDir(), t.TempDir()
+		state = filepath.Join(root, "opt/pydantic-opamp/var/opamp-state")
+		require.NoError(t, os.MkdirAll(filepath.Dir(state), 0o700))
+		require.NoError(t, os.WriteFile(state, []byte("sealed"), 0o600))
+		require.NoError(t, os.WriteFile(filepath.Join(tools, "json"), []byte(revokedJSON), 0o600))
+		require.NoError(t, os.WriteFile(filepath.Join(tools, "status"), []byte("1"), 0o600))
+		return root, tools, state
+	}
+	t.Run("not set aside", func(t *testing.T) {
+		root, tools, state := setUp(t)
+		require.NoError(t, os.WriteFile(filepath.Join(tools, "fail-kick"), nil, 0o600))
+		require.NoError(t, os.WriteFile(state+".refused-20261122T000000Z-1", []byte("older"), 0o600))
+		out, err := macEnroll(t, root, tools, "t", "--endpoint", "wss://opamp.example.com/v1/opamp")
+		require.Error(t, err)
+		assert.Contains(t, out, "the saved credentials are not set aside")
+		assert.NotContains(t, out, "this host now enrolls as a new one")
+		left, err := filepath.Glob(state + ".set-aside-*")
+		require.NoError(t, err)
+		assert.Empty(t, left)
+	})
+	t.Run("unanswered", func(t *testing.T) {
+		root, tools, _ := setUp(t)
+		require.NoError(t, os.WriteFile(filepath.Join(tools, "next"), []byte(refusedJSON), 0o600))
+		require.NoError(t, os.WriteFile(filepath.Join(tools, "wait"), []byte("cp '"+filepath.Join(tools, "next")+"' '"+filepath.Join(tools, "json")+"'\n"), 0o600))
+		out, err := macEnroll(t, root, tools, "t", "--endpoint", "wss://opamp.example.com/v1/opamp")
+		require.Error(t, err)
+		assert.Contains(t, out, "took the connection and not the enrollment token")
+		assert.Contains(t, out, "put them back with: sudo ")
+		assert.NotContains(t, out, "purge")
+		assert.NotContains(t, out, "deleted this host, which keeps")
+	})
+}

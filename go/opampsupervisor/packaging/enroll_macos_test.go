@@ -40,6 +40,7 @@ bootstrap)
 	`+fakeSetAside(tools)+` ;;
 kickstart)
 	[ -e "$loaded" ] || exit 113
+	[ ! -e "`+filepath.Join(tools, "fail-kick")+`" ] || exit 1
 	echo $(($(cat "`+filepath.Join(tools, "kicks")+`" 2>/dev/null || echo 0) + 1)) >"`+filepath.Join(tools, "kicks")+`"
 	`+fakeSetAside(tools)+` ;;
 print)
@@ -178,7 +179,8 @@ func TestMacEnrollWaitsForTheConnection(t *testing.T) {
 	// Run again: nothing changes.
 	run = exec.Command("/bin/sh", "-c", strings.ReplaceAll(command, "launchctl ", filepath.Join(tools, "launchctl")+" "))
 	run.Env = append(os.Environ(), "OPAMP_ENROLL_ROOT="+root)
-	_, _ = run.CombinedOutput()
+	b, _ = run.CombinedOutput()
+	assert.Contains(t, string(b), "nothing is put back, the copy is not there")
 	kept, err = os.ReadFile(state)
 	require.NoError(t, err)
 	assert.Equal(t, "sealed", string(kept))
