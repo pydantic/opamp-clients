@@ -106,7 +106,8 @@ and date. Tests, CI and docs alone don't need a line.
   `telemetry.conf` drop-in, which names the telemetry credential the purge deletes, so a later
   enrollment without a telemetry token failed to start the service (243/CREDENTIALS). The purge
   removes it, and `pydantic-opamp-enroll` removes one an older package left, if it is as the package
-  writes it: another that an administrator wrote, or added to, stays (#158).
+  writes it: another that an administrator wrote, or added to, stays, and enrolling with a
+  telemetry token doesn't write over it (#158).
 - Supervisor: `pydantic-opamp-enroll` (Linux, macOS, Windows) says when the Supervisor service
   failed to start, and gives the command that shows its log. It used to say the Supervisor can't
   connect yet and keeps retrying, as for a running service that can't reach its server (#147).

@@ -66,6 +66,34 @@ func TestEnrollRemovesATelemetryDropInWithoutItsCredential(t *testing.T) {
 	}
 }
 
+// Enrolling with a telemetry token writes no telemetry.conf over one an administrator wrote: with the
+// credential in it the file stays and serves, without it the enrollment fails before it changes anything.
+func TestEnrollKeepsAnAdministratorsTelemetryDropIn(t *testing.T) {
+	const line = "LoadCredentialEncrypted=opamp-telemetry-token:/etc/pydantic-opamp/telemetry-token.cred\n"
+	for content, ok := range map[string]bool{
+		"[Service]\nEnvironment=HTTPS_PROXY=http://proxy:3128\n": false,
+		"[Service]\n#" + line:                 false,
+		"[Service]\nEnvironment=A=b\n" + line: true,
+		"[Service]\n" + line:                  true,
+	} {
+		e := newEnrollment(t)
+		dropin := filepath.Join(e.root, "etc/systemd/system/pydantic-opamp-supervisor.service.d/telemetry.conf")
+		require.NoError(t, os.MkdirAll(filepath.Dir(dropin), 0o755))
+		require.NoError(t, os.WriteFile(dropin, []byte(content), 0o600))
+		out, err := e.run(t, "runtime-token\nwrite-token\n", "--endpoint", "wss://opamp.example.com", "--telemetry-token-stdin", "--no-start")
+		got, rerr := os.ReadFile(dropin)
+		require.NoError(t, rerr)
+		assert.Equal(t, content, string(got))
+		if ok {
+			require.NoError(t, err, out)
+			continue
+		}
+		require.Error(t, err)
+		assert.Contains(t, out, "telemetry.conf isn't this package's, and is kept: rename it")
+		assert.NoDirExists(t, filepath.Join(e.root, "etc/pydantic-opamp"))
+	}
+}
+
 func TestMacEnrollTelemetryCredentials(t *testing.T) {
 	root, tools := t.TempDir(), t.TempDir()
 	out, err := macEnroll(t, root, tools, "runtime-token\nwrite-token\n", "--endpoint", "wss://opamp.example.com", "--telemetry-token-stdin", "--no-start")
