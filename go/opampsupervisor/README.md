@@ -196,7 +196,8 @@ agent:
   has, 1 with its status when it hasn't): the enrollment helpers run it after starting the service.
   It also names each file the running Collector's log receivers couldn't open, as the Collector's
   current log (`agent.log`) says (`unreadable_logs` in the JSON): a file receiver that can open
-  none of its files is healthy and sends nothing. The exit code doesn't change for them.
+  none of its files is healthy and sends nothing. The exit code doesn't change for them, and the
+  list is that log's: empty once it passes its size, and kept until the Collector starts again.
   The command is taken in a file of its own (`status_command.go`) before `main` runs, so
   upstream's `main.go` is unchanged.
 - **The Collector doesn't inherit `OTEL_EXPORTER_OTLP_*`.** Upstream's passed the

@@ -397,6 +397,8 @@ func TestRemoteConfigPolicySystemLogs(t *testing.T) {
 		`receivers: {windows_event_log/system: {channel: System, start_at: end}}`,
 		`receivers: {macos_unified_logging: {max_log_age: 1m, predicate: "logType == 'error'"}}`,
 		`receivers: {journald/system: {units: [sshd, crond], priority: info, start_at: end}}`,
+		`receivers: {journald: {merge: false}}`,
+		`receivers: {journald: {operators: [{type: move, from: body.MESSAGE, to: body}]}}`,
 	} {
 		require.NoError(t, p.Check("", []byte(body)), body)
 	}
@@ -410,6 +412,7 @@ func TestRemoteConfigPolicySystemLogs(t *testing.T) {
 		`receivers: {journald/c: {root_path: /mnt/other, journalctl_path: /usr/bin/journalctl}}`: `receiver "journald/c" sets root_path`,
 		`receivers: {journald: {directory: /home/a/journal}}`:                                    `receiver "journald" sets directory`,
 		`receivers: {journald: {files: [/tmp/x.journal]}}`:                                       `receiver "journald" sets files`,
+		`receivers: {journald: {merge: true}}`:                                                   `receiver "journald" sets merge`,
 	} {
 		require.ErrorContains(t, p.Check("", []byte(body)), wantErr, body)
 	}

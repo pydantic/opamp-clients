@@ -438,8 +438,8 @@ What each rule checks in a remote config:
 - **System logs.** A Windows event log receiver's `remote` (other hosts' logs, with their
   credentials), a macOS unified logging receiver's `archive_path` (an archive read from any
   path), and a journald receiver's `journalctl_path` (the program it runs), `root_path`,
-  `directory` and `files` (a journal other than this host's) are refused: the local config can
-  set them, the server can't.
+  `directory`, `files` and `merge` (journals other than this host's own) are refused: the local
+  config can set them, the server can't.
 - **Storage.** A `file_storage` extension must name its `directory`, and it and any
   `compaction::directory` must be an allowed storage directory or lie under one.
 - **Providers.** Remote configs may reference exactly the environment names bound by the local
@@ -473,7 +473,9 @@ journal) where those groups exist, once per host. To opt out, remove it from the
 (Fedora, RHEL, CentOS Stream, Rocky, Alma) /var/log/messages and /var/log/secure are root's
 alone; read the journal instead, with a `journald` receiver, which `--host-logs` allows. A file
 receiver that can't open its files is still healthy and sends nothing: `opampsupervisor status`
-names each file the Collector couldn't open (`Log files`), from the Collector's current log.
+names each file the Collector couldn't open (`Log files`), as the Collector's current log says
+(the line is gone once that log passes 10 MiB, and a file made readable is named until the
+Collector starts again).
 
 ### Widening it
 

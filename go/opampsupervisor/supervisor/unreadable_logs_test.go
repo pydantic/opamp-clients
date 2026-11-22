@@ -27,7 +27,11 @@ const (
 // A file receiver whose files it can't open is healthy and sends nothing: the status says which
 // files, from which receiver, and why, once a file.
 func TestTheStatusSaysWhichLogFilesTheCollectorCantRead(t *testing.T) {
+	defer func(goos string) { unreadableLogsHintGOOS = goos }(unreadableLogsHintGOOS)
+	unreadableLogsHintGOOS = "linux"
 	log := strings.Join([]string{
+		// A line past the limit is skipped, and the lines after it are read.
+		`{"msg":"Failed to open file","original_path":"/long","x":"` + strings.Repeat("a", 2<<20) + `"}`,
 		startLine, deniedLine, otherLine, deniedLine,
 		"Failed to open file /x (not JSON: the Supervisor's Collector logs JSON)",
 		`{"level":"info","msg":"Started watching file","original_path":"/var/log/Failed to open file"}`,
@@ -45,6 +49,14 @@ func TestTheStatusSaysWhichLogFilesTheCollectorCantRead(t *testing.T) {
 	assert.Contains(t, out.String(), "               can't read /var/log/app/a.log (receiver filelog): too many open files\n")
 	assert.Contains(t, out.String(), "journald receiver", "what to do")
 
+	// The journal is Linux's.
+	out.Reset()
+	unreadableLogsHintGOOS = "darwin"
+	st.Print(&out, time.Now())
+	assert.Contains(t, out.String(), "can't read /var/log/messages")
+	assert.NotContains(t, out.String(), "journald")
+	unreadableLogsHintGOOS = "linux"
+
 	// No hint for a file that isn't a permission matter.
 	out.Reset()
 	st.UnreadableLogs = got[1:]
@@ -57,6 +69,9 @@ func TestTheStatusSaysWhichLogFilesTheCollectorCantRead(t *testing.T) {
 		many = append(many, strings.ReplaceAll(deniedLine, "/var/log/messages", fmt.Sprintf("/var/log/f%d", i)))
 	}
 	assert.Len(t, scanUnreadableLogs(strings.NewReader(strings.Join(many, "\n"))), maxUnreadableLogs)
+
+	// The last line needs no newline; CRLF lines are read too.
+	assert.Len(t, scanUnreadableLogs(strings.NewReader(startLine+"\r\n"+deniedLine)), 1)
 }
 
 // ReadStatus reads them from the running Supervisor's Collector log, and not from a log older
