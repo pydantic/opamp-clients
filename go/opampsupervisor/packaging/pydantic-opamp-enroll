@@ -283,13 +283,17 @@ chmod 0750 "$etc"
 
 # An enrollment that another run was cut short in (killed, or the host lost power) is a person's to put back:
 # this run neither does it nor removes it.
-for d in "$etc"/enrollment-before-*; do
-	case ${d#"$etc"/enrollment-before-} in
-	*[!0-9TZ-]*) continue ;;
-	[0-9]*T[0-9]*Z-[0-9]*) ;;
-	*) continue ;;
-	esac
-	[ -f "$d/put-back" ] && [ ! -L "$d" ] || continue
+copies() {
+	for d in "$etc"/enrollment-before-*; do
+		case ${d#"$etc"/enrollment-before-} in
+		*[!0-9TZ-]*) continue ;;
+		[0-9]*T[0-9]*Z-[0-9]*) ;;
+		*) continue ;;
+		esac
+		if [ -f "$d/put-back" ] && [ ! -L "$d" ]; then echo "$d"; fi
+	done
+}
+for d in $(copies); do
 	echo "an earlier pydantic-opamp-enroll was cut short: the enrollment this host had before it (token, config and credentials) is kept in $d. Put it back with: sudo sh $d/put-back    Or, if this host works as it is, remove it with: sudo rm -r $d" >&2
 done
 
@@ -312,7 +316,12 @@ keep_enrollment() {
 	! "$systemctl" is-active --quiet "$unit" || fail "the Supervisor ($unit) can't be stopped: nothing is changed"
 	to=$etc/enrollment-before-$(date -u +%Y%m%dT%H%M%SZ)-$$
 	kept_tmp=$to.tmp
-	rm -rf "$etc"/enrollment-before-*.tmp
+	# What a run that was killed while it copied left: nothing was changed then. (Not of one that still runs.)
+	for d in "$etc"/enrollment-before-*.tmp; do
+		pid=${d##*-}
+		case ${pid%.tmp} in '' | *[!0-9]*) continue ;; esac
+		kill -0 "${pid%.tmp}" 2>/dev/null || rm -rf "$d"
+	done
 	mkdir "$kept_tmp"
 	for f in enroll-token.cred telemetry-token.cred supervisor.yaml enroll.options supervisor.yaml.sha256 ca.pem; do
 		[ ! -f "$etc/$f" ] || cp -p "$etc/$f" "$kept_tmp/$f"
@@ -666,9 +675,10 @@ not_accepted() {
 	purge=", or for a deleted host remove its data first (sudo pydantic-opamp-uninstall --purge)"
 	taken="Remove this host's data (sudo pydantic-opamp-uninstall --purge), then enroll it again with a new token"
 	# Not with credentials set aside: a purge removes them.
-	if [ -n "$restarted_fresh$(states_aside)$(ls "$storage" | grep '^opamp-state\.replaced-')" ]; then
+	if [ -n "$restarted_fresh$(states_aside)$(ls "$storage" | grep '^opamp-state\.replaced-')$(copies)" ]; then
 		deleted= purge=
-		taken="Copy what is set aside in $storage elsewhere, remove this host's data (sudo pydantic-opamp-uninstall --purge), then enroll it again with a new token"
+		copied=$(copies)
+		taken="Copy what is set aside in $storage${copied:+ and $etc} elsewhere, remove this host's data (sudo pydantic-opamp-uninstall --purge), then enroll it again with a new token"
 	fi
 	# The host goes back to the enrollment it had (put_back): nothing more is to be done with this one.
 	if [ -n "$kept" ]; then

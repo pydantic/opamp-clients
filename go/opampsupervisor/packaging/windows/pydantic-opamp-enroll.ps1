@@ -55,7 +55,7 @@ $ErrorActionPreference = 'Stop'
 $service = 'pydantic-opamp-supervisor'
 # The copies of the enrollment the host had (Keep-Enrollment), and the same while they are made; the Supervisor
 # was stopped for them; its process ID then; the saved credentials were set aside.
-$kept = $null
+$keptDir = $null
 $keptTmp = $null
 $stopped = $false
 $oldPid = 0
@@ -63,7 +63,7 @@ $tried = $false
 
 function Fail([string]$message) {
     [Console]::Error.WriteLine("pydantic-opamp-enroll: $message")
-    if ($script:kept -and -not $script:tried) { exit (Put-Back) }
+    if ($script:keptDir -and -not $script:tried) { exit (Put-Back) }
     exit 1
 }
 
@@ -248,16 +248,17 @@ function Write-Atomically([string]$path, [string]$content) {
 
 # An enrollment that another run was cut short in (killed, or the host lost power) is a person's to put back:
 # this run neither does it nor removes it.
-Get-ChildItem -LiteralPath $root -Directory -Filter 'enrollment-before-*' -ErrorAction SilentlyContinue |
-    Where-Object { $_.Name -cmatch '^enrollment-before-[0-9]+T[0-9]+Z-[0-9]+$' -and -not ($_.Attributes -band [IO.FileAttributes]::ReparsePoint) -and
-        (Test-Path -LiteralPath (Join-Path $_.FullName 'put-back.ps1') -PathType Leaf) } |
-    ForEach-Object { Note "an earlier pydantic-opamp-enroll was cut short: the enrollment this host had before it (token, config and credentials) is kept in $($_.FullName). Put it back with: powershell -NoProfile -ExecutionPolicy Bypass -File `"$($_.FullName)\put-back.ps1`"    Or, if this host works as it is, remove it with: Remove-Item -Recurse -Force -LiteralPath '$($_.FullName)'" }
+function Get-Copies {
+    Get-ChildItem -LiteralPath $root -Directory -Filter 'enrollment-before-*' -ErrorAction SilentlyContinue | Where-Object { $_.Name -cmatch '^enrollment-before-[0-9]+T[0-9]+Z-[0-9]+$' -and -not ($_.Attributes -band [IO.FileAttributes]::ReparsePoint) -and
+        (Test-Path -LiteralPath (Join-Path $_.FullName 'put-back.ps1') -PathType Leaf) }
+}
+Get-Copies | ForEach-Object { Note "an earlier pydantic-opamp-enroll was cut short: the enrollment this host had before it (token, config and credentials) is kept in $($_.FullName). Put it back with: powershell -NoProfile -ExecutionPolicy Bypass -File `"$($_.FullName)\put-back.ps1`"    Or, if this host works as it is, remove it with: Remove-Item -Recurse -Force -LiteralPath '$($_.FullName)'" }
 
 $supervisor = if ($env:OPAMP_SUPERVISOR) { $env:OPAMP_SUPERVISOR } else { Join-Path (Join-Path $env:ProgramFiles 'pydantic-opamp') 'opampsupervisor.exe' }
 $storage = Join-Path $root 'var'
 function Get-Now { try { (& $supervisor status --storage $storage --json 2>$null | Out-String) | ConvertFrom-Json } catch { $null } }
 function Test-Stopped { (Get-Service -Name $service -ErrorAction SilentlyContinue).Status -eq 'Stopped' }
-function Remove-Copies { Remove-Item -LiteralPath $script:kept -Recurse -Force; $script:kept = $null }
+function Remove-Copies { Remove-Item -LiteralPath $script:keptDir -Recurse -Force; $script:keptDir = $null }
 
 # Keeps the enrollment of a host its server takes, until the server takes the new one: the core uses the
 # credentials the server issued only with the token they were issued for, and one offered for another token takes
@@ -275,7 +276,9 @@ function Keep-Enrollment {
     try { Stop-Service -Name $service -Force -ErrorAction Stop } catch { }
     if (-not (Test-Stopped)) { Fail "the Supervisor ($service) can't be stopped: nothing is changed" }
     $to = Join-Path $root ('enrollment-before-' + [DateTime]::UtcNow.ToString('yyyyMMddTHHmmssZ') + "-$PID")
-    Get-ChildItem -LiteralPath $root -Directory -Filter 'enrollment-before-*.tmp' | Remove-Item -Recurse -Force
+    # What a run that was killed while it copied left: nothing was changed then. (Not of one that still runs.)
+    Get-ChildItem -LiteralPath $root -Directory -Filter 'enrollment-before-*.tmp' |
+        Where-Object { $_.Name -match '-([0-9]+)\.tmp$' -and -not (Get-Process -Id $Matches[1] -ErrorAction SilentlyContinue) } | Remove-Item -Recurse -Force
     $script:keptTmp = "$to.tmp"
     $null = New-Item -ItemType Directory -Path $script:keptTmp
     foreach ($f in 'enroll-token', 'telemetry-token', 'supervisor.yaml', 'enroll.options', 'supervisor.yaml.sha256') {
@@ -314,7 +317,7 @@ try {
 }
 '@)
     Move-Item -LiteralPath $script:keptTmp -Destination $to
-    $script:kept = $to
+    $script:keptDir = $to
     $script:keptTmp = $null
     $script:stopped = $false
 }
@@ -322,8 +325,8 @@ try {
 # Ends a run that failed, however it did, with the host back on the enrollment it had; its value is the exit
 # code. Once, and only with the Supervisor stopped and the server not having taken the host meanwhile.
 function Put-Back {
-    $copies = $script:kept
-    $script:kept = $null
+    $copies = $script:keptDir
+    $script:keptDir = $null
     $back = "powershell -NoProfile -ExecutionPolicy Bypass -File `"$copies\put-back.ps1`""
     try { Stop-Service -Name $service -Force -ErrorAction Stop } catch { }
     if (-not (Test-Stopped)) {
@@ -579,15 +582,16 @@ if ($NoStart) {
         $st = $null
         try { $st = (& $supervisor status --storage $storage --json 2>$null | Out-String) | ConvertFrom-Json } catch { }
         # Not with credentials set aside: a purge removes them.
-        $kept = $tried -or @(Get-StatesAside).Count -or (Test-Path -Path "$state.replaced-*")
+        $cut = @(Get-Copies).Count
+        $kept = $tried -or $cut -or @(Get-StatesAside).Count -or (Test-Path -Path "$state.replaced-*")
         $deleted = if ($kept) { '' } else { ', or the server deleted this host, which keeps its identity' }
         $purge = if ($kept) { '' } else { ', or for a deleted host remove its data first (pydantic-opamp-uninstall.ps1 -Purge)' }
         # The server answered the host and didn't take it ("enrollment" in the status, gone once it
         # does). A refused token is told below.
-        $taken = if ($kept) { "Copy what is set aside in $storage elsewhere, remove this host's data (pydantic-opamp-uninstall.ps1 -Purge), then enroll it again with a new token" }
+        $taken = if ($kept) { "Copy what is set aside in $storage$(if ($cut) { " and $root" }) elsewhere, remove this host's data (pydantic-opamp-uninstall.ps1 -Purge), then enroll it again with a new token" }
             else { "Remove this host's data (pydantic-opamp-uninstall.ps1 -Purge), then enroll it again with a new token" }
         # The host goes back to the enrollment it had (Put-Back): nothing more is to be done with this one.
-        if ($kept -and -not $tried) {
+        if ($keptDir -and -not $tried) {
             if ($st -and $st.enrollment -and $st.enrollment.identity_taken) { Fail "not enrolled: the server at $Endpoint holds this host's identity for another installation" }
             if ($st -and $st.enrollment -and $st.enrollment.unreachable) { Fail "not enrolled: the server at $Endpoint tells this host to connect to $($st.enrollment.unreachable), which can't be reached from here (its name, a firewall, a proxy or its certificate)" }
             if ($st -and $st.enrollment -and -not $st.enrollment.token_refused) { Fail "not enrolled: the server at $Endpoint answered this host and hasn't taken it. Why is above" }
@@ -608,13 +612,13 @@ if ($NoStart) {
         }
         Fail "enrolled, but the Supervisor can't connect to $Endpoint yet; it keeps retrying. Fix what is above, then check with: & '$supervisor' status --storage '$storage'"
     }
-    if ($kept) { Remove-Copies }
+    if ($keptDir) { Remove-Copies }
     Write-Output "$done with $Endpoint. The Supervisor is running and connected ($service)."
 }
 } finally {
     # Fail has put it back already; this is for what ends the run otherwise (Ctrl+C, an error).
-    if ($kept -and $tried) { Remove-Copies }
-    elseif ($kept) { $null = Put-Back }
+    if ($keptDir -and $tried) { Remove-Copies }
+    elseif ($keptDir) { $null = Put-Back }
     elseif ($stopped) {
         if ($keptTmp) { Remove-Item -LiteralPath $keptTmp -Recurse -Force -ErrorAction SilentlyContinue }
         Start-Service -Name $service

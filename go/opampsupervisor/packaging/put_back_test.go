@@ -4,6 +4,7 @@
 package packaging
 
 import (
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -240,6 +241,7 @@ func TestEnrollAfterOneThatWasKilled(t *testing.T) {
 	out, err = e.run(t, "other", "--endpoint", "wss://opamp.example.com/v1/opamp")
 	require.Error(t, err, out)
 	assert.Contains(t, out, "Put it back with: sudo sh "+kept+"/put-back")
+	assert.NotContains(t, out, "remove its data", "a purge removes the copies")
 	assert.Equal(t, []string{kept}, copies(t, etc))
 	assert.Equal(t, "SEALED:--name=opamp-enroll-token:other", e.read(t, "enroll-token.cred"), "a host that isn't taken is enrolled as before")
 	_, err = runPutBack(e, kept)
@@ -250,6 +252,19 @@ func TestEnrollAfterOneThatWasKilled(t *testing.T) {
 	assert.Equal(t, "offered\n", readFile(t, replaced[0]))
 	require.NoError(t, os.Remove(replaced[0]))
 	assertOld(t, e, storage, etc)
+}
+
+// What a run that was killed while it copied left goes; another run's that still runs stays.
+func TestEnrollRemovesUnfinishedCopies(t *testing.T) {
+	e, _, etc := enrolledHost(t)
+	e.put(t, "taken", "")
+	dead := filepath.Join(etc, "enrollment-before-20261122T000000Z-999999.tmp")
+	alive := filepath.Join(etc, fmt.Sprintf("enrollment-before-20261122T000000Z-%d.tmp", os.Getpid()))
+	require.NoError(t, os.Mkdir(dead, 0o700))
+	require.NoError(t, os.Mkdir(alive, 0o700))
+	out, err := e.run(t, "new", "--endpoint", "wss://opamp.example.com/v1/opamp")
+	require.NoError(t, err, out)
+	assert.Equal(t, []string{alive}, copies(t, etc))
 }
 
 // A host the server doesn't take has nothing to go back to.

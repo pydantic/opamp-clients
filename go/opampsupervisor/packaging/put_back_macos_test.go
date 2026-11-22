@@ -194,6 +194,7 @@ func TestMacEnrollAfterOneThatWasKilled(t *testing.T) {
 	out, err = h.run("other")
 	require.Error(t, err, out)
 	assert.Contains(t, out, "Put it back with: sudo sh "+kept+"/put-back")
+	assert.NotContains(t, out, "remove its data", "a purge removes the copies")
 	assert.Equal(t, []string{kept}, copies(t, h.etc))
 	assert.Equal(t, "other", readFile(t, filepath.Join(h.etc, "enroll-token")))
 	b, err := exec.Command("/bin/sh", filepath.Join(kept, "put-back")).CombinedOutput()

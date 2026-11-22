@@ -190,6 +190,7 @@ func TestWinEnrollAfterOneThatWasKilled(t *testing.T) {
 	out, err = h.run(t, "other")
 	require.Error(t, err, out)
 	assert.Contains(t, out, "an earlier pydantic-opamp-enroll was cut short")
+	assert.NotContains(t, out, "remove its data", "a purge removes the copies")
 	assert.Equal(t, []string{kept}, copies(t, h.root))
 	assert.Equal(t, "other", readFile(t, filepath.Join(h.root, "enroll-token")))
 	b, err := exec.Command("powershell", "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-File", filepath.Join(h.dir, "fakes.ps1"), "-Root", h.root).CombinedOutput()
