@@ -56,9 +56,9 @@ type executor struct {
 	// stopped before, say) can touch them.
 	instance string
 	lastSave chan struct{} // closed when the last save asked for has ended
-	// used is the URL of the OpAMP request or connection whose outcome came last (platform mode only:
-	// in core mode the core makes them itself).
-	used atomic.Pointer[string]
+	// used is the OpAMP request or connection whose outcome came last: its URL and headers (platform
+	// mode only: in core mode the core makes them itself).
+	used atomic.Pointer[usedRequest]
 	// answered is closed when the first answer from the server arrives (heard; platform mode
 	// only, as used).
 	answered   chan struct{}
@@ -97,7 +97,15 @@ func isWSAnswer(data []byte) bool {
 
 // tried records url as the one the latest request or connection went to, before its outcome
 // reaches the core: a notification of that outcome finds it in place.
-func (x *executor) tried(url string) { x.used.Store(&url) }
+func (x *executor) tried(url string, header http.Header) {
+	x.used.Store(&usedRequest{url: url, header: header})
+}
+
+// usedRequest is where an OpAMP request or connection went, with the headers it sent.
+type usedRequest struct {
+	url    string
+	header http.Header
+}
 
 // newExecutor carries out effects over conn. (Compression is off: the core asks for identity, and
 // Go only decompresses what it asked for itself.)
@@ -142,7 +150,7 @@ func (x *executor) do(eff *corepb.Effect) *report {
 		e := x.fl.add(k.HttpRequest.Id)
 		x.fl.spawn(func() {
 			in := x.post(e.ctx, k.HttpRequest)
-			x.tried(k.HttpRequest.Url)
+			x.tried(k.HttpRequest.Url, toHTTP(k.HttpRequest.Headers))
 			x.emit(report{e: e, in: in, last: true})
 		})
 	case *corepb.Effect_WsOpen:
@@ -580,7 +588,7 @@ func (x *executor) post(ctx context.Context, r *corepb.HttpRequest) *corepb.Inpu
 // any point, drops it: the dial is aborted, or the connection closed without a word.
 func (x *executor) connect(e *effect, o *corepb.WsOpen) {
 	conn, resp, err := x.conn.dialWebSocket(e.ctx, o.Url, toHTTP(o.Headers))
-	x.tried(o.Url)
+	x.tried(o.Url, toHTTP(o.Headers))
 	if err != nil {
 		f := &corepb.WsFailed{Id: o.Id, Detail: lossy(err.Error()), UnixMs: unixMs()}
 		if resp != nil {
