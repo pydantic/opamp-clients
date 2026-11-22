@@ -442,7 +442,7 @@ if ($NoStart) {
         $which = 'this host now enrolls as a new one: the saved credentials the server refused'
         if ($tried -and -not $aside) { Note "the saved credentials are not set aside: if the Supervisor started, its log says why" }
         $st = $null
-        if (-not $aside -and -not $Refresh) { try { $st = (& $supervisor status --storage $storage --json 2>$null | Out-String) | ConvertFrom-Json } catch { } }
+        if (-not $aside -and -not $Refresh) { try { $st = (& $supervisor status --storage $storage --wait 1s --since $started --require-accepted --json 2>$null | Out-String) | ConvertFrom-Json } catch { } }
         if ($st -and $st.server -and ($st.server.http_status -eq 401 -or ($st.server.connected -and -not $st.accepted))) {
             # The last that an earlier run had set aside, if there is one, and the server refuses this host
             # now, too: an outage, or an upgrade, is nothing to put credentials back for.
@@ -451,6 +451,7 @@ if ($NoStart) {
             $which = 'saved credentials the server refused in an earlier run, at ' + ("$aside" -replace '^.*refused-(....)(..)(..)T(..)(..)(..)Z.*$', '$1-$2-$3 $4:$5:$6 UTC')
             if ($all.Count -gt 1) { $more = "there are more set aside than these, the last: & '$supervisor' status --storage '$storage' lists them" }
         }
+        if ($aside -and $which -match 'earlier') { Note 'if this run had another token than the host enrolled with, enroll again with that one first' }
         if ($aside) { Note "$which, and the identity kept with them, are set aside in $aside. If the server refused them for a while only, put them back with: try { Stop-Service $service -ErrorAction Stop; if (Test-Path -LiteralPath '$aside') { `$n = '$state.replaced-' + [DateTime]::UtcNow.ToString('yyyyMMddTHHmmssZ') + '-' + `$PID; if (Test-Path -LiteralPath '$state') { Move-Item -LiteralPath '$state' -Destination `$n -ErrorAction Stop }; try { Move-Item -LiteralPath '$aside' -Destination '$state' -ErrorAction Stop } catch { Move-Item -LiteralPath `$n -Destination '$state'; throw } } else { 'nothing is put back, the copy is not there' } } finally { Start-Service $service }" }
         if ($more) { Note $more }
         if ($notSaved) { exit 1 }
@@ -459,8 +460,8 @@ if ($NoStart) {
         $st = $null
         try { $st = (& $supervisor status --storage $storage --json 2>$null | Out-String) | ConvertFrom-Json } catch { }
         if ($st -and $st.server -and $st.server.connected -and -not $st.accepted) {
-            $deleted = if ($tried) { '' } else { ', or the server deleted this host, which keeps its identity' }
-            $purge = if ($tried) { '' } else { ', or for a deleted host remove its data first (pydantic-opamp-uninstall.ps1 -Purge)' }
+            $deleted = if ($tried -or @(Get-StatesAside).Count) { '' } else { ', or the server deleted this host, which keeps its identity' }
+            $purge = if ($tried -or @(Get-StatesAside).Count) { '' } else { ', or for a deleted host remove its data first (pydantic-opamp-uninstall.ps1 -Purge)' }
             Fail "enrolled, but the server at $Endpoint took the connection and not the enrollment token: it may be used up, expired or revoked$deleted. Enroll again with a new token$purge; check with: & '$supervisor' status --storage '$storage'"
         }
         Fail "enrolled, but the Supervisor can't connect to $Endpoint yet; it keeps retrying. Fix what is above, then check with: & '$supervisor' status --storage '$storage'"

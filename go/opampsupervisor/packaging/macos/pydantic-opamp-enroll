@@ -478,7 +478,7 @@ tell_aside() {
 # refuses this host now, too: an outage, or an upgrade, is nothing to put credentials back for.
 tell_earlier() {
 	[ -z "$refresh" ] || return 0
-	st=$("$supervisor" status --storage "$storage" --json 2>/dev/null) || :
+	st=$("$supervisor" status --storage "$storage" --wait 1s --since "$started" --require-accepted --json 2>/dev/null) || :
 	case $st in
 	*'"http_status": 401'*) ;;
 	*'"accepted": {'*) return 0 ;;
@@ -488,6 +488,7 @@ tell_earlier() {
 	earlier=$(states_aside | tail -n 1)
 	[ -n "$earlier" ] || return 0
 	at=$(echo "${earlier##*refused-}" | sed 's/^\(....\)\(..\)\(..\)T\(..\)\(..\)\(..\)Z.*/\1-\2-\3 \4:\5:\6 UTC/')
+	echo "if this run had another token than the host enrolled with, enroll again with that one first" >&2
 	tell_aside "$earlier" "saved credentials the server refused in an earlier run, at $at"
 	[ "$(states_aside | wc -l)" -eq 1 ] || echo "there are more set aside than these, the last: sudo $supervisor status --storage $storage lists them" >&2
 }
@@ -506,7 +507,8 @@ not_accepted() {
 	if printf '%s\n' "$st" | grep -q '"connected": true' && ! printf '%s\n' "$st" | grep -q '"accepted": {'; then
 		deleted=", or the server deleted this host, which keeps its identity"
 		purge=", or for a deleted host remove its data first (sudo /opt/pydantic-opamp/bin/pydantic-opamp-uninstall --purge)"
-		[ -z "$restarted_fresh" ] || deleted= purge=
+		# Not with credentials set aside: a purge removes them.
+		[ -z "$restarted_fresh$(states_aside)" ] || deleted= purge=
 		echo "enrolled, but the server at $endpoint took the connection and not the enrollment token: it may be used up, expired or revoked$deleted. Enroll again with a new token$purge; check with: sudo $supervisor status --storage $storage" >&2
 		fail_wait
 	fi

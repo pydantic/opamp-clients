@@ -143,6 +143,9 @@ func TestWinEnrollSetsAside(t *testing.T) {
 				return strings.NewReplacer("\r", "", "\n", " ").Replace(string(b))
 			}
 			assert.NotContains(t, rerun("{ \"server\": { \"connected\": false } }"), "put them back with")
+			unanswered := rerun(refusedJSON)
+			assert.Contains(t, unanswered, "took the connection and not the enrollment token")
+			assert.NotContains(t, unanswered, "-Purge")
 			again := rerun(strings.ReplaceAll(revokedJSON, ",\n    \"issued_refused\": 5", ""))
 			assert.Contains(t, again, "saved credentials the server refused in an earlier run, at 2026-11-21 00:00:00 UTC")
 			assert.Contains(t, again, filepath.Base(older))

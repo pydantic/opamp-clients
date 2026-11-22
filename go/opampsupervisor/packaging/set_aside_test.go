@@ -92,6 +92,11 @@ printf '{\n  "stopped": true,\n  "server": {\n    "http_status": 401\n  }\n}\n'
 	out, err := e.run(t, "bootstrap-token", "--endpoint", "wss://opamp.example.com/v1/opamp")
 	require.Error(t, err)
 	assert.NotContains(t, out, "the server refused this host's saved credentials")
+	// Nor for what an earlier run had set aside.
+	require.NoError(t, os.WriteFile(filepath.Join(storage, "opamp-state.refused-20261122T000000Z-1"), []byte("older"), 0o600))
+	out, err = e.run(t, "bootstrap-token", "--endpoint", "wss://opamp.example.com/v1/opamp")
+	require.Error(t, err)
+	assert.NotContains(t, out, "put them back with")
 	calls, err := os.ReadFile(filepath.Join(e.tools, "supervisor.log"))
 	require.NoError(t, err)
 	assert.Regexp(t, `(?m)^status .* --wait 1s --since \d+ --require-accepted --json$`, string(calls))
