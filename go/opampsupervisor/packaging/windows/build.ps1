@@ -5,7 +5,9 @@
 # otelcol-contrib, pinned in ..\contrib.json), the Supervisor, then an .msi (pydantic-opamp-supervisor.wxs, WiX 5):
 #   go\opampsupervisor\packaging\windows\build.ps1 -Version 0.1.0
 # The MSI version is numbers only (major.minor.build). With -CertificateThumbprint, signtool
-# signs both executables and the .msi with that certificate from the machine's store.
+# signs both executables, the two helper scripts and the .msi with that certificate from the
+# machine's store, so a host whose execution policy is AllSigned runs the scripts. The scripts
+# are copied next to the executables and signed there; the ones in this directory stay as they are.
 param(
     [Parameter(Mandatory = $true)][string]$Version,
     [ValidateSet('amd64', 'arm64')][string]$Arch = 'amd64',
@@ -20,7 +22,7 @@ $env:GOOS = 'windows'; $env:GOARCH = $Arch; $env:CGO_ENABLED = '0'
 
 function Sign([string[]]$paths) {
     if ($CertificateThumbprint) {
-        signtool sign /sha1 $CertificateThumbprint /fd sha256 /tr http://timestamp.digicert.com /td sha256 @paths
+        signtool sign /sm /sha1 $CertificateThumbprint /fd sha256 /tr http://timestamp.digicert.com /td sha256 @paths
     }
 }
 
@@ -36,7 +38,11 @@ try {
 } finally {
     Pop-Location
 }
-Sign @((Join-Path $bin 'opampsupervisor.exe'), (Join-Path $bin 'otelcol.exe'))
+$scripts = foreach ($name in 'pydantic-opamp-enroll.ps1', 'pydantic-opamp-uninstall.ps1') {
+    Copy-Item (Join-Path $PSScriptRoot $name) (Join-Path $bin $name) -Force
+    Join-Path $bin $name
+}
+Sign (@((Join-Path $bin 'opampsupervisor.exe'), (Join-Path $bin 'otelcol.exe')) + $scripts)
 
 $msi = Join-Path $packaging "dist\pydantic-opamp-supervisor-$Version-windows-$Arch.msi"
 $platform = if ($Arch -eq 'amd64') { 'x64' } else { 'arm64' }

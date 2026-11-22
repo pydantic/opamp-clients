@@ -7,7 +7,8 @@
   The service is installed stopped and set to start on demand; pydantic-opamp-enroll.ps1 writes
   its config under ProgramData\pydantic-opamp, sets it to start automatically and starts it.
   Uninstalling stops and removes the service but keeps ProgramData\pydantic-opamp, for a
-  reinstall. build.ps1 passes Version and Bin (the directory with the two executables).
+  reinstall. build.ps1 passes Version and Bin (the directory with the two executables and the two
+  helper scripts, signed there when it signs).
 -->
 <Wix xmlns="http://wixtoolset.org/schemas/v4/wxs">
   <Package Name="Pydantic OpAMP Supervisor" Manufacturer="Pydantic" Version="$(var.Version)"
@@ -47,10 +48,10 @@
         <File Source="$(var.Bin)\otelcol.exe" KeyPath="yes" />
       </Component>
       <Component>
-        <File Source="pydantic-opamp-enroll.ps1" KeyPath="yes" />
+        <File Source="$(var.Bin)\pydantic-opamp-enroll.ps1" KeyPath="yes" />
       </Component>
       <Component>
-        <File Source="pydantic-opamp-uninstall.ps1" KeyPath="yes" />
+        <File Source="$(var.Bin)\pydantic-opamp-uninstall.ps1" KeyPath="yes" />
       </Component>
       <Component>
         <File Source="..\..\..\..\LICENSE" Name="LICENSE.txt" KeyPath="yes" />
