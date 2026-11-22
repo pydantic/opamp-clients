@@ -139,6 +139,11 @@ and date. Tests, CI and docs alone don't need a line.
   isn't well (`status` exits 1). The status says why, `--wait --require-accepted` has the host
   accepted and connected for 3 seconds (every enrollment takes that much longer), and
   `pydantic-opamp-enroll` (Linux, macOS, Windows) fails with it (#160).
+- Supervisor installers: `pydantic-opamp-enroll` (Linux, macOS, Windows) run on an enrolled host with a
+  token the server doesn't take (a used-up one, say) replaced the one the host was enrolled with, and
+  the credentials the server issued for it were not used any more: the host stayed off the server. It
+  now keeps the enrollment the host had until the server takes the new one, and otherwise goes back to
+  it and exits 1.
 - Supervisor installers: a host deleted on the server and enrolled again over its kept data with
   the same token could never connect: the client kept the host's own issued credentials, which
   the delete revoked, and doesn't fall back from them to the token. `pydantic-opamp-enroll` (not
