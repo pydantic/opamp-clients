@@ -40,8 +40,9 @@ func TestEnrollRemovesATelemetryDropInWithoutItsCredential(t *testing.T) {
 	e := newEnrollment(t)
 	dropins := filepath.Join(e.root, "etc/systemd/system/pydantic-opamp-supervisor.service.d")
 	require.NoError(t, os.MkdirAll(dropins, 0o755))
+	const ours = "[Service]\nLoadCredentialEncrypted=opamp-telemetry-token:/etc/pydantic-opamp/telemetry-token.cred\n"
 	for _, name := range []string{"telemetry.conf", "operator.conf"} {
-		require.NoError(t, os.WriteFile(filepath.Join(dropins, name), []byte("[Service]\n"), 0o600))
+		require.NoError(t, os.WriteFile(filepath.Join(dropins, name), []byte(ours), 0o600))
 	}
 	out, err := e.run(t, "runtime-token", "--endpoint", "wss://opamp.example.com", "--no-start")
 	require.NoError(t, err, out)
@@ -50,6 +51,19 @@ func TestEnrollRemovesATelemetryDropInWithoutItsCredential(t *testing.T) {
 	log, err := os.ReadFile(filepath.Join(e.tools, "systemctl.log"))
 	require.NoError(t, err)
 	assert.Contains(t, string(log), "daemon-reload")
+	// What an administrator wrote there, or added to, stays, on an enrollment and an upgrade; it is said when
+	// the service can't start with it.
+	for _, content := range []string{"[Service]\nEnvironment=HTTPS_PROXY=http://proxy:3128\n", ours + "Environment=A=b\n"} {
+		require.NoError(t, os.WriteFile(filepath.Join(dropins, "telemetry.conf"), []byte(content), 0o600))
+		for _, args := range [][]string{{"--endpoint", "wss://opamp.example.com/v1/opamp", "--no-start"}, {"--refresh"}} {
+			out, err = e.run(t, "runtime-token", args...)
+			require.NoError(t, err, out)
+			got, err := os.ReadFile(filepath.Join(dropins, "telemetry.conf"))
+			require.NoError(t, err)
+			assert.Equal(t, content, string(got))
+			assert.Equal(t, strings.Contains(content, "opamp-telemetry-token"), strings.Contains(out, "names a telemetry credential that is gone"), out)
+		}
+	}
 }
 
 func TestMacEnrollTelemetryCredentials(t *testing.T) {

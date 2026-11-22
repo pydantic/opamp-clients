@@ -263,7 +263,11 @@ func TestUninstallPurgeRemovesTheTelemetryDropIn(t *testing.T) {
 			t.Fatal(err)
 		}
 		for _, path := range paths {
-			if err := os.WriteFile(path, []byte("[Service]\n"), 0644); err != nil {
+			content := "[Service]\n"
+			if path == telemetry {
+				content += "LoadCredentialEncrypted=opamp-telemetry-token:/etc/pydantic-opamp/telemetry-token.cred\n"
+			}
+			if err := os.WriteFile(path, []byte(content), 0644); err != nil {
 				t.Fatal(err)
 			}
 		}
@@ -290,5 +294,46 @@ func TestUninstallPurgeRemovesTheTelemetryDropIn(t *testing.T) {
 	}
 	if out, err := invoke("--purge"); err != nil || reloads() != 2 {
 		t.Fatalf("reloads %d: %v: %s", reloads(), err, out)
+	}
+	// What an administrator wrote there, or added to, stays, and is said; --dry-run names what goes.
+	write(telemetry)
+	if out, err := invoke("--purge", "--dry-run"); err != nil || !strings.Contains(out, "Delete "+telemetry+".") {
+		t.Fatalf("%v: %s", err, out)
+	}
+	for _, content := range []string{"[Service]\nEnvironment=HTTPS_PROXY=http://proxy:3128\n", "[Service]\nLoadCredentialEncrypted=opamp-telemetry-token:/etc/pydantic-opamp/telemetry-token.cred\nEnvironment=A=b\n"} {
+		if err := os.WriteFile(telemetry, []byte(content), 0644); err != nil {
+			t.Fatal(err)
+		}
+		if out, err := invoke("--purge", "--dry-run"); err != nil || !strings.Contains(out, "Keep "+telemetry) {
+			t.Fatalf("%v: %s", err, out)
+		}
+		if out, err := invoke("--purge"); err != nil || !there(telemetry) || !strings.Contains(out, "isn't as this package writes it, and is kept") || reloads() != 2 {
+			t.Fatalf("reloads %d: %v: %s", reloads(), err, out)
+		}
+	}
+	// Nor is a link followed, the directory's or the file's.
+	elsewhere := t.TempDir()
+	kept := filepath.Join(elsewhere, "telemetry.conf")
+	write(telemetry)
+	if err := os.Rename(telemetry, kept); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(kept, telemetry); err != nil {
+		t.Fatal(err)
+	}
+	if out, err := invoke("--purge"); err != nil || !there(telemetry) || !there(kept) {
+		t.Fatalf("%v: %s", err, out)
+	}
+	if err := os.RemoveAll(dropins); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(elsewhere, dropins); err != nil {
+		t.Fatal(err)
+	}
+	if out, err := invoke("--purge"); err == nil || !strings.Contains(out, "refusing symbolic link") || !there(kept) {
+		t.Fatalf("%v: %s", err, out)
+	}
+	if out, err := invoke(); err != nil || !there(kept) {
+		t.Fatalf("without --purge: %v: %s", err, out)
 	}
 }

@@ -631,7 +631,7 @@ removal after the native package is gone.
 
 Use `--purge` (`-Purge` on Windows) to also delete the package's configuration and
 state directories, including the recovery helper, and on Linux the unit's `telemetry.conf`
-drop-in (other drop-ins stay). A purge deletes the macOS
+drop-in if it is as the package writes it (one edited, and other drop-ins, stay). A purge deletes the macOS
 System Keychain item for `/opt/pydantic-opamp/var/opamp-state` only.
 Custom storage directories, system log files, package repository settings, and
 shared system users stay untouched. A service-stop or package-removal failure
