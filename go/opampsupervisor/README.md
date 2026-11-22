@@ -186,13 +186,14 @@ agent:
   naming the setting to check (`server.endpoint`, `server.headers` or `server.auth`, by the
   answer), the endpoint without credentials; the retries go at debug, and getting through again
   is said once.
-- **An uninstall tells the server.** The uninstall helpers (packaging/README.md) write
-  `uninstall-requested` in the storage directory and stop the service; stopping, the Supervisor
+- **An uninstall tells the server.** The uninstall helpers (packaging/README.md) make a
+  directory, `uninstall-requested-` and the helper's process ID, in the storage directory and stop the service; stopping, the Supervisor
   sends `POST /v1/fleet/installations/self/uninstall/` to its server's origin, with the credentials
   it connects with (over the client's own connection: go/opamp's `Client.Do`), for at most 10
-  seconds and while its collector stops, and writes `told` or `not told: why` to
+  seconds and while its collector stops, and writes `told` (HTTP 204 alone), `refused` (401) or `not told: why` to
   `uninstall-notice` for the helper to say. Told, it removes its saved client state, whose identity
-  and credentials the server has ended. Without the request file nothing is sent
+  and credentials the server has ended. Without a request from a helper that still runs, made in the
+  last 2 minutes, nothing is sent
   (`uninstall_notice.go`, and a few lines in `Shutdown`).
 - **`opampsupervisor status` says how it is.** The running Supervisor keeps
   `supervisor-status.json` in its storage directory: the OpAMP connection (and, when it can't

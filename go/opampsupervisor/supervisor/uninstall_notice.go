@@ -18,8 +18,8 @@ import (
 )
 
 // An uninstall tells the server, so it can tell an uninstalled host from one that is down: the
-// package's uninstaller writes uninstallRequestFile in the storage directory before it stops the
-// service, and the Supervisor, stopping, sends uninstallPath at its server's origin with the
+// package's uninstaller makes the directory uninstallRequest plus its process ID (and, on Linux, when
+// that process started) in the storage directory before it stops the service, and the Supervisor, stopping, sends uninstallPath at its server's origin with the
 // credentials it connects with (those the server issued it, or, before it issued any, the
 // enrollment token in its config: the server refuses that one), then writes what came of it to
 // uninstallNoticeFile, for the uninstaller to say. The credentials never leave the Supervisor:
@@ -28,15 +28,17 @@ import (
 // its collector (so it adds little to a stop that has a limit: the service manager's, or the
 // uninstaller's own wait), and the stop goes on whatever came of it.
 const (
-	uninstallRequestFile   = "uninstall-requested"
+	uninstallRequest       = "uninstall-requested-"
 	uninstallNoticeFile    = "uninstall-notice"
 	uninstallPath          = "/v1/fleet/installations/self/uninstall/"
 	uninstallNoticeTimeout = 10 * time.Second
-	// uninstallTold is the result line when the server was told, and the one word the uninstaller reads.
-	uninstallTold = "told"
-	// uninstallRequestMaxAge bounds how old a request may be: the uninstaller makes it and stops the
-	// service at once, so an older one is an uninstall that failed, and this stop an ordinary one.
-	uninstallRequestMaxAge = 2 * time.Minute
+	// uninstallTold and uninstallRefused are the result line when the server was told, and when it
+	// refused the credentials; any other starts with "not told: ".
+	uninstallTold    = "told"
+	uninstallRefused = "refused"
+	// uninstallRequestFor is how long a request stands: the uninstaller makes it, stops the service at
+	// once and waits for that, so another is an uninstall that failed, and this stop an ordinary one.
+	uninstallRequestFor = 2 * time.Minute
 )
 
 // uninstallSender is the started OpAMP client (go/opamp's Client): Do sends to the server it uses
@@ -51,20 +53,8 @@ type uninstallSender interface {
 // says whether the server was told.
 func (s *Supervisor) noticeUninstall() (wait func() (told bool)) {
 	dir := s.config.Storage.Directory
-	request := filepath.Join(dir, uninstallRequestFile)
-	notAsked := func() bool { return false }
-	info, err := os.Lstat(request)
-	if err != nil {
-		return notAsked
-	}
-	if err := os.Remove(request); err != nil {
-		// It would ask again at every later stop.
-		s.telemetrySettings.Logger.Warn("The uninstall request can't be removed: the OpAMP server isn't told", zap.Error(err))
-		return notAsked
-	}
-	if age := time.Since(info.ModTime()); age > uninstallRequestMaxAge || age < -uninstallRequestMaxAge {
-		s.telemetrySettings.Logger.Warn("An uninstall was asked for and not made: the OpAMP server isn't told", zap.Duration("asked", age))
-		return notAsked
+	if _, ok := asked(s.telemetrySettings.Logger, dir, uninstallRequest, uninstallRequestFor, time.Now()); !ok {
+		return func() bool { return false }
 	}
 	var sender uninstallSender
 	if c, ok := s.opampClient.(*coreClient); ok {
@@ -97,8 +87,9 @@ func (s *Supervisor) forgetClient() {
 	}
 }
 
-// sendUninstallNotice sends the notice and says what came of it: "told", or "not told: why". The
-// why names the HTTP status or the error, never a credential.
+// sendUninstallNotice sends the notice and says what came of it: "told", "refused", or "not told: why".
+// Told is the route's own answer (204) and no other: anything else on the way to a server may answer any
+// path with a page, and a host that takes that for it drops credentials that still work. The why names the HTTP status or the error, never a credential.
 func sendUninstallNotice(ctx context.Context, sender uninstallSender) string {
 	if sender == nil || sender.Endpoint() == "" {
 		return "not told: the Supervisor wasn't connected to its server"
@@ -122,10 +113,10 @@ func sendUninstallNotice(ctx context.Context, sender uninstallSender) string {
 	}
 	_ = resp.Body.Close()
 	switch resp.StatusCode {
-	case http.StatusNoContent, http.StatusOK:
+	case http.StatusNoContent:
 		return uninstallTold
 	case http.StatusUnauthorized:
-		return "not told: the server didn't take this host's credentials (HTTP 401)"
+		return uninstallRefused // revoked just before the uninstall, say
 	case http.StatusNotFound:
 		return "not told: the server has no such endpoint (HTTP 404), or Fleet is off there"
 	default:

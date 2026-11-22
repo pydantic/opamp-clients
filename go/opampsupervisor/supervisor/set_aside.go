@@ -39,7 +39,7 @@ const setAsideFor = 2 * time.Minute
 // refused what the last run connected with as not valid. One it can't rename stays as it is.
 func setStateAside(logger *zap.Logger, dir string, now time.Time) {
 	state := filepath.Join(dir, coreClientStateFile)
-	by, ok := asked(logger, dir, now)
+	by, ok := asked(logger, dir, setAsideRequest, setAsideFor, now)
 	if !ok {
 		return
 	}
@@ -76,10 +76,10 @@ func setStateAside(logger *zap.Logger, dir string, now time.Time) {
 	logger.Info("The server refused this host's saved credentials: they are set aside, and it enrolls as a new host", zap.String("path", aside))
 }
 
-// asked is whether an enrollment helper that still runs asked, just now, for the state to be set aside, and
-// its process ID. A request is taken away, and counts once.
-func asked(logger *zap.Logger, dir string, now time.Time) (by int, ok bool) {
-	for _, name := range namesWith(dir, setAsideRequest) {
+// asked is whether a helper that still runs asked, just now, for what requests of the name ask for (to set
+// the state aside, or uninstall_notice.go's), and its process ID. A request is taken away, and counts once.
+func asked(logger *zap.Logger, dir, request string, standsFor time.Duration, now time.Time) (by int, ok bool) {
+	for _, name := range namesWith(dir, request) {
 		path := filepath.Join(dir, name)
 		st, err := os.Lstat(path)
 		if err != nil {
@@ -87,16 +87,16 @@ func asked(logger *zap.Logger, dir string, now time.Time) (by int, ok bool) {
 		}
 		if err := os.Remove(path); err != nil {
 			// Taken at every start, it would never end.
-			logger.Error("A request to set the saved credentials aside can't be removed, and isn't taken", zap.Error(err))
+			logger.Error("A request can't be removed, and isn't taken", zap.Error(err))
 			continue
 		}
-		id, mark, _ := strings.Cut(strings.TrimPrefix(name, setAsideRequest), ".")
+		id, mark, _ := strings.Cut(strings.TrimPrefix(name, request), ".")
 		pid, err := strconv.Atoi(id)
 		age := now.Sub(st.ModTime())
-		if err == nil && st.IsDir() && age < setAsideFor && age > -setAsideFor && processAlive(pid) && sameProcess(pid, mark, st.ModTime()) {
+		if err == nil && st.IsDir() && age < standsFor && age > -standsFor && processAlive(pid) && sameProcess(pid, mark, st.ModTime()) {
 			by, ok = pid, true
 		} else {
-			logger.Warn("A request to set the saved credentials aside isn't taken: nobody waits for it", zap.String("request", name), zap.Duration("age", age))
+			logger.Warn("A request isn't taken: nobody waits for it", zap.String("request", name), zap.Duration("age", age))
 		}
 	}
 	return by, ok

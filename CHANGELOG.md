@@ -83,7 +83,8 @@ and date. Tests, CI and docs alone don't need a line.
 - Supervisor installers: the uninstall helpers (Linux, macOS, Windows) tell the server the host is
   being removed, so it can tell an uninstalled host from one that is down. The running Supervisor
   sends it, with the credentials it connects with, as the helper stops it; the helper prints whether
-  the server was told, and the removal goes on either way. It needs a server with
+  the server was told, and the removal goes on either way. Told, the host's saved identity and
+  credentials go, and a reinstall enrolls it as a new host. It needs a server with
   `POST /v1/fleet/installations/self/uninstall/` (#157).
 - Go: `opamp.Client.Do` sends a request to the server's origin with the client's connection (TLS,
   proxy) and the headers it sends the server, so an application can tell the server something

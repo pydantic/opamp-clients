@@ -13,6 +13,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"strconv"
 	"sync"
 	"testing"
 	"time"
@@ -60,7 +61,9 @@ func TestTheUninstallNotice(t *testing.T) {
 	assert.Equal(t, "https://fleet.example:8443/v1/fleet/installations/self/uninstall/", got.URL.String())
 
 	for status, want := range map[int]string{
-		http.StatusUnauthorized:        "not told: the server didn't take this host's credentials (HTTP 401)",
+		http.StatusUnauthorized:        "refused",
+		http.StatusOK:                  "not told: HTTP 200",
+		http.StatusFound:               "not told: HTTP 302",
 		http.StatusNotFound:            "not told: the server has no such endpoint (HTTP 404), or Fleet is off there",
 		http.StatusInternalServerError: "not told: HTTP 500",
 	} {
@@ -96,7 +99,7 @@ func TestTheUninstallNotice(t *testing.T) {
 }
 
 // The Supervisor sends it only when the uninstaller asked just now (the request, made beside its
-// state: a directory on Linux and macOS, a file on Windows), takes the request, and writes the
+// state, by its process ID), takes the request, and writes the
 // result line where the uninstaller reads it, readable by its user alone.
 func TestTheSupervisorNoticesAnUninstallOnlyWhenAsked(t *testing.T) {
 	newSupervisor := func(t *testing.T) (*Supervisor, string) {
@@ -117,41 +120,51 @@ func TestTheSupervisorNoticesAnUninstallOnlyWhenAsked(t *testing.T) {
 	s.noticeUninstall()()
 	assert.Empty(t, notice(dir), "not asked: nothing written")
 
-	for name, ask := range map[string]func(string) error{
-		"a directory": func(p string) error { return os.Mkdir(p, 0o700) },
-		"a file":      func(p string) error { return os.WriteFile(p, nil, 0o600) },
+	ask := func(t *testing.T, dir string, pid int, ago time.Duration) string {
+		request := filepath.Join(dir, uninstallRequest+strconv.Itoa(pid))
+		require.NoError(t, os.Mkdir(request, 0o700))
+		at := time.Now().Add(-ago)
+		require.NoError(t, os.Chtimes(request, at, at))
+		return request
+	}
+	s, dir = newSupervisor(t)
+	request := ask(t, dir, os.Getpid(), 0)
+	s.noticeUninstall()()
+	assert.Equal(t, "not told: the Supervisor wasn't connected to its server\n", notice(dir), "no client here")
+	assert.NoDirExists(t, request, "the request is taken")
+	if info, err := os.Stat(filepath.Join(dir, uninstallNoticeFile)); assert.NoError(t, err) && os.PathSeparator == '/' {
+		assert.Equal(t, os.FileMode(0o600), info.Mode().Perm())
+	}
+
+	// A request whose uninstaller ended (killed before the stop, say), one too old, or one this can't remove, tells nothing: the stop is an ordinary one.
+	for name, left := range map[string]func(t *testing.T, dir string) string{
+		"an uninstaller that ended": func(t *testing.T, dir string) string { return ask(t, dir, deadPID(t), 0) },
+		"an uninstaller that hangs": func(t *testing.T, dir string) string {
+			return ask(t, dir, longRunning(t), uninstallRequestFor+time.Second)
+		},
+		"a name without an ID": func(t *testing.T, dir string) string {
+			p := filepath.Join(dir, uninstallRequest)
+			require.NoError(t, os.Mkdir(p, 0o700))
+			return p
+		},
+		"a request that isn't a directory": func(t *testing.T, dir string) string {
+			p := filepath.Join(dir, uninstallRequest+strconv.Itoa(os.Getpid()))
+			require.NoError(t, os.WriteFile(p, nil, 0o600))
+			return p
+		},
 	} {
 		t.Run(name, func(t *testing.T) {
 			s, dir := newSupervisor(t)
-			require.NoError(t, ask(filepath.Join(dir, uninstallRequestFile)))
-			s.noticeUninstall()()
-			assert.Equal(t, "not told: the Supervisor wasn't connected to its server\n", notice(dir), "no client here")
-			_, err := os.Stat(filepath.Join(dir, uninstallRequestFile))
-			assert.True(t, os.IsNotExist(err), "the request is taken")
-			if info, err := os.Stat(filepath.Join(dir, uninstallNoticeFile)); assert.NoError(t, err) && os.PathSeparator == '/' {
-				assert.Equal(t, os.FileMode(0o600), info.Mode().Perm())
-			}
+			request := left(t, dir)
+			assert.False(t, s.noticeUninstall()())
+			assert.Empty(t, notice(dir))
+			_, err := os.Lstat(request)
+			assert.ErrorIs(t, err, os.ErrNotExist, "taken away")
 		})
 	}
-
-	// One left by an uninstall that failed, or a request this can't remove, tells nothing, and
-	// a request this old is taken away.
-	t.Run("an old request", func(t *testing.T) {
-		s, dir := newSupervisor(t)
-		request := filepath.Join(dir, uninstallRequestFile)
-		require.NoError(t, os.Mkdir(request, 0o700))
-		old := time.Now().Add(-uninstallRequestMaxAge - time.Second)
-		require.NoError(t, os.Chtimes(request, old, old))
-		s.noticeUninstall()()
-		assert.Empty(t, notice(dir))
-		_, err := os.Stat(request)
-		assert.True(t, os.IsNotExist(err))
-	})
 	t.Run("a request that can't be removed", func(t *testing.T) {
 		s, dir := newSupervisor(t)
-		request := filepath.Join(dir, uninstallRequestFile)
-		require.NoError(t, os.Mkdir(request, 0o700))
-		require.NoError(t, os.WriteFile(filepath.Join(request, "x"), nil, 0o600), "os.Remove refuses a directory that isn't empty")
+		require.NoError(t, os.WriteFile(filepath.Join(ask(t, dir, os.Getpid(), 0), "x"), nil, 0o600), "os.Remove refuses a directory that isn't empty")
 		s.noticeUninstall()()
 		assert.Empty(t, notice(dir), "it would be sent at every later stop")
 	})
@@ -190,7 +203,7 @@ func TestTheUninstallNoticeThroughTheClient(t *testing.T) {
 
 	s := &Supervisor{config: config.Supervisor{Storage: config.Storage{Directory: dir}}, opampClient: c}
 	s.telemetrySettings.Logger = zap.NewNop()
-	require.NoError(t, os.Mkdir(filepath.Join(dir, uninstallRequestFile), 0o700))
+	require.NoError(t, os.Mkdir(filepath.Join(dir, uninstallRequest+strconv.Itoa(os.Getpid())), 0o700))
 	assert.True(t, s.noticeUninstall()(), "told")
 	b, err := os.ReadFile(filepath.Join(dir, uninstallNoticeFile))
 	require.NoError(t, err)
@@ -218,7 +231,7 @@ func TestAToldUninstallForgetsTheClientsState(t *testing.T) {
 	s.forgetClient() // nothing left to forget
 
 	s, dir, kept := setup(t)
-	require.NoError(t, os.Mkdir(filepath.Join(dir, uninstallRequestFile), 0o700))
+	require.NoError(t, os.Mkdir(filepath.Join(dir, uninstallRequest+strconv.Itoa(os.Getpid())), 0o700))
 	if s.noticeUninstall()() { // not connected: not told
 		s.forgetClient()
 	}
