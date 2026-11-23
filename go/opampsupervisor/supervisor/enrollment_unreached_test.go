@@ -65,6 +65,26 @@ func TestAnOfferedEndpointThatCannotBeReachedTakesOneCredential(t *testing.T) {
 	}
 }
 
+// A server that closes a moment after its offer, as a real one does: one credential too.
+func TestAnOfferedEndpointFromASlowServer(t *testing.T) {
+	setHolds(t, 6*time.Second, 100*time.Millisecond, 8*time.Millisecond)
+	for name, host := range unreachable(t) {
+		for _, wait := range []time.Duration{50 * time.Millisecond, 300 * time.Millisecond} {
+			t.Run(name+" "+wait.String(), func(t *testing.T) {
+				s := newEnrollServer(t)
+				s.set(func(s *enrollServer) { s.dest, s.closeAfter = "ws://"+host+"/v1/opamp", wait })
+				dir := t.TempDir()
+				c := enrollHost(t, s, dir)
+				require.Eventually(t, func() bool { return c.holdsInARow() >= 3 }, 60*time.Second, 20*time.Millisecond)
+				offers, tokens, keys := s.seen()
+				require.Equal(t, []int{1, 1, 0}, []int{offers, tokens, keys})
+				_, enrollment := hostStatus(t, dir)
+				require.Equal(t, host, enrollment["unreachable"])
+			})
+		}
+	}
+}
+
 // The first try again is after a minute, as after a close.
 func TestAnOfferedEndpointIsTriedAgainInAMinute(t *testing.T) {
 	s := newEnrollServer(t)

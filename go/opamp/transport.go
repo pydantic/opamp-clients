@@ -725,6 +725,16 @@ func (x *executor) drive(e *effect, conn *websocket.Conn, via *attempt, maxMessa
 					continue
 				}
 				// The close: ours, or the answer to the server's.
+				if serverClose < 0 {
+					code, err := x.awaitClose(e, via, reads)
+					if err != nil {
+						x.emit(report{e: e, in: wsLost(id, err), last: true})
+						return
+					}
+					if code >= 0 {
+						serverClose, reads = code, nil
+					}
+				}
 				msg := websocket.FormatCloseMessage(websocket.CloseNormalClosure, "")
 				if err := conn.WriteControl(websocket.CloseMessage, msg, time.Time{}); err != nil {
 					x.emit(report{e: e, in: wsLost(id, err), last: true})
@@ -752,6 +762,40 @@ func (x *executor) drive(e *effect, conn *websocket.Conn, via *attempt, maxMessa
 					}
 				}
 			}
+		}
+	}
+}
+
+// awaitClose waits for the server's Close (its code; -1 if none came) before ours, if via awaits it: a server
+// that enrolls agents closes the connection it offered a credential on, and which of the two closed it first is
+// all that tells it from one that serves the agent there (standing.heldBack).
+func (x *executor) awaitClose(e *effect, via *attempt, reads <-chan wsRead) (int, error) {
+	if !via.settles() {
+		return -1, nil
+	}
+	defer via.settled()
+	t := time.NewTimer(settleFor)
+	defer t.Stop()
+	for {
+		select {
+		case <-e.ctx.Done():
+			return -1, nil
+		case <-t.C:
+			return -1, nil
+		case r := <-reads:
+			if r.err == nil {
+				if m := wsMessage(r.data); m != nil {
+					via.message(m)
+				}
+				continue
+			}
+			code, ok := closeCode(r.err)
+			if !ok {
+				via.lost(r.err.Error())
+				return -1, r.err
+			}
+			via.closed(code, closeReason(r.err))
+			return code, nil
 		}
 	}
 }

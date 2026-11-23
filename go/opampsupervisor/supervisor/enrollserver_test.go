@@ -36,6 +36,8 @@ type enrollServer struct {
 	refuseToken string
 	// dest, if set, is the endpoint the offers are for, instead of the server's own.
 	dest string
+	// closeAfter is how long after its answer the server closes the connection.
+	closeAfter time.Duration
 	// serveToken: the token is answered as any credential, with no offer.
 	serveToken bool
 
@@ -91,6 +93,10 @@ func newEnrollServer(t *testing.T) *enrollServer {
 				}
 			}
 			if code != 0 {
+				s.mu.Lock()
+				wait := s.closeAfter
+				s.mu.Unlock()
+				time.Sleep(wait)
 				_ = c.WriteControl(websocket.CloseMessage, websocket.FormatCloseMessage(code, reason), time.Now().Add(time.Second))
 				_ = c.SetReadDeadline(time.Now().Add(time.Second))
 				for {

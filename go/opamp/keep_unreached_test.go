@@ -6,6 +6,7 @@ package opamp
 import (
 	"context"
 	"io"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"path/filepath"
@@ -111,6 +112,141 @@ func TestKeepUnreached(t *testing.T) {
 			t.Fatalf("%+v", st)
 		}
 	}
+}
+
+// slowServer offers a credential for to on every connection made with the token, and closes it after wait (never,
+// and answers what comes next, with keeps).
+func slowServer(t *testing.T, to string, wait time.Duration, keeps bool) (*httptest.Server, func() int) {
+	t.Helper()
+	var mu sync.Mutex
+	n := 0
+	s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		c, err := (&websocket.Upgrader{}).Upgrade(w, r, nil)
+		if err != nil {
+			return
+		}
+		defer c.Close()
+		for first := true; ; first = false {
+			_, data, err := c.ReadMessage()
+			m := &protobufs.AgentToServer{}
+			if err != nil || proto.Unmarshal(data[1:], m) != nil {
+				return
+			}
+			out := &protobufs.ServerToAgent{InstanceUid: m.InstanceUid}
+			mu.Lock()
+			if first && (n == 0 || !keeps) {
+				n++
+				out.ConnectionSettings = &protobufs.ConnectionSettingsOffers{Hash: []byte{byte(n)}, Opamp: &protobufs.OpAMPConnectionSettings{DestinationEndpoint: to,
+					Headers: &protobufs.Headers{Headers: []*protobufs.Header{{Key: "Authorization", Value: "Bearer key-" + string(rune('a'+n))}}}}}
+			}
+			mu.Unlock()
+			b, _ := proto.Marshal(out)
+			_ = c.WriteMessage(websocket.BinaryMessage, append([]byte{0}, b...))
+			if keeps {
+				continue
+			}
+			time.Sleep(wait)
+			_ = c.WriteControl(websocket.CloseMessage, websocket.FormatCloseMessage(websocket.CloseNormalClosure, ""), time.Now().Add(time.Second))
+			_ = c.SetReadDeadline(time.Now().Add(time.Second))
+			_, _, _ = c.ReadMessage()
+			return
+		}
+	}))
+	t.Cleanup(s.Close)
+	return s, func() int { mu.Lock(); defer mu.Unlock(); return n }
+}
+
+// A server that closes the connection a moment after its offer, when the agent has already failed to reach the
+// endpoint it offered (which refuses at once): one credential, as from one that closes first.
+func TestKeepUnreachedFromASlowServer(t *testing.T) {
+	for _, wait := range []time.Duration{0, 50 * time.Millisecond, 300 * time.Millisecond, 700 * time.Millisecond} {
+		t.Run(wait.String(), func(t *testing.T) {
+			t.Parallel()
+			s, offers := slowServer(t, "ws://"+refusing(t)+"/v1/opamp", wait, false)
+			c := startKeeping(t, "ws"+s.URL[4:], true)
+			for late := time.Now().Add(15 * time.Second); c.Standing().Unreached == ""; time.Sleep(20 * time.Millisecond) {
+				if time.Now().After(late) {
+					t.Fatalf("not told: %+v after %d offers", c.Standing(), offers())
+				}
+			}
+			time.Sleep(4 * time.Second)
+			if n := offers(); n != 1 {
+				t.Fatalf("%d offers, %+v", n, c.Standing())
+			}
+		})
+	}
+}
+
+// A server that offers a credential and serves the agent with the one it has isn't kept from the agent.
+func TestKeepUnreachedServedMeanwhile(t *testing.T) {
+	s, offers := slowServer(t, "ws://"+refusing(t)+"/v1/opamp", 0, true)
+	c := startKeeping(t, "ws"+s.URL[4:], true)
+	for late := time.Now().Add(20 * time.Second); !c.Standing().Accepted; time.Sleep(20 * time.Millisecond) {
+		if time.Now().After(late) {
+			t.Fatalf("not served: %+v after %d offers", c.Standing(), offers())
+		}
+	}
+	if st := c.Standing(); st.Unreached != "" {
+		t.Fatalf("%+v", st)
+	}
+}
+
+// A server that says nothing more and doesn't close is waited for no longer than settleFor: the agent's own close
+// comes then, and it goes on.
+func TestKeepUnreachedFromASilentServer(t *testing.T) {
+	opened, closed := make(chan struct{}, 8), make(chan time.Duration, 8)
+	s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		c, err := (&websocket.Upgrader{}).Upgrade(w, r, nil)
+		if err != nil {
+			return
+		}
+		defer c.Close()
+		opened <- struct{}{}
+		_, data, err := c.ReadMessage()
+		m := &protobufs.AgentToServer{}
+		if err != nil || proto.Unmarshal(data[1:], m) != nil {
+			return
+		}
+		b, _ := proto.Marshal(&protobufs.ServerToAgent{InstanceUid: m.InstanceUid, ConnectionSettings: &protobufs.ConnectionSettingsOffers{Hash: []byte{1},
+			Opamp: &protobufs.OpAMPConnectionSettings{DestinationEndpoint: "ws://" + refusing(t) + "/v1/opamp",
+				Headers: &protobufs.Headers{Headers: []*protobufs.Header{{Key: "Authorization", Value: "Bearer key-1"}}}}}})
+		_ = c.WriteMessage(websocket.BinaryMessage, append([]byte{0}, b...))
+		at := time.Now()
+		for {
+			if _, _, err := c.ReadMessage(); err != nil {
+				closed <- time.Since(at)
+				return
+			}
+		}
+	}))
+	defer s.Close()
+	c := startKeeping(t, "ws"+s.URL[4:], true)
+	select {
+	case took := <-closed:
+		if took > settleFor+time.Second {
+			t.Fatalf("held for %s", took)
+		}
+	case <-time.After(10 * time.Second):
+		t.Fatalf("not closed: %+v", c.Standing())
+	}
+	// It goes on: to the server with the token, which wasn't seen to enroll it.
+	<-opened
+	select {
+	case <-opened:
+	case <-time.After(20 * time.Second):
+		t.Fatalf("held: %+v", c.Standing())
+	}
+}
+
+// refusing is an address nothing listens on.
+func refusing(t *testing.T) string {
+	t.Helper()
+	l, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer l.Close()
+	return l.Addr().String()
 }
 
 // Over HTTP, where a second offer tells that the server enrolls agents: two, and no more.

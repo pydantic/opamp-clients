@@ -109,6 +109,8 @@ type standing struct {
 	// last try with a credential the server issued, if it made no connection.
 	keepUnreached, keepSaved bool
 	unreached                string
+	// settling is, while the server's Close is awaited (awaitClose), closed once it isn't any more.
+	settling chan struct{}
 }
 
 // offered is an offer the server made: where to, and the headers (a digest of each value, so the
@@ -505,6 +507,31 @@ func (a *attempt) failedToConnect(detail string) {
 	a.lost(detail)
 }
 
+// settleFor is how long the server's Close of a connection it offered a credential on is awaited.
+const settleFor = time.Second
+
+// settles is whether the server's Close of the attempt's connection is awaited before ours is sent: for an agent
+// it doesn't serve yet (Config.KeepUnreached) and only offered a credential on it. Then settled is to be called.
+func (a *attempt) settles() bool {
+	if a == nil {
+		return false
+	}
+	a.s.mu.Lock()
+	defer a.s.mu.Unlock()
+	if !a.s.keepUnreached || !a.offered || a.s.st.Accepted || a.s.settling != nil {
+		return false
+	}
+	a.s.settling = make(chan struct{})
+	return true
+}
+
+func (a *attempt) settled() {
+	a.s.mu.Lock()
+	defer a.s.mu.Unlock()
+	close(a.s.settling)
+	a.s.settling = nil
+}
+
 // heldBack is whether the attempt, with the configured credential, is not to be made (Config.KeepUnreached):
 // the server would offer another, and the last was never tried.
 func (a *attempt) heldBack() bool {
@@ -512,6 +539,12 @@ func (a *attempt) heldBack() bool {
 		return false
 	}
 	s := a.s
+	s.mu.Lock()
+	settling := s.settling
+	s.mu.Unlock()
+	if settling != nil && !a.issued {
+		<-settling // settleFor at most
+	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if a.issued || !s.keepUnreached || s.unreached == "" || s.st.Accepted || s.st.Rounds == 0 && !s.keepSaved {
