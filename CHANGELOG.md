@@ -187,6 +187,9 @@ and date. Tests, CI and docs alone don't need a line.
   of the package's files open (an antivirus or a log viewer, say) and no longer fails with 1601,
   leaving the Supervisor stopped. The `.msi` installs its files before it removes the old version.
   After such a failure, installing the new `.msi` again finishes the upgrade (#162).
+- Supervisor on macOS: `pydantic-opamp-enroll` (`--refresh` too), ended by a signal (Ctrl-C, a lost
+  ssh connection) while it restarts the service, starts it again before it ends. It left the
+  service unloaded until the Mac started again (#159).
 - Supervisor: `pydantic-opamp-enroll` (Linux, macOS, Windows) says when the Supervisor service
   failed to start, and gives the command that shows its log. It used to say the Supervisor can't
   connect yet and keeps retrying, as for a running service that can't reach its server (#147).
