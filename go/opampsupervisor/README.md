@@ -113,7 +113,7 @@ agent:
   `filelog` receiver at any file the collector reads, `${file:...}` a secret into an exporter,
   or send what it collects anywhere. A config refused is FAILED, with the reason, and never
   runs. The policy is read with confmap, as the config is merged (a `receivers::filelog` key is a
-  receiver). Without a policy the Supervisor says at start that the remote config is
+  receiver). Without a policy the Supervisor says once at start, at info, that the remote config is
   unrestricted. Upstream has no limit. What the packaged policy allows, how to widen it on the
   host, and what a server can still do:
   [packaging/README.md](packaging/README.md#what-the-server-can-do-to-this-host).
