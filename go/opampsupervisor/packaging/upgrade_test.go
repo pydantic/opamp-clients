@@ -4,7 +4,8 @@
 //go:build install && (darwin || windows)
 
 // An upgrade in place: the released package OPAMP_PKG or OPAMP_MSI installed and enrolled, then
-// this build's package OPAMP_UPGRADE installed over it. The Supervisor comes back on its own, with
+// this build's package OPAMP_UPGRADE installed over it, on Windows with one of its files held open
+// by another program, which the upgrade leaves running. The Supervisor comes back on its own, with
 // the credentials it was issued, and its config is written again with this version's settings:
 //
 //	OPAMP_PKG=$PWD/released.pkg OPAMP_UPGRADE=$PWD/dist/....pkg go test -tags=install -run Upgrade .
@@ -45,8 +46,10 @@ func TestUpgradeInPlace(t *testing.T) {
 	} else {
 		t.Setenv("OPAMP_PKG", upgrade)
 	}
-	install(t)
+	held := holdForUpgrade(t)
+	installUpgrade(t)
 	defer uninstall(t, true)
+	held()
 	require.EventuallyWithT(t, func(c *assert.CollectT) {
 		auths, _ := srv.seen()
 		if assert.NotEmpty(c, auths) {

@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"io"
 	"io/fs"
+	"math"
 	"os"
 	"time"
 
@@ -25,8 +26,14 @@ import (
 //
 // With --wait DURATION it waits, for at most that long, for a Supervisor started at or after --since
 // (Unix seconds) to connect, and then says how it is: 0 once it is connected, 1 when it isn't by
-// then. The enrollment helpers run it after they start the service, so an install that can't
+// then. Once connected it gives the server a few seconds (supervisor.AcceptGrace) to take the
+// Supervisor, so what it prints says whether it did. The enrollment helpers run it after they start the service, so an install that can't
 // reach its server (an untrusted certificate, say) says so instead of succeeding.
+//
+// With --require-accepted the server must also have answered this Supervisor in its run
+// (Status.Accepted): the command exits 1 without it, and --wait waits for it too. A server that
+// takes the connection but not the credentials (an enrollment key it refuses, say) closes it
+// unanswered and reads as connected; this tells the two apart.
 //
 // It is a new file rather than a change to upstream's main.go: the command is taken here, before
 // main runs.
@@ -44,6 +51,7 @@ func statusCommand(args []string, stdout, stderr io.Writer) int {
 	jsonOut := flags.Bool("json", false, "Print the status as JSON, as the status file holds it")
 	wait := flags.Duration("wait", 0, "Wait this long for the Supervisor to connect to its OpAMP server")
 	since := flags.Int64("since", 0, "With --wait: only a Supervisor started at or after this Unix time counts")
+	requireAccepted := flags.Bool("require-accepted", false, "Also require that the server has answered this Supervisor since it started; with --wait, wait for it")
 	if err := flags.Parse(args); err != nil {
 		return 2
 	}
@@ -58,20 +66,40 @@ func statusCommand(args []string, stdout, stderr io.Writer) int {
 		dir = cfg.Storage.Directory
 	}
 	if *wait > 0 {
-		return waitConnected(dir, *wait, time.Unix(*since, 0), *jsonOut, stdout, stderr)
+		return waitConnected(dir, *wait, time.Unix(*since, 0), *requireAccepted, *jsonOut, stdout, stderr)
 	}
-	st, err := supervisor.ReadStatus(dir)
+	st, err := readStatus(dir)
+	// A read that meets the Supervisor's replacing of the file (Windows) is tried again for a
+	// moment.
+	for start := time.Now(); err != nil && time.Since(start) < min(isTransientRead(err), transientReadFor); {
+		time.Sleep(50 * time.Millisecond)
+		st, err = readStatus(dir)
+	}
 	if err != nil {
 		return readFailed(dir, err, stderr)
 	}
 	if code := printStatus(st, *jsonOut, stdout, stderr); code != 0 {
 		return code
 	}
-	if !st.OK() {
+	if !st.OK() || *requireAccepted && !st.IsAccepted() {
 		return 1
 	}
 	return 0
 }
+
+// readStatus reads the status file; a variable for the tests.
+var readStatus = supervisor.ReadStatus
+
+// isTransientRead is how long a run of failed reads of the status file is tried again, as one
+// that may only have met the Supervisor's replacing of it (transientRead): 0 not at all, forever
+// as long as the caller waits. A variable for the tests.
+var isTransientRead = transientRead
+
+// forever: tried again as long as the caller waits.
+const forever = time.Duration(math.MaxInt64)
+
+// transientReadFor is how long the plain command tries such a read again.
+const transientReadFor = 2 * time.Second
 
 // readFailed says why the status in dir can't be read, and returns the exit code for it (2).
 func readFailed(dir string, err error, stderr io.Writer) int {
@@ -102,21 +130,40 @@ func printStatus(st *supervisor.Status, jsonOut bool, stdout, stderr io.Writer) 
 	return 0
 }
 
-// waitConnected polls the status file until a Supervisor started at or after since is connected,
-// or wait is up; it then prints the status as the plain command does. A status file that exists
-// but can't be read (permissions, say) fails at once, since waiting won't change it.
-func waitConnected(dir string, wait time.Duration, since time.Time, jsonOut bool, stdout, stderr io.Writer) int {
+// waitConnected polls the status file until a Supervisor started at or after since is connected
+// and taken by the server, or, without accepted, connected for supervisor.AcceptGrace (or until
+// wait is up, connected); or wait is up; it then prints the status as the plain command does. A
+// read that meets the Supervisor's replacing of the file (a sharing violation on Windows) is
+// tried again until wait is up, and access denied on Windows (that, or a real permission error)
+// for 2 seconds; a status file that can't be read otherwise fails at once, since waiting won't
+// change it.
+func waitConnected(dir string, wait time.Duration, since time.Time, accepted, jsonOut bool, stdout, stderr io.Writer) int {
 	deadline := time.Now().Add(wait)
+	var failing time.Time // when the run of failed reads began
 	for {
-		st, err := supervisor.ReadStatus(dir)
+		st, err := readStatus(dir)
 		if err != nil && !errors.Is(err, fs.ErrNotExist) {
+			if failing.IsZero() {
+				failing = time.Now()
+			}
+			if time.Since(failing) < isTransientRead(err) && time.Now().Before(deadline) {
+				time.Sleep(50 * time.Millisecond)
+				continue
+			}
 			return readFailed(dir, err, stderr)
 		}
+		failing = time.Time{}
 		current := err == nil && !st.Started.Before(since) && st.Running()
 		connected := current && st.Server != nil && st.Server.Connected
 		late := time.Now().After(deadline)
 		switch {
-		case connected:
+		case connected && st.IsAccepted():
+			return printStatus(st, jsonOut, stdout, stderr)
+		case connected && !accepted && time.Since(st.Server.Since) >= supervisor.AcceptGrace:
+			// Connected is enough without --require-accepted; the server was given its grace to
+			// take the Supervisor first, so what is printed says whether it did.
+			return printStatus(st, jsonOut, stdout, stderr)
+		case connected && !accepted && late:
 			return printStatus(st, jsonOut, stdout, stderr)
 		case late && !current:
 			fmt.Fprintf(stderr, "the Supervisor hasn't reported its status in %s within %s: check its log\n", dir, wait)
