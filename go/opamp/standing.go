@@ -103,6 +103,8 @@ type standing struct {
 	header      http.Header
 	takesOffers bool
 	offers      []offered
+	// claims is Standing.FailedClaims at the server's last message.
+	claims int
 	// taken is the credential the server last took the agent on.
 	taken digest
 	// keepUnreached and keepSaved are Config's, set before the client starts; unreached is the host of the
@@ -303,7 +305,10 @@ func (a *attempt) message(m *protobufs.ServerToAgent) {
 			if !a.ws && (st.Offers > 1 || st.ClaimError != "") {
 				st.round() // the request before got one too, or the one it had failed
 			}
+		case isOffer && !a.ws && !st.Accepted && st.FailedClaims > a.s.claims:
+			st.Rounds++ // one it was offered before, which was tried and failed since
 		}
+		a.s.claims = st.FailedClaims
 	})
 }
 
