@@ -610,6 +610,13 @@ including after an upgrade from one of those. Before stopping its services, Linu
 package restarts them. CI installs the released 0.9.0 `.pkg` and `.msi`, enrolls them, and
 upgrades them in place to the package it built.
 
+A Windows upgrade installs the new files before it removes the old version, whose removal then
+has nothing to delete. Removed first, a package up to 0.10.3 (which doesn't set
+`MSIRESTARTMANAGERCONTROL`) shut down every program that had one of its files open (an
+antivirus or a log viewer, say), whatever the upgrade's command line said, and the upgrade then
+failed with 1601, the Supervisor stopped. Installing the new `.msi` again, once nothing holds the
+files, finishes it, with the enrollment kept.
+
 The Supervisor can't be updated over OpAMP. A server's package offer
 ([Collector updates from the server](#collector-updates-from-the-server)) replaces only the
 Collector it runs.
