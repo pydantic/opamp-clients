@@ -85,7 +85,7 @@ and date. Tests, CI and docs alone don't need a line.
 
 - Supervisor: a Supervisor without `agent::remote_config_policy` says once at start, at info,
   that the remote config is unrestricted, and how to limit it (`--restricted` on the enrollment
-  helpers). It was a warning at each start, though it is the default and nothing is wrong (#PR).
+  helpers). It was a warning at each start, though it is the default and nothing is wrong (#163).
 - Go, Python, Node.js, Java, .NET: every SDK runs the settings layer's agent flow, so what an
   SDK does around a policy is the same in each language: when debug mode ends, when export health
   is sent, and the lines it logs about reaching the server (#129).
