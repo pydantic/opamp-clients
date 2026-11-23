@@ -926,3 +926,40 @@ func TestTheSameOfferOverHTTP(t *testing.T) {
 		})
 	}
 }
+
+// A hold ends the held run's watchers: after holds and starts again, one watches the saves.
+func TestAHoldEndsTheHeldRunsWatchers(t *testing.T) {
+	setHolds(t, time.Second, time.Second, time.Second)
+	s := newRV(t)
+	var mu sync.Mutex
+	refused := 0
+	s.ans = func(n, k int, auth string, m *protobufs.AgentToServer) (*protobufs.ServerToAgent, int) {
+		mu.Lock()
+		defer mu.Unlock()
+		if auth == "Bearer token" {
+			return rvOffer(m, "h1", s.url(), "Bearer key1"), 1000
+		}
+		if refused < 2 {
+			refused++
+			return nil, 1008
+		}
+		return &protobufs.ServerToAgent{InstanceUid: m.InstanceUid}, 0
+	}
+	dir := t.TempDir()
+	c := newCoreClient(zap.NewNop(), filepath.Join(dir, coreClientStateFile), nil)
+	require.NoError(t, c.SetAgentDescription(&protobufs.AgentDescription{}))
+	require.NoError(t, c.Start(t.Context(), types.StartSettings{OpAMPServerURL: s.url(), Header: tokenHeader,
+		Capabilities: protobufs.AgentCapabilities_AgentCapabilities_AcceptsOpAMPConnectionSettings | protobufs.AgentCapabilities_AgentCapabilities_ReportsConnectionSettingsStatus}))
+	t.Cleanup(func() { _ = c.Stop(context.Background()) })
+	require.Eventually(t, func() bool { st, _ := hostStatus(t, dir); return st.IsAccepted() }, 30*time.Second, 20*time.Millisecond)
+	mu.Lock()
+	require.Equal(t, 2, refused, "refused twice, so held twice")
+	mu.Unlock()
+	watchers := func() int {
+		buf := make([]byte, 1<<22)
+		return strings.Count(string(buf[:runtime.Stack(buf, true)]), "(*coreClient).watchSaves(")
+	}
+	require.Eventually(t, func() bool { return watchers() == 1 }, 5*time.Second, 20*time.Millisecond, "watchers of the saves: %d", watchers())
+	require.NoError(t, c.Stop(context.Background()))
+	require.Eventually(t, func() bool { return watchers() == 0 }, 5*time.Second, 20*time.Millisecond)
+}

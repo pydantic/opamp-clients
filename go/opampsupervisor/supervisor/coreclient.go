@@ -273,23 +273,31 @@ func (c *coreClient) startLocked(ctx context.Context) error {
 		return err
 	}
 	c.client = started
-	// The status says how the server takes this Supervisor, until Stop.
-	go c.watchStanding(started, c.quit)
+	// The status says how the server takes this Supervisor, until Stop or a hold, which ends this run.
+	run := make(chan struct{})
 	go func(quit <-chan struct{}) {
-		failed := ""
-		for {
-			select {
-			case <-started.Saves():
-				if e := started.SaveError(); e != failed {
-					failed = e
-					c.ifCurrent(started, func() { c.report.saved(c.logger, e) })
-				}
-			case <-quit:
-				return
-			}
-		}
+		defer close(run)
+		c.watchStanding(started, quit)
 	}(c.quit)
+	go c.watchSaves(started, run)
 	return nil
+}
+
+// watchSaves keeps the status's save error, the client's last, until run ends: Stop, or a hold
+// (enrollment.go), after which the next start watches its own client.
+func (c *coreClient) watchSaves(started *collector.Client, run <-chan struct{}) {
+	failed := ""
+	for {
+		select {
+		case <-started.Saves():
+			if e := started.SaveError(); e != failed {
+				failed = e
+				c.ifCurrent(started, func() { c.report.saved(c.logger, e) })
+			}
+		case <-run:
+			return
+		}
+	}
 }
 
 // Stop stops the client; one opened but not started is let go.
