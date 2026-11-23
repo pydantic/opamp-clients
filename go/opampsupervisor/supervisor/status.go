@@ -41,6 +41,10 @@ type Status struct {
 	Collector *CollectorStatus `json:"collector,omitempty"`
 	// RemoteConfig is the last one's status: nil before the server sent one.
 	RemoteConfig *RemoteConfigState `json:"remote_config,omitempty"`
+	// RunningConfig is, while the server's last config FAILED (the policy refused it, say), the
+	// config before it, which the collector runs instead, as last reported: nil when there is
+	// none to tell.
+	RunningConfig *RemoteConfigState `json:"running_config,omitempty"`
 	// Accepted is when the server first answered this Supervisor in this run: nil while it hasn't.
 	// A server that takes the connection and then closes it unanswered, as one does for
 	// credentials it refuses (an enrollment key used up or revoked, say), leaves it nil while the
@@ -111,6 +115,9 @@ type statusReport struct {
 	now  func() time.Time
 	// closed: the client stopped, and the file says so for good.
 	closed bool
+	// received is the hash of the last remote config the client was given, in hex: by the server,
+	// or saved and handed over at start (a refused one too).
+	received string
 }
 
 func newStatusReport(dir string) *statusReport {
@@ -191,14 +198,43 @@ func (r *statusReport) health(logger *zap.Logger, h *protobufs.ComponentHealth) 
 	})
 }
 
+// receivedRemoteConfig: the client was given a remote config with this hash.
+func (r *statusReport) receivedRemoteConfig(hash []byte) {
+	if r == nil {
+		return
+	}
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.received = hex.EncodeToString(hash)
+}
+
+// remoteConfig records a config's status. The server's last config is the one the status is of:
+// once it FAILED, a report about another config (the one still running, which the Supervisor
+// reports at a restart or a retarget) says what runs instead, and doesn't hide the failure.
 func (r *statusReport) remoteConfig(logger *zap.Logger, s *protobufs.RemoteConfigStatus) {
 	r.update(logger, func(st *Status, now time.Time) {
+		received := r.received // update holds r.mu
 		rc := &RemoteConfigState{Hash: hex.EncodeToString(s.GetLastRemoteConfigHash()),
 			Status: remoteConfigStatusName(s.GetStatus()), Since: now, Error: s.GetErrorMessage()}
-		if old := st.RemoteConfig; old != nil && old.Hash == rc.Hash && old.Status == rc.Status && old.Error == rc.Error {
-			return
+		same := func(a, b *RemoteConfigState) bool {
+			return a != nil && b != nil && a.Hash == b.Hash && a.Status == b.Status && a.Error == b.Error
 		}
-		st.RemoteConfig = rc
+		old := st.RemoteConfig
+		switch {
+		case received != "" && rc.Hash != received && old != nil && old.Hash == received && old.Status == "FAILED":
+			if !same(st.RunningConfig, rc) {
+				st.RunningConfig = rc
+			}
+		case same(old, rc):
+		case rc.Status == "FAILED" && received != "" && rc.Hash == received:
+			// What ran before keeps running.
+			if old != nil && old.Hash != rc.Hash && old.Status != "FAILED" {
+				st.RunningConfig = old
+			}
+			st.RemoteConfig = rc
+		default:
+			st.RemoteConfig, st.RunningConfig = rc, nil
+		}
 	})
 }
 
@@ -398,6 +434,9 @@ func (st *Status) Print(w io.Writer, now time.Time) {
 		line("Remote config", "%s since %s (hash %s): %s", rc.Status, ago(rc.Since), short(rc.Hash), rc.Error)
 	default:
 		line("Remote config", "%s since %s (hash %s)", rc.Status, ago(rc.Since), short(rc.Hash))
+	}
+	if run := st.RunningConfig; run != nil && st.RemoteConfig != nil {
+		line("", "the config before it (hash %s) runs instead: %s since %s", short(run.Hash), run.Status, ago(run.Since))
 	}
 }
 

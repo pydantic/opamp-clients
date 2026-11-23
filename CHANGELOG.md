@@ -121,6 +121,11 @@ and date. Tests, CI and docs alone don't need a line.
 
 ### Fixed
 
+- Supervisor: `opampsupervisor status` keeps a remote config the policy refused as FAILED, and
+  says which config runs instead (`running_config` in `--json`). It showed the config still
+  running as APPLIED once the Supervisor reported it again, at a restart or a retarget, so a
+  refused config read as applied. The server's view was right (#153).
+
 - Supervisor installers: a host deleted on the server and enrolled again over its kept data with
   the same token could never connect: the client kept the host's own issued credentials, which
   the delete revoked, and doesn't fall back from them to the token. `pydantic-opamp-enroll` (not
