@@ -130,6 +130,12 @@ and date. Tests, CI and docs alone don't need a line.
 
 ### Fixed
 
+- Supervisor installers (Linux): `pydantic-opamp-uninstall --purge` left the unit's
+  `telemetry.conf` drop-in, which names the telemetry credential the purge deletes, so a later
+  enrollment without a telemetry token failed to start the service (243/CREDENTIALS). The purge
+  removes it, and `pydantic-opamp-enroll` removes one an older package left, if it is as the package
+  writes it: another that an administrator wrote, or added to, stays, and enrolling with a
+  telemetry token doesn't write over it (#158).
 - Supervisor: `opampsupervisor status` keeps a remote config the policy refused as FAILED, and
   says which config runs instead (`running_config` in `--json`). It showed the config still
   running as APPLIED once the Supervisor reported it again, at a restart or a retarget, so a

@@ -277,6 +277,17 @@ if [ -z "$refresh" ]; then
 	esac
 fi
 
+dropin=$root/etc/systemd/system/$unit.d
+# What this script writes to telemetry.conf there: with it, the file is this package's; any other isn't.
+telemetry_conf='[Service]
+LoadCredentialEncrypted=opamp-telemetry-token:/etc/pydantic-opamp/telemetry-token.cred'
+# An administrator's own file of the name stays: with the credential in it, it does what this one does, and
+# without, it can't be had.
+if [ -n "$telemetry_stdin" ] && { [ -e "$dropin/telemetry.conf" ] || [ -L "$dropin/telemetry.conf" ]; } &&
+	! grep -qxs "${telemetry_conf#*"$nl"}" "$dropin/telemetry.conf"; then
+	fail "$dropin/telemetry.conf isn't this package's, and is kept: rename it (another .conf name there does the same), then run this again"
+fi
+
 umask 077
 mkdir -p "$etc"
 chmod 0750 "$etc"
@@ -291,10 +302,17 @@ if [ -n "$telemetry_stdin" ]; then
 	printf '%s' "$telemetry_token" | "$creds" encrypt --name=opamp-telemetry-token - "$etc/telemetry-token.cred.tmp"
 	chmod 0600 "$etc/telemetry-token.cred.tmp"
 	mv -f "$etc/telemetry-token.cred.tmp" "$etc/telemetry-token.cred"
-	dropin=$root/etc/systemd/system/$unit.d
 	mkdir -p "$dropin"
-	printf '[Service]\nLoadCredentialEncrypted=opamp-telemetry-token:/etc/pydantic-opamp/telemetry-token.cred\n' >"$dropin/telemetry.conf"
+	[ -e "$dropin/telemetry.conf" ] || printf '%s\n' "$telemetry_conf" >"$dropin/telemetry.conf"
 	"$systemctl" daemon-reload
+elif [ ! -f "$etc/telemetry-token.cred" ] && [ -f "$dropin/telemetry.conf" ]; then
+	if [ ! -L "$dropin/telemetry.conf" ] && [ "$(cat "$dropin/telemetry.conf")" = "$telemetry_conf" ]; then
+		# Left by an older package's purge: without the credential it names, the service can't start.
+		rm -f "$dropin/telemetry.conf"
+		"$systemctl" daemon-reload
+	elif grep -q 'opamp-telemetry-token' "$dropin/telemetry.conf"; then
+		echo "pydantic-opamp-enroll: $dropin/telemetry.conf names a telemetry credential that is gone, and holds more than this package writes: it is kept, and the service can't start with it" >&2
+	fi
 fi
 
 agent_env=
