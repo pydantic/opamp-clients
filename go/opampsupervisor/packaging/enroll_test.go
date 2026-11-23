@@ -490,6 +490,13 @@ func TestEnrollHostLogs(t *testing.T) {
 	assertHostLogs(t, p, enroll(), body, `configures extension "file_storage/host_logs"`)
 	require.ErrorContains(t, p.Check("", []byte(`extensions: {file_storage: {directory: /etc/cron.d}}`)), "allowed_storage_directories doesn't allow")
 	require.ErrorContains(t, p.Check("", []byte(`receivers: {filelog: {include: [/etc/shadow]}}`)), "allowed_log_paths doesn't allow")
+
+	// The journal too, where the syslog files are root's alone (RHEL-family hosts): with
+	// --host-logs only, and this host's own.
+	journal := []byte(`receivers: {journald/system: {priority: info, start_at: end}}`)
+	require.NoError(t, p.Check("", journal))
+	require.ErrorContains(t, enroll().Check("", journal), `configures receiver "journald/system"`)
+	require.ErrorContains(t, p.Check("", []byte(`receivers: {journald: {journalctl_path: /tmp/x}}`)), "sets journalctl_path")
 }
 
 // Started, enrollment waits for the Supervisor to connect: one that can't (a server certificate

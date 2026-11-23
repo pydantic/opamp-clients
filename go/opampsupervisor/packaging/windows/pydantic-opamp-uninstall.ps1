@@ -63,7 +63,9 @@ function Uninstall-Collector {
     try { $running = Get-Service -Name $service -ErrorAction Stop }
     catch { if ($_.FullyQualifiedErrorId -notlike 'NoServiceFoundForGivenName*') { throw } }
     if ($running -and -not $products.Count) {
-        throw 'The service has no registered MSI package. Retained data has not been deleted.'
+        # An upgrade from a package up to 0.10.3 that was stopped part way (1601) leaves this: installing
+        # the new package again puts it right.
+        throw 'The service has no registered MSI package. If an upgrade failed, install the new .msi again. Retained data has not been deleted.'
     }
     if ($running) {
         Stop-Service -Name $service -ErrorAction Stop

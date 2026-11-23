@@ -80,6 +80,15 @@ and date. Tests, CI and docs alone don't need a line.
   `Client.Saves()`, why the last save of the state failed (#150).
 - Supervisor: `opampsupervisor status` says when the client's state can't be saved (`save_error` in
   `--json`), and exits 1: a restart would lose the host's credentials (#150).
+- Supervisor: the agent description reports `pydantic.fleet.host_key`, a UUID derived from the
+  host's machine ID as systemd derives an application-specific one (on Linux,
+  `systemd-id128 machine-id --app-specific=c8fe2a9e-5d40-4615-8f88-fd606391a0ca --uuid`; the
+  machine ID itself isn't reported), the same for as long as the host keeps its machine ID, so a server can tie a host
+  enrolled again to the one it replaces. Upgraded hosts report it once the new Supervisor runs (#151).
+- Supervisor: the Collector is given the host key as `pydantic.fleet.host_key` in
+  `OTEL_RESOURCE_ATTRIBUTES`, so a config whose `resourcedetection` processor lists the `env`
+  detector stamps it on the host's data, which a server can then match to the host it enrolled.
+  It needs no environment reference in the config, so restricted hosts take it too (#151).
 - Supervisor installers and container image: the Collector runs with
   `--feature-gates=telemetry.newPipelineTelemetry`, so its own metrics count the items every
   receiver, processor (`batch` too) and exporter takes in and passes on. A Prometheus reader of
@@ -157,6 +166,18 @@ and date. Tests, CI and docs alone don't need a line.
   message to the local OpAMP server with another instance UID") for each message of the
   Collector still running with the previous instance UID. The server's new UID is now said once at
   info, with the previous one, and those messages go at debug (#150).
+- Supervisor on Linux: with `--restricted`, `pydantic-opamp-enroll --host-logs` also lets the
+  server's configs read the journal, with a `journald` receiver (not its `journalctl_path`,
+  `root_path`, `directory`, `files` or `merge`, which stay the local config's). On RHEL-family
+  hosts the syslog files are root's alone, so a restricted host could send none of its system
+  logs (#152).
+- Supervisor: `opampsupervisor status` names each file the Collector's log receivers couldn't
+  open (a file receiver that can't read its files is healthy and sends nothing), and says to read
+  the journal where the syslog files are root's alone (#152).
+- Supervisor: a Windows upgrade from 0.10.3 or older no longer shuts down programs that have one
+  of the package's files open (an antivirus or a log viewer, say) and no longer fails with 1601,
+  leaving the Supervisor stopped. The `.msi` installs its files before it removes the old version.
+  After such a failure, installing the new `.msi` again finishes the upgrade (#162).
 - Supervisor: `pydantic-opamp-enroll` (Linux, macOS, Windows) says when the Supervisor service
   failed to start, and gives the command that shows its log. It used to say the Supervisor can't
   connect yet and keeps retrying, as for a running service that can't reach its server (#147).

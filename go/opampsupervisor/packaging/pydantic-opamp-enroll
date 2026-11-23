@@ -32,7 +32,7 @@ usage: pydantic-opamp-enroll --endpoint URL [--token-file PATH] [--ca-file PATH]
   --log-path PATH          with --restricted, a file, or a directory, the server's configs may read
                            logs from; repeat it for more (default: none)
   --host-logs              with --restricted, let the server's configs read this host's system logs:
-                           the files under /var/log, with read positions kept in
+                           the journal and the files under /var/log, with read positions kept in
                            /var/lib/pydantic-opamp/collector
   --accept-packages        install the collector the server offers, if this repository's release
                            workflow signed it (default: only the installed collector runs)
@@ -235,9 +235,14 @@ set +f
 # --host-logs: the system log files, and the file_storage extension that keeps where a receiver
 # got to, in a directory of the Supervisor's own.
 extensions="[health_check]"
+receivers="[otlp, host_metrics, hostmetrics, file_log, filelog, nop]"
 storage_directories=
 if [ -n "$host_logs" ]; then
 	log_paths=$(append "$log_paths" /var/log)
+	# And the journal, which every systemd host keeps and the Collector's user reads (it is in
+	# systemd-journal): on RHEL-family hosts the syslog files are root's alone (/var/log/messages,
+	# 0600). The policy keeps the receiver to this host's own journal, by the journalctl here.
+	receivers="[otlp, host_metrics, hostmetrics, file_log, filelog, nop, journald]"
 	extensions="[health_check, file_storage]"
 	storage_directories="$nl    # Where its file_storage extensions may keep files: these directories, and what is under them.
     allowed_storage_directories: [\"/var/lib/pydantic-opamp/collector\"]"
@@ -359,7 +364,7 @@ if [ -n "$restricted" ]; then
   remote_config_policy:
     # The component types a Logfire config uses, by their names and their older aliases.
     allowed_components:
-      receivers: [otlp, host_metrics, hostmetrics, file_log, filelog, nop]
+      receivers: $receivers
       processors: [batch, memory_limiter, resource, resource_detection, resourcedetection, transform]
       exporters: [otlp_grpc, otlp, otlp_http, otlphttp, debug, nop]
       extensions: $extensions
