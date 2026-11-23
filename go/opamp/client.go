@@ -263,6 +263,13 @@ type Client struct {
 	loopG atomic.Uint64
 	// used is where the latest OpAMP request or connection went (the executor's).
 	used *atomic.Pointer[string]
+	// usedIssued is whether it was made with headers other than the configured ones (the executor's).
+	usedIssued *atomic.Bool
+	// saveError is how the last save ended, and saves says that one did (the executor's).
+	saveError *atomic.Pointer[string]
+	saves     <-chan struct{}
+	// answered is the executor's, in platform mode; nil in core mode.
+	answered <-chan struct{}
 }
 
 // Start starts a client. notify is called for every Notification, one at a time, on the client's
@@ -432,6 +439,12 @@ func (o *Opened) start(status Status, first []*corepb.Input, notify func(*Client
 	queue = append(queue, report{in: &corepb.Input{Kind: &corepb.Input_Start{Start: &corepb.Empty{}}}})
 	x := newExecutor(o.conn)
 	cl.used = &x.used
+	cl.usedIssued = &x.usedIssued
+	cl.saveError, cl.saves = &x.saveError, x.saves
+	x.configure(cfg.Header)
+	if !o.coreMode {
+		cl.answered = x.answered
+	}
 	if cfg.fs != nil {
 		x.fs = cfg.fs
 	}
@@ -488,6 +501,38 @@ func (c *Client) Endpoint() string {
 	}
 	return ""
 }
+
+// UsedIssued is whether the latest OpAMP request or WebSocket connection was made with credentials a server
+// issued (an offer of connection settings), rather than the configured ones: a configured header had another
+// value (those the core sets itself aside). What is issued in other headers alone isn't seen, and with headers
+// an application sets on each request (collector.Config.AuthHeader) it says nothing. It is false before any
+// outcome, and in core mode, as Endpoint.
+func (c *Client) UsedIssued() bool { return c.usedIssued != nil && c.usedIssued.Load() }
+
+// Saves receives when a save of the state has ended, saved or not (several may be one): SaveError says how the
+// last did. The client saves again what isn't saved. For one receiver.
+func (c *Client) Saves() <-chan struct{} { return c.saves }
+
+// SaveError is why the last save of the state failed; "" if it was saved, or none was made.
+func (c *Client) SaveError() string {
+	if c.saveError == nil {
+		return ""
+	}
+	if e := c.saveError.Load(); e != nil {
+		return *e
+	}
+	return ""
+}
+
+// Answered is closed once an answer from the server has reached the client since Start: a
+// ServerToAgent that isn't an error response, in a WebSocket message or in an HTTP success (with
+// the protobuf content type, or none). It is how an application tells a server that took the
+// agent from one that took the connection and closed it unanswered (as one may for credentials
+// it refuses, while the connection reads connected); a server that answers HTTP requests always
+// answers, but over WebSocket one may send nothing until it has something to say (opamp-go's
+// server does so), so a server it never closes for may leave it open. It is never taken back.
+// Platform mode only, where the client makes the requests: nil in core mode.
+func (c *Client) Answered() <-chan struct{} { return c.answered }
 
 func (c *Client) setUID(uid []byte) {
 	if len(uid) != 16 {

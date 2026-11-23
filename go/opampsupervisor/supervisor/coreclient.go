@@ -76,6 +76,8 @@ type coreClient struct {
 	reach *reachability
 	// report keeps the status file `opampsupervisor status` reads (set in newCoreClient).
 	report *statusReport
+	// quit is closed by Stop: the wait for the server's first answer ends.
+	quit chan struct{}
 }
 
 var _ client.OpAMPClient = (*coreClient)(nil)
@@ -224,11 +226,46 @@ func (c *coreClient) Start(ctx context.Context, settings types.StartSettings) er
 	c.uid = c.opened.InstanceUID()
 	c.reach = newReachability(c.logger, settings.OpAMPServerURL)
 	c.report.started(c.logger, c.reach.endpoint, c.uid)
+	// A config refused before this start stays the status: the core reports the refusal again
+	// itself, and the server, told so, sends it no more.
+	refused := c.opened.Resumed().RemoteConfigRefused
+	if refused == nil && initial.RemoteConfigStatus.GetStatus() == protobufs.RemoteConfigStatuses_RemoteConfigStatuses_FAILED {
+		refused = initial.RemoteConfigStatus
+	}
+	if refused != nil {
+		c.report.receivedRemoteConfig(refused.GetLastRemoteConfigHash())
+		c.report.remoteConfig(c.logger, refused)
+	}
 	started, err := c.opened.Start(initial, c.onNotification)
 	if err != nil {
 		return err
 	}
 	c.client = started
+	// The status says once the server has answered (it took this Supervisor), until Stop.
+	c.quit = make(chan struct{})
+	go func(quit <-chan struct{}) {
+		failed := ""
+		for {
+			select {
+			case <-started.Saves():
+				if e := started.SaveError(); e != failed {
+					failed = e
+					c.report.saved(c.logger, e)
+				}
+			case <-quit:
+				return
+			}
+		}
+	}(c.quit)
+	if answered := started.Answered(); answered != nil {
+		go func(quit <-chan struct{}) {
+			select {
+			case <-answered:
+				c.report.accepted(c.logger)
+			case <-quit:
+			}
+		}(c.quit)
+	}
 	return nil
 }
 
@@ -237,6 +274,10 @@ func (c *coreClient) Stop(ctx context.Context) error {
 	c.mu.Lock()
 	started, opened := c.client, c.opened
 	c.client, c.stopped = nil, true
+	if c.quit != nil {
+		close(c.quit)
+		c.quit = nil
+	}
 	c.mu.Unlock()
 	if started == nil {
 		if opened != nil {
@@ -271,7 +312,7 @@ func (c *coreClient) onNotification(cl *collector.Client, n collector.Notificati
 	case opamp.ConnectFailed:
 		// Changed here: the Supervisor hears the first failure of a run, with what to check in its
 		// config; the retries that follow go at debug, not an error each (reachability).
-		c.report.connectFailed(c.logger, n.Status, n.Detail)
+		c.report.connectFailed(c.logger, n.Status, n.Detail, cl != nil && cl.UsedIssued())
 		if err := c.reach.failed(n.Status, n.Detail); err != nil && cb.OnConnectFailed != nil {
 			cb.OnConnectFailed(ctx, err)
 		}
@@ -280,6 +321,7 @@ func (c *coreClient) onNotification(cl *collector.Client, n collector.Notificati
 			cb.OnError(ctx, &protobufs.ServerErrorResponse{Type: n.ErrorType, ErrorMessage: n.Message})
 		}
 	case opamp.RemoteConfig:
+		c.report.receivedRemoteConfig(n.RemoteConfig.GetConfigHash())
 		message(&types.MessageData{RemoteConfig: n.RemoteConfig})
 	case opamp.ConnectionSettings:
 		offers := n.ConnectionSettings

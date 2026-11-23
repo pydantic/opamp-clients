@@ -84,8 +84,12 @@ func (s *Supervisor) reportConnectionSettings(hash []byte, err error) {
 		status.Status = protobufs.ConnectionSettingsStatuses_ConnectionSettingsStatuses_FAILED
 		status.ErrorMessage = "The Supervisor could not apply the connection credentials."
 		var named connectionSettingsError
-		if errors.As(err, &named) {
+		var policy ownTelemetryPolicyError
+		switch {
+		case errors.As(err, &named):
 			status.ErrorMessage = named.Error()
+		case errors.As(err, &policy):
+			status.ErrorMessage = errOwnTelemetryPolicy.Error()
 		}
 	}
 	_ = s.opampClient.SetConnectionSettingsStatus(status)
