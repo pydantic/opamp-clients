@@ -110,6 +110,10 @@ and date. Tests, CI and docs alone don't need a line.
 - Supervisor: `opampsupervisor status` names each file the Collector's log receivers couldn't
   open (a file receiver that can't read its files is healthy and sends nothing), and says to read
   the journal where the syslog files are root's alone (#152).
+- Supervisor: a Windows upgrade from 0.10.3 or older no longer shuts down programs that have one
+  of the package's files open (an antivirus or a log viewer, say) and no longer fails with 1601,
+  leaving the Supervisor stopped. The `.msi` installs its files before it removes the old version.
+  After such a failure, installing the new `.msi` again finishes the upgrade (#162).
 - Supervisor: `pydantic-opamp-enroll` (Linux, macOS, Windows) says when the Supervisor service
   failed to start, and gives the command that shows its log. It used to say the Supervisor can't
   connect yet and keeps retrying, as for a running service that can't reach its server (#147).
