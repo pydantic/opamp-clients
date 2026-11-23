@@ -267,6 +267,24 @@ func TestEnrollRemovesUnfinishedCopies(t *testing.T) {
 	assert.Equal(t, []string{alive}, copies(t, etc))
 }
 
+// A drop-in that is an administrator's link is one again, and what it leads to is as it was.
+func TestEnrollPutsALinkBack(t *testing.T) {
+	e, _, etc := enrolledHost(t)
+	dropin := filepath.Join(e.root, "etc/systemd/system/pydantic-opamp-supervisor.service.d")
+	require.NoError(t, os.MkdirAll(dropin, 0o755))
+	own := filepath.Join(t.TempDir(), "own.conf")
+	require.NoError(t, os.WriteFile(own, []byte("[Service]\nEnvironment=A=b\n"), 0o644))
+	require.NoError(t, os.Symlink(own, filepath.Join(dropin, "telemetry.conf")))
+	out, err := e.run(t, "new", "--endpoint", "wss://opamp.example.com/v1/opamp")
+	require.Error(t, err, out)
+	assert.Contains(t, out, "this host is back on the enrollment it had, and connected")
+	to, err := os.Readlink(filepath.Join(dropin, "telemetry.conf"))
+	require.NoError(t, err, "not a link any more")
+	assert.Equal(t, own, to)
+	assert.Equal(t, "[Service]\nEnvironment=A=b\n", readFile(t, own))
+	assert.Empty(t, copies(t, etc))
+}
+
 // A host the server doesn't take has nothing to go back to.
 func TestEnrollOfAHostThatIsNotTaken(t *testing.T) {
 	for name, file := range map[string]string{"not taken": "old-gone", "stopped": "running"} {

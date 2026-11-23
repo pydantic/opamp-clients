@@ -344,7 +344,8 @@ keep_enrollment() {
 	done
 	mkdir "$kept_tmp"
 	for f in enroll-token telemetry-token supervisor.yaml enroll.options supervisor.yaml.sha256; do
-		[ ! -f "$etc/$f" ] || cp -p "$etc/$f" "$kept_tmp/$f"
+		# A link as a link.
+		{ [ ! -e "$etc/$f" ] && [ ! -L "$etc/$f" ]; } || cp -P -p "$etc/$f" "$kept_tmp/$f"
 	done
 	cp -P -p "$storage/opamp-state" "$kept_tmp/opamp-state"
 	if [ ! -f "$kept_tmp/opamp-state" ] || [ -L "$kept_tmp/opamp-state" ]; then fail "$storage/opamp-state is not a file: nothing is changed"; fi
@@ -366,8 +367,9 @@ done
 trap '"$launchctl" bootstrap system "$plist"' EXIT
 # Whole again if it is cut short: the copies go last. (A file that wasn't there goes.)
 one() {
-	if [ -f "$kept/$1" ]; then
-		cp -p "$kept/$1" "$2/$1.put-back"
+	if [ -e "$kept/$1" ] || [ -L "$kept/$1" ]; then
+		rm -f "$2/$1.put-back"
+		cp -P -p "$kept/$1" "$2/$1.put-back"
 		mv -f "$2/$1.put-back" "$2/$1"
 	else
 		rm -f "$2/$1"
