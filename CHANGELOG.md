@@ -69,7 +69,7 @@ and date. Tests, CI and docs alone don't need a line.
 - Supervisor: the Collector is given the host key as `pydantic.fleet.host_key` in
   `OTEL_RESOURCE_ATTRIBUTES`, so a config whose `resourcedetection` processor lists the `env`
   detector stamps it on the host's data, which a server can then match to the host it enrolled.
-  It needs no environment reference in the config, so restricted hosts take it too (#154).
+  It needs no environment reference in the config, so restricted hosts take it too (#151).
 - Supervisor installers and container image: the Collector runs with
   `--feature-gates=telemetry.newPipelineTelemetry`, so its own metrics count the items every
   receiver, processor (`batch` too) and exporter takes in and passes on. A Prometheus reader of
