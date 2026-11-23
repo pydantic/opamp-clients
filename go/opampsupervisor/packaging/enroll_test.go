@@ -40,6 +40,8 @@ case $1 in
 is-active) [ -e "`+filepath.Join(dir, "inactive")+`" ] && exit 3 ;;
 show) cat "$restarts" 2>/dev/null ;;
 restart)
+	[ ! -e "`+filepath.Join(dir, "fail-start")+`" ] || [ ! -d "$(echo "$OPAMP_ENROLL_ROOT"/var/lib/pydantic-opamp/opamp-state.set-aside-*)" ] || exit 1
+	`+fakeSetAside(dir)+`
 	crashes=$(cat "`+filepath.Join(dir, "crashes")+`" 2>/dev/null) || exit 0
 	echo $(($(cat "$restarts" 2>/dev/null || echo 0) + crashes)) >"$restarts" ;;
 esac
@@ -48,19 +50,54 @@ exit 0
 	return creds, systemctl
 }
 
+// fakeSetAside is what the Supervisor does when asked, as it starts (supervisor/set_aside.go), and, with
+// dir/heal, the server taking the host then.
+func fakeSetAside(dir string) string {
+	return `S=$OPAMP_ENROLL_ROOT/var/lib/pydantic-opamp
+	[ -d "$S" ] || S=$OPAMP_ENROLL_ROOT/opt/pydantic-opamp/var
+	for request in "$S"/opamp-state.set-aside-*; do
+		rmdir "$request" 2>/dev/null || continue
+		echo asked >>"` + filepath.Join(dir, "asked.log") + `"
+		[ -e "$S/opamp-state" ] || continue
+		mv "$S/opamp-state" "$S/opamp-state.refused-2026112$(wc -l <"` + filepath.Join(dir, "asked.log") + `" | tr -d ' ')T000000Z-$(echo "${request##*-}" | cut -d . -f 1)"
+		echo new >"$S/opamp-state"
+		if [ -e "` + filepath.Join(dir, "heal") + `" ]; then rm -f "` + filepath.Join(dir, "status") + `" "` + filepath.Join(dir, "json") + `"; fi
+		[ ! -e "` + filepath.Join(dir, "healed") + `" ] || . "` + filepath.Join(dir, "healed") + `"
+		[ ! -e "` + filepath.Join(dir, "healed-json") + `" ] || cp "` + filepath.Join(dir, "healed-json") + `" "` + filepath.Join(dir, "json") + `"
+	done`
+}
+
 // fakeSupervisor stands in for `opampsupervisor status`: it logs its arguments to
-// dir/supervisor.log, and prints and exits as dir/status says ("0" when it is missing).
+// dir/supervisor.log, and prints and exits as dir/status says ("0" when it is missing). With
+// --json it prints dir/json (a status that is connected and not accepted: a refused token), or
+// one that isn't connected.
 func fakeSupervisor(t *testing.T, dir string) string {
 	t.Helper()
 	supervisor := filepath.Join(dir, "opampsupervisor")
 	require.NoError(t, os.WriteFile(supervisor, []byte(`#!/bin/sh
-echo "$@" >>"`+filepath.Join(dir, "supervisor.log")+`"
 code=$(cat "`+filepath.Join(dir, "status")+`" 2>/dev/null || echo 0)
+case " $* " in *" --json "*)
+	echo "$@" >>"`+filepath.Join(dir, "json-calls.log")+`"
+	# dir/stale: the status is of a start before --since.
+	[ ! -e "`+filepath.Join(dir, "stale")+`" ] || case " $* " in *" --since "*) exit 1 ;; esac
+	cat "`+filepath.Join(dir, "json")+`" 2>/dev/null || printf '{\n  "server": {\n    "connected": false\n  }\n}\n'
+	exit "$code" ;;
+esac
+echo "$@" >>"`+filepath.Join(dir, "supervisor.log")+`"
+# dir/wait: what happens in the wait after the state was set aside.
+[ ! -e "`+filepath.Join(dir, "asked.log")+`" ] || [ ! -e "`+filepath.Join(dir, "wait")+`" ] || . "`+filepath.Join(dir, "wait")+`"
 [ "$code" = 0 ] || echo "OpAMP server   can't reach it: this host doesn't trust the server's certificate"
 exit "$code"
 `), 0o755))
 	return supervisor
 }
+
+// revokedJSON is `status --json` for a Supervisor whose saved credentials the server refuses.
+const revokedJSON = "{\n  \"server\": {\n    \"connected\": false,\n    \"since\": \"2026-11-21T12:00:00Z\",\n    \"http_status\": 401,\n    \"issued_refused\": 5\n  }\n}\n"
+
+// refusedJSON is `status --json` for a Supervisor the server took the connection of and never
+// answered: a refused token.
+const refusedJSON = "{\n  \"server\": {\n    \"connected\": true,\n    \"since\": \"2026-11-21T12:00:00Z\"\n  }\n}\n"
 
 type enrollment struct {
 	root, tools string
@@ -160,7 +197,7 @@ func TestEnrollAllowsAnyConfigByDefault(t *testing.T) {
 // remote config use.
 var packagedComponents = map[string][]string{
 	"receivers":  {"otlp", "host_metrics", "hostmetrics", "file_log", "filelog", "nop"},
-	"processors": {"batch", "memory_limiter", "resource", "resource_detection", "resourcedetection"},
+	"processors": {"batch", "memory_limiter", "resource", "resource_detection", "resourcedetection", "transform"},
 	"exporters":  {"otlp_grpc", "otlp", "otlp_http", "otlphttp", "debug", "nop"},
 	"extensions": {"health_check"},
 }
@@ -471,7 +508,7 @@ func TestEnrollWaitsForTheConnection(t *testing.T) {
 	assert.Contains(t, out, "The Supervisor is running and connected")
 	calls, err := os.ReadFile(filepath.Join(e.tools, "supervisor.log"))
 	require.NoError(t, err)
-	assert.Regexp(t, `^status --storage `+regexp.QuoteMeta(e.root)+`/var/lib/pydantic-opamp --wait 30s --since \d+\n$`, string(calls))
+	assert.Regexp(t, `^status --storage `+regexp.QuoteMeta(e.root)+`/var/lib/pydantic-opamp --wait 30s --since \d+ --require-accepted\n$`, string(calls))
 
 	require.NoError(t, os.WriteFile(filepath.Join(e.tools, "status"), []byte("1"), 0o600))
 	out, err = e.run(t, "bootstrap-token", "--endpoint", "wss://opamp.example.com/v1/opamp")
@@ -479,6 +516,186 @@ func TestEnrollWaitsForTheConnection(t *testing.T) {
 	assert.Contains(t, out, "doesn't trust the server's certificate")
 	assert.Contains(t, out, "can't connect to wss://opamp.example.com/v1/opamp yet; it keeps retrying")
 	assert.NotContains(t, out, "running and connected")
+
+	// Connected, and the server never answered: the token was refused (used up, expired, revoked).
+	require.NoError(t, os.WriteFile(filepath.Join(e.tools, "json"), []byte(refusedJSON), 0o600))
+	out, err = e.run(t, "bootstrap-token", "--endpoint", "wss://opamp.example.com/v1/opamp")
+	require.Error(t, err)
+	assert.Contains(t, out, "took the connection and not the enrollment token: it may be used up, expired or revoked")
+	assert.NotContains(t, out, "keeps retrying")
+	require.NoError(t, os.Remove(filepath.Join(e.tools, "json")))
+
+	// Enrolled again with the same token after the server revoked the host's own credentials (it
+	// deleted the host): the Supervisor is asked to set the saved state aside as it starts again, once.
+	state := filepath.Join(e.root, "var/lib/pydantic-opamp/opamp-state")
+	aside := func() []string {
+		found, err := filepath.Glob(state + ".refused-*")
+		require.NoError(t, err)
+		return found
+	}
+	require.NoError(t, os.MkdirAll(filepath.Dir(state), 0o700))
+	require.NoError(t, os.WriteFile(state, []byte("sealed"), 0o600))
+	require.NoError(t, os.WriteFile(filepath.Join(e.tools, "json"), []byte(revokedJSON), 0o600))
+	require.NoError(t, os.WriteFile(filepath.Join(e.tools, "heal"), nil, 0o600))
+	out, err = e.run(t, "bootstrap-token", "--endpoint", "wss://opamp.example.com/v1/opamp")
+	require.NoError(t, err, out)
+	assert.Contains(t, out, "the server refused this host's saved credentials")
+	assert.Contains(t, out, "The Supervisor is running and connected")
+	require.Len(t, aside(), 1)
+	// Taken, and its new state not saved, whichever way that shows: not enrolled, the way back said.
+	for _, how := range []string{"rm -f \"$S/opamp-state\"", "true"} {
+		require.NoError(t, os.WriteFile(state, []byte("sealed"), 0o600))
+		require.NoError(t, os.WriteFile(filepath.Join(e.tools, "json"), []byte(revokedJSON), 0o600))
+		require.NoError(t, os.WriteFile(filepath.Join(e.tools, "status"), []byte("1"), 0o600))
+		require.NoError(t, os.WriteFile(filepath.Join(e.tools, "healed"), []byte(how), 0o600))
+		if how == "true" {
+			require.NoError(t, os.WriteFile(filepath.Join(e.tools, "healed-json"), []byte("{\n  \"save_error\": \"no space left\"\n}\n"), 0o600))
+		}
+		out, err = e.run(t, "bootstrap-token", "--endpoint", "wss://opamp.example.com/v1/opamp")
+		require.Error(t, err, how)
+		assert.Contains(t, out, "its new credentials could not be saved")
+		assert.Contains(t, out, "put them back with: sudo ")
+		assert.NotContains(t, out, "Enrolled with")
+	}
+	require.NoError(t, os.Remove(filepath.Join(e.tools, "healed")))
+	require.NoError(t, os.Remove(filepath.Join(e.tools, "healed-json")))
+	_ = os.Remove(filepath.Join(e.tools, "json"))
+	for _, path := range aside()[1:] {
+		require.NoError(t, os.Remove(path))
+	}
+	kept, err := os.ReadFile(aside()[0])
+	require.NoError(t, err)
+	assert.Equal(t, "sealed", string(kept))
+	// A 403 (a missing permission, say) is not a revoked credential: the state stays.
+	require.NoError(t, os.WriteFile(state, []byte("sealed"), 0o600))
+	require.NoError(t, os.WriteFile(filepath.Join(e.tools, "json"), []byte(strings.NewReplacer("401", "403", ",\n    \"issued_refused\": 5", "").Replace(revokedJSON)), 0o600))
+	require.NoError(t, os.WriteFile(filepath.Join(e.tools, "status"), []byte("1"), 0o600))
+	out, err = e.run(t, "bootstrap-token", "--endpoint", "wss://opamp.example.com/v1/opamp")
+	require.Error(t, err)
+	assert.NotContains(t, out, "the server refused this host's saved credentials")
+	assert.FileExists(t, state)
+	require.Len(t, aside(), 1)
+
+	// Refused again after that: no second try, where the credentials are, and the command that puts them
+	// back.
+	require.NoError(t, os.Remove(filepath.Join(e.tools, "heal")))
+	require.NoError(t, os.WriteFile(filepath.Join(e.tools, "json"), []byte(revokedJSON), 0o600))
+	out, err = e.run(t, "bootstrap-token", "--endpoint", "wss://opamp.example.com/v1/opamp")
+	require.Error(t, err)
+	assert.Equal(t, 1, strings.Count(out, "the server refused this host's saved credentials"))
+	require.Len(t, aside(), 2)
+	assert.Contains(t, out, "are set aside in "+aside()[1])
+	// Run again, with nothing to set aside (the try has no credentials of its own), or asked and not done:
+	// the one before is said.
+	require.NoError(t, os.WriteFile(filepath.Join(e.tools, "json"), []byte(strings.ReplaceAll(revokedJSON, ",\n    \"issued_refused\": 5", "")), 0o600))
+	again, err := e.run(t, "bootstrap-token", "--endpoint", "wss://opamp.example.com/v1/opamp")
+	require.Error(t, err)
+	require.Len(t, aside(), 2)
+	assert.Contains(t, again, "saved credentials the server refused in an earlier run, at 2026-11-2")
+	assert.Regexp(t, `at 2026-11-2\d 00:00:00 UTC, and the identity kept with them, are set aside in `+regexp.QuoteMeta(aside()[1])+`\.`, again)
+	assert.Contains(t, again, "put them back with: sudo ")
+	assert.Contains(t, again, "if this run had another token than the host enrolled with, enroll again with that one first")
+	// Connected and unanswered, with one aside: no advice to remove the data it is in.
+	require.NoError(t, os.WriteFile(filepath.Join(e.tools, "json"), []byte(refusedJSON), 0o600))
+	unanswered, err := e.run(t, "bootstrap-token", "--endpoint", "wss://opamp.example.com/v1/opamp")
+	require.Error(t, err)
+	assert.Contains(t, unanswered, "took the connection and not the enrollment token")
+	assert.Contains(t, unanswered, "put them back with: sudo ")
+	assert.NotContains(t, unanswered, "purge")
+	assert.Contains(t, again, "there are more set aside than these, the last: ")
+	assert.NotContains(t, out, "there are more set aside")
+	require.NoError(t, os.WriteFile(filepath.Join(e.tools, "json"), []byte(revokedJSON), 0o600))
+	assert.NotContains(t, out, "purge")
+	_, command, ok := strings.Cut(out, "put them back with: sudo ")
+	require.True(t, ok, out)
+	command, _, _ = strings.Cut(command, "\n")
+	if runtime.GOOS != "linux" {
+		command = strings.ReplaceAll(command, "mv -T ", "mv ") // coreutils'
+	}
+	// The command, run: the old state is back, and what was there is set aside instead.
+	run := exec.Command("/bin/sh", "-c", strings.ReplaceAll(command, "systemctl ", e.systemctl+" "))
+	run.Env = append(os.Environ(), "OPAMP_ENROLL_ROOT="+e.root)
+	b, err := run.CombinedOutput()
+	require.NoError(t, err, string(b))
+	kept, err = os.ReadFile(state)
+	require.NoError(t, err)
+	assert.Equal(t, "sealed", string(kept))
+	require.Len(t, aside(), 1)
+	replaced, err := filepath.Glob(state + ".replaced-*")
+	require.NoError(t, err)
+	require.Len(t, replaced, 1)
+	b, err = os.ReadFile(replaced[0])
+	require.NoError(t, err)
+	assert.Equal(t, "new\n", string(b), "what was in its place is kept")
+	// Run again: nothing changes.
+	run = exec.Command("/bin/sh", "-c", strings.ReplaceAll(command, "systemctl ", e.systemctl+" "))
+	run.Env = append(os.Environ(), "OPAMP_ENROLL_ROOT="+e.root)
+	b, _ = run.CombinedOutput()
+	assert.Contains(t, string(b), "nothing is put back, the copy is not there")
+	kept, err = os.ReadFile(state)
+	require.NoError(t, err)
+	assert.Equal(t, "sealed", string(kept))
+	require.Len(t, aside(), 1)
+	// Unanswered, with only what a person replaced there: no advice to remove that either.
+	require.NoError(t, os.WriteFile(filepath.Join(e.tools, "json"), []byte(refusedJSON), 0o600))
+	kept0 := aside()[0]
+	require.NoError(t, os.Rename(kept0, filepath.Join(e.tools, "kept0")))
+	out, err = e.run(t, "bootstrap-token", "--endpoint", "wss://opamp.example.com/v1/opamp")
+	require.Error(t, err)
+	assert.Contains(t, out, "took the connection and not the enrollment token")
+	assert.NotContains(t, out, "purge")
+	assert.NotContains(t, out, "put them back with")
+	require.NoError(t, os.Rename(filepath.Join(e.tools, "kept0"), kept0))
+	// What fails later for another reason, or in an upgrade, is nothing to put credentials back for.
+	require.NoError(t, os.Remove(filepath.Join(e.tools, "json")))
+	for _, args := range [][]string{{"--endpoint", "wss://opamp.example.com/v1/opamp"}, {"--refresh"}} {
+		out, err = e.run(t, "bootstrap-token", args...)
+		require.Error(t, err)
+		assert.NotContains(t, out, "put them back with")
+	}
+	require.NoError(t, os.WriteFile(filepath.Join(e.tools, "json"), []byte(revokedJSON), 0o600))
+	out, err = e.run(t, "bootstrap-token", "--refresh")
+	require.Error(t, err)
+	assert.NotContains(t, out, "put them back with")
+
+	// The new try's start fails: said so.
+	require.NoError(t, os.WriteFile(filepath.Join(e.tools, "fail-start"), nil, 0o600))
+	require.NoError(t, os.WriteFile(filepath.Join(e.tools, "inactive"), nil, 0o600))
+	out, err = e.run(t, "bootstrap-token", "--endpoint", "wss://opamp.example.com/v1/opamp")
+	require.Error(t, err)
+	assert.Contains(t, out, "failed to start")
+	assert.Contains(t, out, "UTC, and the identity kept with them, are set aside in")
+	assert.Contains(t, out, "the saved credentials are not set aside: if the Supervisor started, its log says why")
+	require.Len(t, aside(), 1)
+	requests, err := filepath.Glob(state + ".set-aside-*")
+	require.NoError(t, err)
+	assert.Empty(t, requests)
+	require.NoError(t, os.Remove(filepath.Join(e.tools, "fail-start")))
+	require.NoError(t, os.Remove(filepath.Join(e.tools, "inactive")))
+
+	// Refused a time or two, or not with the credentials it issued (another token given now): not asked.
+	for _, json := range []string{strings.ReplaceAll(revokedJSON, ": 5", ": 2"), strings.ReplaceAll(revokedJSON, ",\n    \"issued_refused\": 5", "")} {
+		require.NoError(t, os.WriteFile(filepath.Join(e.tools, "json"), []byte(json), 0o600))
+		out, err = e.run(t, "bootstrap-token", "--endpoint", "wss://opamp.example.com/v1/opamp")
+		require.Error(t, err)
+		assert.NotContains(t, out, "the server refused this host's saved credentials")
+	}
+	require.NoError(t, os.WriteFile(filepath.Join(e.tools, "json"), []byte(revokedJSON), 0o600))
+
+	// --refresh (a package upgrade) never asks, nor does a run with something else in the state's place.
+	out, err = e.run(t, "", "--refresh")
+	require.Error(t, err)
+	assert.NotContains(t, out, "the server refused this host's saved credentials")
+	for _, plant := range []func() error{func() error { return os.Mkdir(state, 0o700) }, func() error { return os.Symlink(t.TempDir(), state) }, func() error { return os.Symlink(aside()[0], state) }} {
+		require.NoError(t, os.Remove(state))
+		require.NoError(t, plant())
+		out, err = e.run(t, "bootstrap-token", "--endpoint", "wss://opamp.example.com/v1/opamp")
+		require.Error(t, err)
+		assert.NotContains(t, out, "the server refused this host's saved credentials")
+	}
+	require.NoError(t, os.Remove(state))
+	require.Len(t, aside(), 1)
+	require.NoError(t, os.Remove(filepath.Join(e.tools, "json")))
 
 	// A service that failed to start (an unreadable credential, say) never tried to connect: the
 	// install says so and where its log is, not that it keeps retrying.

@@ -51,6 +51,7 @@ func (s *Supervisor) clientPersistentState() (*persistentState, error) {
 	if err := s.loadStorageSealer(); err != nil {
 		return nil, err
 	}
+	setStateAside(s.telemetrySettings.Logger, s.config.Storage.Directory, time.Now())
 	c := newCoreClient(s.telemetrySettings.Logger.Named("opamp-client"), filepath.Join(s.config.Storage.Directory, coreClientStateFile), s.storageSealer)
 	if s.config.Capabilities.AcceptsPackages {
 		c.installPackage = s.onInstallPackage

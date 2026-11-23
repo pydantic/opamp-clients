@@ -194,12 +194,54 @@ agent:
   and exits 0 when connected, healthy and not FAILED, 1 otherwise, 2 with no status to read.
   `--wait DURATION --since UNIX` waits for a Supervisor started since then to connect (0 once it
   has, 1 with its status when it hasn't): the enrollment helpers run it after starting the service.
+  The remote config's status is that of the last config the server sent: once that FAILED (the
+  policy refused it, say), the Supervisor's report about the config the collector still runs, at
+  a restart or a retarget, doesn't hide it; the status says what runs instead
+  (`running_config`).
+  The status also says whether the server has answered this Supervisor since it started
+  (`accepted`: its first message that isn't an error response). A server answers at once a host
+  whose credentials it takes, while one that takes the connection but not the credentials (a
+  used-up enrollment key, say) closes it unanswered: that host reads as connected and not
+  accepted. (A server that over WebSocket sends nothing until it has something to say reads as
+  not accepted too.) `--require-accepted` makes `status` exit 1 without it, and
+  `--wait` wait for it; without the flag, `--wait` still returns 0 on the connection, after giving
+  the server up to 10 seconds to answer so that what it prints says whether it did.
+  The status also says what became of the server's own telemetry settings (`own_telemetry`:
+  APPLIED, REFUSED by `agent::remote_config_policy` (an endpoint it doesn't allow, say) or FAILED,
+  and why, its URLs without user info, query or fragment), from the server or, at a start, from
+  the settings saved. It doesn't make the status unwell: the Collector runs without them. A
+  server may offer them again at each connection; a refusal is logged at error once for each
+  reason, then at debug.
   It also names each file the running Collector's log receivers couldn't open, as the Collector's
   current log (`agent.log`) says (`unreadable_logs` in the JSON): a file receiver that can open
   none of its files is healthy and sends nothing. The exit code doesn't change for them, and the
   list is that log's: empty once it passes its size, and kept until the Collector starts again.
   The command is taken in a file of its own (`status_command.go`) before `main` runs, so
   upstream's `main.go` is unchanged.
+- **A saved state the server refuses is set aside when asked** (a new file, `set_aside.go`). The client
+  never falls back from the credentials a server issued to the configured ones, so a host the server
+  deleted is refused for good. An enrollment helper that a person runs with a token asks, by making the
+  directory `opamp-state.set-aside-PID` (its own process ID; on Linux with when it started, as /proc
+  has it) in the storage directory, restarting the
+  Supervisor and waiting. If the server refused the credentials it issued this host as not valid (HTTP
+  401) in the last tries of the Supervisor's last run, three or more, that helper still runs and the
+  request is not older than 2 minutes, the Supervisor renames `opamp-state` to `opamp-state.refused-`,
+  the time (UTC) and the process ID as it starts, before its client opens it, and the client starts from
+  the configured credentials, as a new host. Nothing puts one set aside back, replaces it or removes it
+  but a person, or a purge. `opampsupervisor status` lists them (`set_aside` in `--json`), and says when
+  the client's state can't be saved (`save_error`; it exits 1 then): a restart would lose it.
+- **On macOS the Collector's own log is sampled by default.** Upstream's macOS unified log
+  receiver logs "Running log command" at info for each poll, and polls again 100 ms after any poll
+  that found logs: about one line a second on a busy Mac, into `agent.log` and the Collector's own
+  telemetry. The Supervisor's own telemetry section on macOS sets
+  `service::telemetry::logs::sampling` (in each minute the first 5 lines with the same level and
+  message, then one in 500). A remote config that sets its own sampling keeps it; Linux and
+  Windows get no default.
+- **A new instance UID from the server is said once.** When the server gives the host a new
+  instance UID (an enrollment with a new key over kept state, where the client starts with the UID
+  it kept), the Supervisor logs it at info with the previous one. The collector started before it
+  sends the previous UID until it starts again; those messages are ignored at debug, where each was
+  a warning.
 - **The agent description carries a host key.** The Supervisor adds `pydantic.fleet.host_key` to
   the non-identifying attributes it reports: a UUID derived from the OS's machine ID (Linux
   `/etc/machine-id`, macOS `IOPlatformUUID`, Windows `MachineGuid`, as the OpenTelemetry Go SDK
@@ -258,12 +300,12 @@ Every file from upstream keeps its license header (Apache-2.0, [LICENSE](LICENSE
 paths were rewritten to this module's. The files changed beyond that say what changed in their
 header. These files are new, and are this repository's:
 
-- `supervisor/coreclient.go`, `agent_update.go`, `apply_step.go`, `client_state.go`, `startup.go`, `sealed_storage.go`, `telemetry_env.go`, `idle_telemetry.go`, `reachability.go`, `status.go`, `host_key.go`, `host_key_env.go`,
+- `supervisor/coreclient.go`, `agent_update.go`, `apply_step.go`, `client_state.go`, `startup.go`, `sealed_storage.go`, `telemetry_env.go`, `idle_telemetry.go`, `reachability.go`, `status.go`, `set_aside.go`, `set_aside_darwin.go`, `set_aside_linux.go`, `set_aside_other.go`, `set_aside_windows.go`, `own_telemetry_status.go`, `instance_uid_change.go`, `log_sampling.go`, `host_key.go`, `host_key_env.go`,
   `localserver.go`, `service_log.go`, `config/remote_config_policy.go`, `commander/collector_env.go`,
   `commander/agent_log.go` and `verifier/cosign.go`, and the tests
   beside them (with `supervisor/remote_config_refusal_test.go`, `restart_command_test.go` and
   `supervisor/config/core_test.go`, and the Cosign release fixture in `verifier/testdata/`);
-- `status_command.go` and `run_signals.go`, and their tests;
+- `status_command.go`, `status_read_*.go` and `run_signals.go`, and their tests;
 - `e2e_packages_test.go`, `e2e_policy_test.go` and `e2e_state_test.go`, and their configs in `testdata/`
   (`testdata/collector/manifest.yaml`, `testdata/supervisor/supervisor_auth_bearer_ws.yaml`,
   `supervisor_packages.yaml` and `supervisor_policy.yaml`);

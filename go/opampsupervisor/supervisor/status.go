@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net/http"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -40,9 +41,49 @@ type Status struct {
 	Collector *CollectorStatus `json:"collector,omitempty"`
 	// RemoteConfig is the last one's status: nil before the server sent one.
 	RemoteConfig *RemoteConfigState `json:"remote_config,omitempty"`
+	// RunningConfig is, while the server's last config FAILED (the policy refused it, say), the
+	// config before it, which the collector runs instead, as last reported: nil when there is
+	// none to tell.
+	RunningConfig *RemoteConfigState `json:"running_config,omitempty"`
+	// Accepted is when the server first answered this Supervisor in this run: nil while it hasn't.
+	// A server that takes the connection and then closes it unanswered, as one does for
+	// credentials it refuses (an enrollment key used up or revoked, say), leaves it nil while the
+	// connection reads connected.
+	Accepted *AcceptedState `json:"accepted,omitempty"`
+	// OwnTelemetry is what became of the server's last own telemetry settings: nil before it sent
+	// any.
+	OwnTelemetry *OwnTelemetryState `json:"own_telemetry,omitempty"`
+	// SaveError is why the client's state (the credentials the server issued, the identity) can't be saved: ""
+	// if it is. A host restarted so loses them.
+	SaveError string `json:"save_error,omitempty"`
+	// SetAside are the files of the saved states set aside, the oldest first, as the status is read: the
+	// credentials in them are ones the server refused, or a person set aside for those (set_aside.go).
+	SetAside []string `json:"set_aside,omitempty"`
 	// UnreadableLogs are the files the running Collector's log receivers couldn't open, as its log
 	// says: ReadStatus reads them, the Supervisor doesn't write them.
 	UnreadableLogs []UnreadableLog `json:"unreadable_logs,omitempty"`
+}
+
+// OwnTelemetryState is the outcome of the server's last own telemetry settings (where the
+// collector sends its own metrics and logs), since Since: "APPLIED" (in the collector's config;
+// whether it runs is the collector's health), "REFUSED" by agent::remote_config_policy, or
+// "FAILED" otherwise, with why (its URLs without user info, query or fragment). It doesn't make
+// the status unwell: the collector runs, without those settings.
+type OwnTelemetryState struct {
+	Status string    `json:"status"`
+	Since  time.Time `json:"since"`
+	Error  string    `json:"error,omitempty"`
+}
+
+// AcceptedState is when the server first answered the Supervisor in this run: the first
+// ServerToAgent from it, not an error response, to reach the client (go/opamp's
+// Client.Answered). A server answers at once a host whose credentials it takes; one that takes
+// the connection and closes it unanswered doesn't. A server that over WebSocket sends nothing
+// until it has something to say leaves it nil too. It is the Supervisor's own run: a restart
+// starts without it, whatever was saved, and it isn't taken back in the run (credentials refused
+// at a later connection with an HTTP error make the connection fail, which Server says).
+type AcceptedState struct {
+	Since time.Time `json:"since"`
 }
 
 type ServerStatus struct {
@@ -50,6 +91,9 @@ type ServerStatus struct {
 	Since      time.Time `json:"since"`
 	HTTPStatus int       `json:"http_status,omitempty"`
 	Error      string    `json:"error,omitempty"`
+	// IssuedRefused is how many of the last tries in a row the server refused as not valid (HTTP 401) with
+	// the credentials it issued this host.
+	IssuedRefused int `json:"issued_refused,omitempty"`
 }
 
 type CollectorStatus struct {
@@ -74,6 +118,9 @@ type statusReport struct {
 	now  func() time.Time
 	// closed: the client stopped, and the file says so for good.
 	closed bool
+	// received is the hash of the last remote config the client was given, in hex: by the server,
+	// or saved and handed over at start (a refused one too).
+	received string
 }
 
 func newStatusReport(dir string) *statusReport {
@@ -96,7 +143,14 @@ func (r *statusReport) update(logger *zap.Logger, change func(*Status, time.Time
 	now := r.now()
 	change(&r.st, now)
 	r.st.Updated = now
-	if err := writeStatus(r.path, &r.st); err != nil && logger != nil {
+	err := writeStatus(r.path, &r.st)
+	// On Windows the file can't be replaced while a reader (`status --wait`) has it open: tried
+	// again for a moment, since a change such as the server's first answer is written once.
+	for i := 0; err != nil && runtime.GOOS == "windows" && i < 10; i++ {
+		time.Sleep(20 * time.Millisecond)
+		err = writeStatus(r.path, &r.st)
+	}
+	if err != nil && logger != nil {
 		logger.Debug("The status file wasn't written", zap.String("path", r.path), zap.Error(err))
 	}
 }
@@ -119,14 +173,22 @@ func (r *statusReport) connected(logger *zap.Logger) {
 	})
 }
 
+// saved keeps how the last save of the client's state ended.
+func (r *statusReport) saved(logger *zap.Logger, saveError string) {
+	r.update(logger, func(st *Status, _ time.Time) { st.SaveError = saveError })
+}
+
 // connectFailed keeps the time of the first failure of a run, and the latest failure's detail.
-func (r *statusReport) connectFailed(logger *zap.Logger, status int, detail string) {
+func (r *statusReport) connectFailed(logger *zap.Logger, status int, detail string, issued bool) {
 	r.update(logger, func(st *Status, now time.Time) {
-		since := now
+		since, refused := now, 0
 		if st.Server != nil && !st.Server.Connected {
-			since = st.Server.Since
+			since, refused = st.Server.Since, st.Server.IssuedRefused
 		}
-		st.Server = &ServerStatus{Since: since, HTTPStatus: status, Error: detail}
+		if refused++; status != http.StatusUnauthorized || !issued {
+			refused = 0
+		}
+		st.Server = &ServerStatus{Since: since, HTTPStatus: status, Error: detail, IssuedRefused: refused}
 	})
 }
 
@@ -139,14 +201,76 @@ func (r *statusReport) health(logger *zap.Logger, h *protobufs.ComponentHealth) 
 	})
 }
 
+// receivedRemoteConfig: the client was given a remote config with this hash.
+func (r *statusReport) receivedRemoteConfig(hash []byte) {
+	if r == nil {
+		return
+	}
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.received = hex.EncodeToString(hash)
+}
+
+// remoteConfig records a config's status. The server's last config is the one the status is of:
+// once it FAILED, a report about another config (the one still running, which the Supervisor
+// reports at a restart or a retarget) says what runs instead, and doesn't hide the failure.
 func (r *statusReport) remoteConfig(logger *zap.Logger, s *protobufs.RemoteConfigStatus) {
 	r.update(logger, func(st *Status, now time.Time) {
+		received := r.received // update holds r.mu
 		rc := &RemoteConfigState{Hash: hex.EncodeToString(s.GetLastRemoteConfigHash()),
 			Status: remoteConfigStatusName(s.GetStatus()), Since: now, Error: s.GetErrorMessage()}
-		if old := st.RemoteConfig; old != nil && old.Hash == rc.Hash && old.Status == rc.Status && old.Error == rc.Error {
+		same := func(a, b *RemoteConfigState) bool {
+			return a != nil && b != nil && a.Hash == b.Hash && a.Status == b.Status && a.Error == b.Error
+		}
+		old := st.RemoteConfig
+		switch {
+		case received != "" && rc.Hash != received && old != nil && old.Hash == received && old.Status == "FAILED":
+			if !same(st.RunningConfig, rc) {
+				st.RunningConfig = rc
+			}
+		case same(old, rc):
+		case rc.Status == "FAILED" && received != "" && rc.Hash == received:
+			// What ran before keeps running.
+			if old != nil && old.Hash != rc.Hash && old.Status != "FAILED" {
+				st.RunningConfig = old
+			}
+			st.RemoteConfig = rc
+		default:
+			st.RemoteConfig, st.RunningConfig = rc, nil
+		}
+	})
+}
+
+// accepted records the server's first answer of the run.
+func (r *statusReport) accepted(logger *zap.Logger) {
+	if r == nil {
+		return
+	}
+	r.mu.Lock()
+	done := r.st.Accepted != nil
+	r.mu.Unlock()
+	if done {
+		return
+	}
+	r.update(logger, func(st *Status, now time.Time) {
+		if st.Accepted == nil {
+			st.Accepted = &AcceptedState{Since: now}
+		}
+	})
+}
+
+// ownTelemetry records the outcome of the server's own telemetry settings: refused with err, or
+// applied. The time is that of the first of a run of the same outcome.
+func (r *statusReport) ownTelemetry(logger *zap.Logger, err error) {
+	r.update(logger, func(st *Status, now time.Time) {
+		ot := &OwnTelemetryState{Status: ownTelemetryOutcome(err), Since: now}
+		if err != nil {
+			ot.Error = shownURLs(err.Error())
+		}
+		if old := st.OwnTelemetry; old != nil && old.Status == ot.Status && old.Error == ot.Error {
 			return
 		}
-		st.RemoteConfig = rc
+		st.OwnTelemetry = ot
 	})
 }
 
@@ -212,6 +336,7 @@ func ReadStatus(dir string) (*Status, error) {
 	if err := json.Unmarshal(b, &st); err != nil {
 		return nil, fmt.Errorf("%s: %w", StatusFile, err)
 	}
+	st.SetAside = statesSetAside(dir)
 	st.UnreadableLogs = nil
 	if st.Running() {
 		// A log older than the Supervisor isn't its Collector's (one from before it passed the
@@ -222,6 +347,13 @@ func ReadStatus(dir string) (*Status, error) {
 	}
 	return &st, nil
 }
+
+// AcceptGrace is how long after connecting a server is given to answer before the status reads
+// it as not having taken the Supervisor: a server answers an agent's first message at once.
+const AcceptGrace = 10 * time.Second
+
+// IsAccepted is whether the server has taken this Supervisor, as Accepted says.
+func (st *Status) IsAccepted() bool { return st.Accepted != nil }
 
 // Running is whether the Supervisor that wrote the status still runs: it didn't stop, and its
 // process is there (as this machine sees it; another PID namespace, a container's say, can't).
@@ -234,7 +366,7 @@ func (st *Status) Running() bool {
 func (st *Status) OK() bool {
 	return st.Running() && st.Server != nil && st.Server.Connected &&
 		st.Collector != nil && st.Collector.Healthy &&
-		(st.RemoteConfig == nil || st.RemoteConfig.Status != "FAILED")
+		(st.RemoteConfig == nil || st.RemoteConfig.Status != "FAILED") && st.SaveError == ""
 }
 
 // Print writes the status for a person, now being the time to count ages from.
@@ -283,6 +415,30 @@ func (st *Status) Print(w io.Writer, now time.Time) {
 	default:
 		line("Collector", "unhealthy since %s: %s", ago(c.Since), c.Error)
 	}
+	switch a := st.Accepted; {
+	case a != nil:
+		line("Accepted", "yes: the server answered this host at %s", ago(a.Since))
+	case st.Server != nil && st.Server.Connected && now.Sub(st.Server.Since) < AcceptGrace:
+		line("Accepted", "not yet: waiting for the server's first answer since it connected")
+	default:
+		line("Accepted", "not yet: the server hasn't answered this host since it started")
+		if st.Server != nil && st.Server.Connected {
+			line("", "A server that takes the connection but not the credentials (a used-up or revoked enrollment key, say) looks like this: check the host in the server's UI, and the key")
+		}
+	}
+	switch ot := st.OwnTelemetry; {
+	case ot == nil:
+	case ot.Error != "":
+		line("Own telemetry", "%s since %s: %s", ot.Status, ago(ot.Since), ot.Error)
+	default:
+		line("Own telemetry", "%s since %s", ot.Status, ago(ot.Since))
+	}
+	if st.SaveError != "" {
+		line("Saved state", "can't be saved, and a restart loses it: %s", st.SaveError)
+	}
+	for _, path := range st.SetAside {
+		line("Set aside", "a saved state, with its credentials, in %s", path)
+	}
 	switch rc := st.RemoteConfig; {
 	case rc == nil:
 		line("Remote config", "none received yet")
@@ -290,6 +446,9 @@ func (st *Status) Print(w io.Writer, now time.Time) {
 		line("Remote config", "%s since %s (hash %s): %s", rc.Status, ago(rc.Since), short(rc.Hash), rc.Error)
 	default:
 		line("Remote config", "%s since %s (hash %s)", rc.Status, ago(rc.Since), short(rc.Hash))
+	}
+	if run := st.RunningConfig; run != nil && st.RemoteConfig != nil {
+		line("", "the config before it (hash %s) runs instead: %s since %s", short(run.Hash), run.Status, ago(run.Since))
 	}
 	printUnreadableLogs(line, st.UnreadableLogs)
 }

@@ -100,6 +100,12 @@ Once the server issues the agent its own credentials, the Supervisor uses them f
 
 The enrollment token in the config is then only a fallback.
 
+If the server refuses those credentials three times or more in a row (it deleted the host, say),
+enrolling again with the same token has the Supervisor set them aside, in `opamp-state.refused-` and the time beside `opamp-state`, and enrolls
+the host as a new one. They stay there until a purge removes the data, and `opampsupervisor status` lists
+them. If the new enrollment fails, the command says how to put them back: a server that refused good ones
+for a while only. What that replaces is kept as `opamp-state.replaced-` and the time.
+
 Other options:
 - `--token-file PATH` reads the token from a file instead of standard input.
 - `--ca-file PATH` sets the CA bundle to trust for the server. On Linux it is copied to
@@ -421,7 +427,7 @@ collector keeps the config it had.
 
 | Rule | Default | Widen it with |
 |---|---|---|
-| `allowed_components` | receivers `otlp`, `host_metrics`, `file_log`, `nop`; processors `batch`, `memory_limiter`, `resource`, `resource_detection`; exporters `otlp_grpc`, `otlp_http`, `debug`, `nop`; extension `health_check` (and the older names `hostmetrics`, `filelog`, `resourcedetection`, `otlp` and `otlphttp`) | an edit to the config |
+| `allowed_components` | receivers `otlp`, `host_metrics`, `file_log`, `nop`; processors `batch`, `memory_limiter`, `resource`, `resource_detection`, `transform` (it changes only the records passing through: OTTL reads no file, environment or network); exporters `otlp_grpc`, `otlp_http`, `debug`, `nop`; extension `health_check` (and the older names `hostmetrics`, `filelog`, `resourcedetection`, `otlp` and `otlphttp`) | an edit to the config |
 | `allowed_providers` | none, except environment names explicitly bound by `agent.connection_env`; no other `${env:...}` or `${file:...}` | an edit to the config (not recommended) |
 | `allowed_exporter_endpoints` | the OpAMP endpoint's host and port, over https (http with `--plaintext`) | `--exporter-endpoint` (`-ExporterEndpoint` on Windows) |
 | `allowed_log_paths` | none | `--log-path` (`-LogPath` on Windows); `--host-logs` adds `/var/log` on Linux, and `/var/log` and `/private/var/log` (one directory) on macOS |

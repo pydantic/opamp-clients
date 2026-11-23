@@ -123,3 +123,44 @@ func TestANilStatusReportDoesNothing(t *testing.T) {
 	r.stopped(nil)
 	r.close(nil)
 }
+
+// The status says when the server first answered this Supervisor, and nothing else makes it
+// say so: connecting, a config the client hands over from its saved state, or the core naming the
+// UID the Supervisor has.
+func TestTheStatusSaysWhenTheServerTookTheSupervisor(t *testing.T) {
+	dir := t.TempDir()
+	c := newCoreClient(zap.NewNop(), filepath.Join(dir, coreClientStateFile), nil)
+	clock := time.Date(2026, 11, 21, 12, 0, 0, 0, time.UTC)
+	c.report.now = func() time.Time { return clock }
+	c.reach = newReachability(c.logger, "wss://opamp.example.com/v1/opamp")
+	c.uid = [16]byte{1}
+	c.report.started(c.logger, c.reach.endpoint, c.uid)
+
+	c.onNotification(nil, collector.Notification{Notification: opamp.Notification{Kind: opamp.Connected}})
+	c.onNotification(nil, collector.Notification{Notification: opamp.Notification{Kind: opamp.InstanceUIDChanged, InstanceUID: [16]byte{1}}})
+	c.onNotification(nil, collector.Notification{Notification: opamp.Notification{Kind: opamp.RemoteConfig, RemoteConfig: remoteConfig("receivers: {}")}})
+	c.onNotification(nil, collector.Notification{Notification: opamp.Notification{Kind: collector.ServerCustomCapabilities}})
+	st, err := ReadStatus(dir)
+	require.NoError(t, err)
+	assert.Nil(t, st.Accepted)
+	assert.False(t, st.IsAccepted())
+	var out bytes.Buffer
+	st.Print(&out, clock)
+	assert.Contains(t, out.String(), "not yet: waiting for the server's first answer", "within its grace")
+	out.Reset()
+	st.Print(&out, clock.Add(AcceptGrace))
+	assert.Contains(t, out.String(), "not yet: the server hasn't answered this host")
+	assert.Contains(t, out.String(), "enrollment key")
+
+	clock = clock.Add(time.Minute)
+	c.report.accepted(c.logger)
+	clock = clock.Add(time.Minute)
+	c.report.accepted(c.logger)
+	st, err = ReadStatus(dir)
+	require.NoError(t, err)
+	require.NotNil(t, st.Accepted)
+	assert.Equal(t, clock.Add(-time.Minute), st.Accepted.Since, "the first answer is kept")
+	out.Reset()
+	st.Print(&out, clock)
+	assert.Contains(t, out.String(), "Accepted       yes: the server answered this host at")
+}
