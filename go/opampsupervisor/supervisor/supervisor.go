@@ -10,7 +10,7 @@
 // installed, with a rollback if the new one isn't healthy, and removed when no longer offered
 // (agent_update.go). A remote config
 // agent::remote_config_policy refuses is FAILED, and is neither run nor kept; without a policy,
-// the start says the remote config is unrestricted. The Supervisor's state (persistentState, and
+// the start says, at info, that the remote config is unrestricted. The Supervisor's state (persistentState, and
 // the remote configs and own-telemetry settings it saved) is the OpAMP client's, read before the
 // bootstrap (client_state.go): it writes no files of its own, and a remote config the collector
 // refused isn't run again at the next start. The client's state file is sealed with
@@ -376,10 +376,11 @@ func NewSupervisor(ctx context.Context, logger *zap.Logger, cfg config.Superviso
 
 	s.configApplyTimeout = s.config.Agent.ConfigApplyTimeout
 
-	// Changed here: say so, in the local log, when the server's remote config is unlimited.
+	// Changed here: say so once, in the local log, when the server's remote config is unlimited. It is
+	// the default, so a note, not a warning.
 	if logger != nil && s.config.Capabilities.AcceptsRemoteConfig && !s.config.Agent.RemoteConfigPolicy.Enabled() {
-		logger.Warn("The remote config is unrestricted (no agent::remote_config_policy): " +
-			"the server may have the collector read any file it can and send it anywhere")
+		logger.Info("The remote config is unrestricted (no agent::remote_config_policy): the server's configs " +
+			"run as sent. To limit them, set agent::remote_config_policy (the enrollment helpers' --restricted)")
 	}
 
 	return s, nil
