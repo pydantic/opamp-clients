@@ -104,7 +104,7 @@ and date. Tests, CI and docs alone don't need a line.
 
 - Supervisor on macOS: `pydantic-opamp-enroll` (`--refresh` too), ended by a signal (Ctrl-C, a lost
   ssh connection) while it restarts the service, starts it again before it ends. It left the
-  service unloaded until the Mac started again (#160).
+  service unloaded until the Mac started again (#159).
 - Supervisor: `pydantic-opamp-enroll` (Linux, macOS, Windows) says when the Supervisor service
   failed to start, and gives the command that shows its log. It used to say the Supervisor can't
   connect yet and keeps retrying, as for a running service that can't reach its server (#147).
