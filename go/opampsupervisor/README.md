@@ -194,6 +194,10 @@ agent:
   and exits 0 when connected, healthy and not FAILED, 1 otherwise, 2 with no status to read.
   `--wait DURATION --since UNIX` waits for a Supervisor started since then to connect (0 once it
   has, 1 with its status when it hasn't): the enrollment helpers run it after starting the service.
+  The remote config's status is that of the last config the server sent: once that FAILED (the
+  policy refused it, say), the Supervisor's report about the config the collector still runs, at
+  a restart or a retarget, doesn't hide it; the status says what runs instead
+  (`running_config`).
   The status also says whether the server has taken this Supervisor since it started (`accepted`):
   it has answered, offering no credential (a message that isn't an error response), or answered on a
   credential it issued. A server answers at once a host whose credentials it takes, while
