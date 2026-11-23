@@ -143,7 +143,7 @@ and date. Tests, CI and docs alone don't need a line.
   token the server doesn't take (a used-up one, say) replaced the one the host was enrolled with, and
   the credentials the server issued for it were not used any more: the host stayed off the server. It
   now keeps the enrollment the host had until the server takes the new one, and otherwise goes back to
-  it and exits 1.
+  it and exits 1 (#161).
 - Supervisor installers: a host deleted on the server and enrolled again over its kept data with
   the same token could never connect: the client kept the host's own issued credentials, which
   the delete revoked, and doesn't fall back from them to the token. `pydantic-opamp-enroll` (not
