@@ -40,6 +40,9 @@ type Status struct {
 	Collector *CollectorStatus `json:"collector,omitempty"`
 	// RemoteConfig is the last one's status: nil before the server sent one.
 	RemoteConfig *RemoteConfigState `json:"remote_config,omitempty"`
+	// UnreadableLogs are the files the running Collector's log receivers couldn't open, as its log
+	// says: ReadStatus reads them, the Supervisor doesn't write them.
+	UnreadableLogs []UnreadableLog `json:"unreadable_logs,omitempty"`
 }
 
 type ServerStatus struct {
@@ -198,7 +201,8 @@ func writeStatus(path string, st *Status) error {
 	return os.Rename(tmp.Name(), path)
 }
 
-// ReadStatus reads the status file in a storage directory.
+// ReadStatus reads the status file in a storage directory, and, while its Supervisor runs, the
+// files its Collector can't open.
 func ReadStatus(dir string) (*Status, error) {
 	b, err := os.ReadFile(filepath.Join(dir, StatusFile))
 	if err != nil {
@@ -207,6 +211,14 @@ func ReadStatus(dir string) (*Status, error) {
 	var st Status
 	if err := json.Unmarshal(b, &st); err != nil {
 		return nil, fmt.Errorf("%s: %w", StatusFile, err)
+	}
+	st.UnreadableLogs = nil
+	if st.Running() {
+		// A log older than the Supervisor isn't its Collector's (one from before it passed the
+		// Collector's log through, say).
+		if info, err := os.Stat(filepath.Join(dir, agentLogFileName)); err == nil && !info.ModTime().Before(st.Started) {
+			st.UnreadableLogs = unreadableLogs(dir)
+		}
 	}
 	return &st, nil
 }
@@ -279,6 +291,7 @@ func (st *Status) Print(w io.Writer, now time.Time) {
 	default:
 		line("Remote config", "%s since %s (hash %s)", rc.Status, ago(rc.Since), short(rc.Hash))
 	}
+	printUnreadableLogs(line, st.UnreadableLogs)
 }
 
 func short(hash string) string {

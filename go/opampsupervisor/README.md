@@ -194,6 +194,10 @@ agent:
   and exits 0 when connected, healthy and not FAILED, 1 otherwise, 2 with no status to read.
   `--wait DURATION --since UNIX` waits for a Supervisor started since then to connect (0 once it
   has, 1 with its status when it hasn't): the enrollment helpers run it after starting the service.
+  It also names each file the running Collector's log receivers couldn't open, as the Collector's
+  current log (`agent.log`) says (`unreadable_logs` in the JSON): a file receiver that can open
+  none of its files is healthy and sends nothing. The exit code doesn't change for them, and the
+  list is that log's: empty once it passes its size, and kept until the Collector starts again.
   The command is taken in a file of its own (`status_command.go`) before `main` runs, so
   upstream's `main.go` is unchanged.
 - **The agent description carries a host key.** The Supervisor adds `pydantic.fleet.host_key` to

@@ -111,6 +111,14 @@ and date. Tests, CI and docs alone don't need a line.
 
 ### Fixed
 
+- Supervisor on Linux: with `--restricted`, `pydantic-opamp-enroll --host-logs` also lets the
+  server's configs read the journal, with a `journald` receiver (not its `journalctl_path`,
+  `root_path`, `directory`, `files` or `merge`, which stay the local config's). On RHEL-family
+  hosts the syslog files are root's alone, so a restricted host could send none of its system
+  logs (#152).
+- Supervisor: `opampsupervisor status` names each file the Collector's log receivers couldn't
+  open (a file receiver that can't read its files is healthy and sends nothing), and says to read
+  the journal where the syslog files are root's alone (#152).
 - Supervisor: a Windows upgrade from 0.10.3 or older no longer shuts down programs that have one
   of the package's files open (an antivirus or a log viewer, say) and no longer fails with 1601,
   leaving the Supervisor stopped. The `.msi` installs its files before it removes the old version.
