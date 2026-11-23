@@ -76,10 +76,10 @@ and date. Tests, CI and docs alone don't need a line.
   the agent, the credentials it offered it and why none is in use, and its last error response and
   wait. `Config.KeepUnreached` keeps an agent on an offered credential whose endpoint couldn't be
   reached. It tells a server that took the agent from one that took the connection and closed it
-  unanswered, or that only offers credentials it then refuses (#159).
+  unanswered, or that only offers credentials it then refuses (#160).
 - Supervisor: `opampsupervisor status` says how the enrollment of a host the server doesn't take
   goes (`enrollment` in `--json`): the credentials offered, why none is in use, and when the host
-  tries again. It exits 1 then, and `--wait --require-accepted` doesn't wait past it (#159).
+  tries again. It exits 1 then, and `--wait --require-accepted` doesn't wait past it (#160).
 - Go: `Client.UsedIssued()`, whether the latest request or connection was made with credentials a
   server issued rather than the configured ones (platform mode), and `Client.SaveError()` with
   `Client.Saves()`, why the last save of the state failed (#150).
