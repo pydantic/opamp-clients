@@ -286,6 +286,9 @@ agent:
   heartbeat), and a config that collects that log ships them. Here it logs at the config's level,
   info unless set, and its lines carry no time of their own, where each began with the seconds
   since 1970 (`supervisor/service_log.go`).
+- **The binary may be 42 MiB.** Upstream's test of its size (linux/amd64, stripped) allows 40 MiB.
+  With the shared core and what is listed here it needs a little more than that, so the limit
+  is 42 MiB (`e2e_test.go`), and growth past it still fails the test.
 
 Every file from upstream keeps its license header (Apache-2.0, [LICENSE](LICENSE)); the import
 paths were rewritten to this module's. The files changed beyond that say what changed in their

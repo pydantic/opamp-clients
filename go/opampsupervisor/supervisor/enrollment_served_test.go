@@ -870,3 +870,59 @@ func TestAHostTakenAndDroppedIsNotAcceptedForLong(t *testing.T) {
 		})
 	}
 }
+
+// Plain HTTP, from a server that offers the same credential each time, and doesn't take the host with it: under a
+// hash of its own each time, the host tries it again and again, until it is held; under the same one it tries it
+// once, and asks again at its interval, as a server that serves it and only repeats itself wants.
+func TestTheSameOfferOverHTTP(t *testing.T) {
+	for _, same := range []bool{false, true} {
+		t.Run(fmt.Sprintf("same hash %v", same), func(t *testing.T) {
+			t.Parallel()
+			var mu sync.Mutex
+			tokens, claims := 0, 0
+			var s *httptest.Server
+			s = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				b, _ := io.ReadAll(r.Body)
+				m := &protobufs.AgentToServer{}
+				_ = proto.Unmarshal(b, m)
+				mu.Lock()
+				defer mu.Unlock()
+				if r.Header.Get("Authorization") != "Bearer token" {
+					claims++
+					w.WriteHeader(http.StatusUnauthorized)
+					return
+				}
+				tokens++
+				hash := "same"
+				if !same {
+					hash = fmt.Sprint(tokens)
+				}
+				w.Header().Set("Content-Type", "application/x-protobuf")
+				o, _ := proto.Marshal(rvOffer(m, hash, s.URL, "Bearer key"))
+				_, _ = w.Write(o)
+			}))
+			defer s.Close()
+			dir := t.TempDir()
+			c := rvHost(t, s.URL, dir, tokenHeader, 0)
+			seen := func() (int, int) { mu.Lock(); defer mu.Unlock(); return tokens, claims }
+			if same {
+				time.Sleep(12 * time.Second)
+				n, k := seen()
+				require.False(t, c.holding())
+				require.Equal(t, 1, k)
+				require.LessOrEqual(t, n, 5)
+				return
+			}
+			require.Eventually(t, c.holding, 20*time.Second, 20*time.Millisecond)
+			time.Sleep(time.Second) // what was under way
+			n, k := seen()
+			time.Sleep(3 * time.Second)
+			m, l := seen()
+			require.Equal(t, []int{n, k}, []int{m, l}, "held, and went on")
+			require.LessOrEqual(t, k, 8)
+			st, e := hostStatus(t, dir)
+			require.False(t, st.OK())
+			require.EqualValues(t, 1, e["offers"])
+		})
+	}
+}
