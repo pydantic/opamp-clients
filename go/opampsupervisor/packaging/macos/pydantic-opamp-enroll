@@ -143,8 +143,15 @@ unload() {
 # load loads the daemon that unload unloaded, and then ends on a signal that came meanwhile.
 load() {
 	unsignaled "$launchctl" bootstrap system "$plist"
-	trap - HUP INT TERM
-	[ -z "$ended" ] || exit "$ended"
+	resume_interrupts
+}
+
+# Once a restart is safe to interrupt again, exit through the enrollment's cleanup trap.
+resume_interrupts() {
+	trap 'exit 129' HUP
+	trap 'exit 130' INT
+	trap 'exit 143' TERM
+	[ -z "${ended:-}" ] || exit "$ended"
 }
 
 # unsignaled runs a command that the signals (a Ctrl-C reaches the commands here too) don't end.
@@ -353,6 +360,7 @@ keep_enrollment() {
 	old_pid=$(printf '%s\n' "$st" | sed -n 's/^  "pid": \([0-9]*\),*$/\1/p')
 	stopped=yes
 	unload
+	resume_interrupts
 	to=$etc/enrollment-before-$(date -u +%Y%m%dT%H%M%SZ)-$$
 	kept_tmp=$to.tmp
 	# What a run that was killed while it copied left: nothing was changed then. (Not of one that still runs.)
@@ -462,11 +470,9 @@ put_back() {
 	exit 1
 }
 trap put_back EXIT
-trap 'exit 129' HUP
-trap 'exit 130' INT
 trap 'exit 131' QUIT
 trap 'exit 141' PIPE
-trap 'exit 143' TERM
+resume_interrupts
 keep_enrollment
 
 if [ -z "$refresh" ]; then
