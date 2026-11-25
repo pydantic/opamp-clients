@@ -32,7 +32,7 @@ usage: pydantic-opamp-enroll --endpoint URL [--token-file PATH] [--ca-file PATH]
   --log-path PATH          with --restricted, a file, or a directory, the server's configs may read
                            logs from; repeat it for more (default: none)
   --host-logs              with --restricted, let the server's configs read this host's system logs:
-                           the files under /var/log, with read positions kept in
+                           the journal and the files under /var/log, with read positions kept in
                            /var/lib/pydantic-opamp/collector
   --accept-packages        install the collector the server offers, if this repository's release
                            workflow signed it (default: only the installed collector runs)
@@ -240,9 +240,14 @@ set +f
 # --host-logs: the system log files, and the file_storage extension that keeps where a receiver
 # got to, in a directory of the Supervisor's own.
 extensions="[health_check]"
+receivers="[otlp, host_metrics, hostmetrics, file_log, filelog, nop]"
 storage_directories=
 if [ -n "$host_logs" ]; then
 	log_paths=$(append "$log_paths" /var/log)
+	# And the journal, which every systemd host keeps and the Collector's user reads (it is in
+	# systemd-journal): on RHEL-family hosts the syslog files are root's alone (/var/log/messages,
+	# 0600). The policy keeps the receiver to this host's own journal, by the journalctl here.
+	receivers="[otlp, host_metrics, hostmetrics, file_log, filelog, nop, journald]"
 	extensions="[health_check, file_storage]"
 	storage_directories="$nl    # Where its file_storage extensions may keep files: these directories, and what is under them.
     allowed_storage_directories: [\"/var/lib/pydantic-opamp/collector\"]"
@@ -275,6 +280,17 @@ if [ -z "$refresh" ]; then
 	case $token in
 	*[!A-Za-z0-9._~+/=-]*) fail "the enrollment token has characters a bearer token can't" ;;
 	esac
+fi
+
+dropin=$root/etc/systemd/system/$unit.d
+# What this script writes to telemetry.conf there: with it, the file is this package's; any other isn't.
+telemetry_conf='[Service]
+LoadCredentialEncrypted=opamp-telemetry-token:/etc/pydantic-opamp/telemetry-token.cred'
+# An administrator's own file of the name stays: with the credential in it, it does what this one does, and
+# without, it can't be had.
+if [ -n "$telemetry_stdin" ] && { [ -e "$dropin/telemetry.conf" ] || [ -L "$dropin/telemetry.conf" ]; } &&
+	! grep -qxs "${telemetry_conf#*"$nl"}" "$dropin/telemetry.conf"; then
+	fail "$dropin/telemetry.conf isn't this package's, and is kept: rename it (another .conf name there does the same), then run this again"
 fi
 
 umask 077
@@ -442,10 +458,17 @@ if [ -n "$telemetry_stdin" ]; then
 	printf '%s' "$telemetry_token" | "$creds" encrypt --name=opamp-telemetry-token - "$etc/telemetry-token.cred.tmp"
 	chmod 0600 "$etc/telemetry-token.cred.tmp"
 	mv -f "$etc/telemetry-token.cred.tmp" "$etc/telemetry-token.cred"
-	dropin=$root/etc/systemd/system/$unit.d
 	mkdir -p "$dropin"
-	printf '[Service]\nLoadCredentialEncrypted=opamp-telemetry-token:/etc/pydantic-opamp/telemetry-token.cred\n' >"$dropin/telemetry.conf"
+	[ -e "$dropin/telemetry.conf" ] || printf '%s\n' "$telemetry_conf" >"$dropin/telemetry.conf"
 	"$systemctl" daemon-reload
+elif [ ! -f "$etc/telemetry-token.cred" ] && [ -f "$dropin/telemetry.conf" ]; then
+	if [ ! -L "$dropin/telemetry.conf" ] && [ "$(cat "$dropin/telemetry.conf")" = "$telemetry_conf" ]; then
+		# Left by an older package's purge: without the credential it names, the service can't start.
+		rm -f "$dropin/telemetry.conf"
+		"$systemctl" daemon-reload
+	elif grep -q 'opamp-telemetry-token' "$dropin/telemetry.conf"; then
+		echo "pydantic-opamp-enroll: $dropin/telemetry.conf names a telemetry credential that is gone, and holds more than this package writes: it is kept, and the service can't start with it" >&2
+	fi
 fi
 
 agent_env=
@@ -515,7 +538,7 @@ if [ -n "$restricted" ]; then
   remote_config_policy:
     # The component types a Logfire config uses, by their names and their older aliases.
     allowed_components:
-      receivers: [otlp, host_metrics, hostmetrics, file_log, filelog, nop]
+      receivers: $receivers
       processors: [batch, memory_limiter, resource, resource_detection, resourcedetection, transform]
       exporters: [otlp_grpc, otlp, otlp_http, otlphttp, debug, nop]
       extensions: $extensions

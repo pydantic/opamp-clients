@@ -63,6 +63,9 @@ type Status struct {
 	// SetAside are the files of the saved states set aside, the oldest first, as the status is read: the
 	// credentials in them are ones the server refused, or a person set aside for those (set_aside.go).
 	SetAside []string `json:"set_aside,omitempty"`
+	// UnreadableLogs are the files the running Collector's log receivers couldn't open, as its log
+	// says: ReadStatus reads them, the Supervisor doesn't write them.
+	UnreadableLogs []UnreadableLog `json:"unreadable_logs,omitempty"`
 }
 
 // OwnTelemetryState is the outcome of the server's last own telemetry settings (where the
@@ -333,7 +336,8 @@ func writeStatus(path string, st *Status) error {
 	return os.Rename(tmp.Name(), path)
 }
 
-// ReadStatus reads the status file in a storage directory.
+// ReadStatus reads the status file in a storage directory, and, while its Supervisor runs, the
+// files its Collector can't open.
 func ReadStatus(dir string) (*Status, error) {
 	b, err := os.ReadFile(filepath.Join(dir, StatusFile))
 	if err != nil {
@@ -344,6 +348,14 @@ func ReadStatus(dir string) (*Status, error) {
 		return nil, fmt.Errorf("%s: %w", StatusFile, err)
 	}
 	st.SetAside = statesSetAside(dir)
+	st.UnreadableLogs = nil
+	if st.Running() {
+		// A log older than the Supervisor isn't its Collector's (one from before it passed the
+		// Collector's log through, say).
+		if info, err := os.Stat(filepath.Join(dir, agentLogFileName)); err == nil && !info.ModTime().Before(st.Started) {
+			st.UnreadableLogs = unreadableLogs(dir)
+		}
+	}
 	return &st, nil
 }
 
@@ -457,6 +469,7 @@ func (st *Status) Print(w io.Writer, now time.Time) {
 	if run := st.RunningConfig; run != nil && st.RemoteConfig != nil {
 		line("", "the config before it (hash %s) runs instead: %s since %s", short(run.Hash), run.Status, ago(run.Since))
 	}
+	printUnreadableLogs(line, st.UnreadableLogs)
 }
 
 func short(hash string) string {

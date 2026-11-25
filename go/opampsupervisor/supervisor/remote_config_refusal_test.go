@@ -75,17 +75,21 @@ func TestSupervisorKeepsItsConfigWhenThePolicyRefusesOne(t *testing.T) {
 	require.Equal(t, []byte("allowed"), restarted.remoteConfig.Load().GetConfigHash())
 }
 
-// Accepting remote configs with no policy is allowed (upstream's behaviour), and said at start.
-func TestSupervisorWarnsWhenTheRemoteConfigIsUnrestricted(t *testing.T) {
+// Accepting remote configs with no policy is allowed (upstream's behaviour, and the default), and said once
+// at start, at info: not a warning, as nothing is wrong.
+func TestSupervisorSaysAtInfoThatTheRemoteConfigIsUnrestricted(t *testing.T) {
 	cfg := setupSupervisorConfig(t, configTemplate)
 	cfg.Capabilities.AcceptsRemoteConfig = true
-	core, logs := observer.New(zap.WarnLevel)
+	core, logs := observer.New(zap.DebugLevel)
 	_, err := NewSupervisor(t.Context(), zap.New(core), cfg)
 	require.NoError(t, err)
-	require.Equal(t, 1, logs.FilterMessageSnippet("remote config is unrestricted").Len())
+	said := logs.FilterMessageSnippet("remote config is unrestricted").All()
+	require.Len(t, said, 1)
+	require.Equal(t, zap.InfoLevel, said[0].Level)
+	require.Contains(t, said[0].Message, "--restricted")
 
 	cfg.Agent.RemoteConfigPolicy = config.RemoteConfigPolicy{AllowedComponents: map[string][]string{"receivers": {"nop"}}}
-	core, logs = observer.New(zap.WarnLevel)
+	core, logs = observer.New(zap.DebugLevel)
 	_, err = NewSupervisor(t.Context(), zap.New(core), cfg)
 	require.NoError(t, err)
 	require.Zero(t, logs.FilterMessageSnippet("remote config is unrestricted").Len())

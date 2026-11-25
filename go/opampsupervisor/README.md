@@ -113,7 +113,7 @@ agent:
   `filelog` receiver at any file the collector reads, `${file:...}` a secret into an exporter,
   or send what it collects anywhere. A config refused is FAILED, with the reason, and never
   runs. The policy is read with confmap, as the config is merged (a `receivers::filelog` key is a
-  receiver). Without a policy the Supervisor says at start that the remote config is
+  receiver). Without a policy the Supervisor says once at start, at info, that the remote config is
   unrestricted. Upstream has no limit. What the packaged policy allows, how to widen it on the
   host, and what a server can still do:
   [packaging/README.md](packaging/README.md#what-the-server-can-do-to-this-host).
@@ -215,6 +215,10 @@ agent:
   the settings saved. It doesn't make the status unwell: the Collector runs without them. A
   server may offer them again at each connection; a refusal is logged at error once for each
   reason, then at debug.
+  It also names each file the running Collector's log receivers couldn't open, as the Collector's
+  current log (`agent.log`) says (`unreadable_logs` in the JSON): a file receiver that can open
+  none of its files is healthy and sends nothing. The exit code doesn't change for them, and the
+  list is that log's: empty once it passes its size, and kept until the Collector starts again.
   The command is taken in a file of its own (`status_command.go`) before `main` runs, so
   upstream's `main.go` is unchanged.
 - **A saved state the server refuses is set aside when asked** (a new file, `set_aside.go`). The client
@@ -262,6 +266,31 @@ agent:
   it kept), the Supervisor logs it at info with the previous one. The collector started before it
   sends the previous UID until it starts again; those messages are ignored at debug, where each was
   a warning.
+- **The agent description carries a host key.** The Supervisor adds `pydantic.fleet.host_key` to
+  the non-identifying attributes it reports: a UUID derived from the OS's machine ID (Linux
+  `/etc/machine-id`, macOS `IOPlatformUUID`, Windows `MachineGuid`, as the OpenTelemetry Go SDK
+  reads it) the way systemd derives an application-specific machine ID: HMAC-SHA256 keyed with the
+  machine ID's 16 bytes over this package's application ID `c8fe2a9e-5d40-4615-8f88-fd606391a0ca`,
+  the same way on every system, so on Linux it is what
+  `systemd-id128 machine-id --app-specific=c8fe2a9e-5d40-4615-8f88-fd606391a0ca --uuid` prints. It
+  stays the same while the host keeps its machine ID (an uninstall, a purge and reinstall, a
+  reboot, a new key), so a server can tie a host enrolled again to the one it replaces; it reveals
+  nothing about the machine ID, which isn't reported. It is not `host.id`, which is the raw machine
+  ID the `resourcedetection` processor exports. One set in
+  `agent::description::non_identifying_attributes` wins, and set to `""` there none is reported; a
+  host with no machine ID (a container, say), or with one that isn't a host's own (text that isn't 16
+  bytes, as systemd's `uninitialized`, or all zeros), reports none. Like the other attributes of the agent
+  description, it is also a resource attribute of the Collector's own telemetry. Hosts cloned from
+  one image share the key unless the image makes a new machine ID.
+  The Collector is given the same key in its environment, as `pydantic.fleet.host_key` in
+  `OTEL_RESOURCE_ATTRIBUTES`, percent-encoded: a config whose `resourcedetection` processor lists
+  the `env` detector stamps it on the data that Collector produces, so a server can tell that the
+  data came from that host's Collector. (A Collector that forwards other hosts' data stamps its own
+  key on theirs.) The config needs no `${env:...}` reference for it, which a remote config policy
+  would refuse. What the host's environment or `agent.env` already says in
+  `OTEL_RESOURCE_ATTRIBUTES` (or, when that is empty, the older `OTEL_RESOURCE`, which the
+  detector reads only then) is kept; a host key there is replaced, or dropped when the Supervisor
+  reports none (`host_key_env.go`, and a line in `Start`).
 - **The Collector doesn't inherit `OTEL_EXPORTER_OTLP_*`.** Upstream's passed the
   Supervisor's whole environment, so headers set on the host reached the own-telemetry endpoint
   a server chose. Set one in `agent.env` to pass it
@@ -298,7 +327,7 @@ Every file from upstream keeps its license header (Apache-2.0, [LICENSE](LICENSE
 paths were rewritten to this module's. The files changed beyond that say what changed in their
 header. These files are new, and are this repository's:
 
-- `supervisor/coreclient.go`, `agent_update.go`, `apply_step.go`, `client_state.go`, `startup.go`, `sealed_storage.go`, `telemetry_env.go`, `idle_telemetry.go`, `reachability.go`, `status.go`, `enrollment.go`, `set_aside.go`, `set_aside_darwin.go`, `set_aside_linux.go`, `set_aside_other.go`, `set_aside_windows.go`, `own_telemetry_status.go`, `instance_uid_change.go`, `log_sampling.go`,
+- `supervisor/coreclient.go`, `agent_update.go`, `apply_step.go`, `client_state.go`, `startup.go`, `sealed_storage.go`, `telemetry_env.go`, `idle_telemetry.go`, `reachability.go`, `status.go`, `enrollment.go`, `set_aside.go`, `set_aside_darwin.go`, `set_aside_linux.go`, `set_aside_other.go`, `set_aside_windows.go`, `own_telemetry_status.go`, `instance_uid_change.go`, `log_sampling.go`, `host_key.go`, `host_key_env.go`,
   `localserver.go`, `service_log.go`, `config/remote_config_policy.go`, `commander/collector_env.go`,
   `commander/agent_log.go` and `verifier/cosign.go`, and the tests
   beside them (with `supervisor/remote_config_refusal_test.go`, `restart_command_test.go` and
