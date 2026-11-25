@@ -250,6 +250,274 @@ func TestUninstallWaitsForTheMacServiceToUnload(t *testing.T) {
 	}
 }
 
+// The uninstaller asks the Supervisor to tell Fleet, through the request file, only when the
+// service runs; it prints one line for what came of it, removes both files, and goes on whatever
+// it says. --help and --dry-run ask nothing.
+func TestUninstallSaysWhetherFleetWasTold(t *testing.T) {
+	for _, platform := range []string{"Linux", "Darwin"} {
+		for name, c := range map[string]struct {
+			notice  string // what the Supervisor writes as it stops ("" for none)
+			running bool
+			want    string // "" for no line about Fleet
+			listed  bool   // the line about the server still listing the host
+			gone    bool   // the line about a reinstall being a new host
+		}{
+			"told":                        {notice: "told", running: true, want: "Fleet was told this host is being removed.", gone: true},
+			"revoked":                     {notice: "refused", running: true, want: "Fleet refused this host's credentials (HTTP 401), as it does once they are revoked there."},
+			"not told":                    {notice: "not told: no answer within 10s", running: true, want: "Fleet was not told this host is being removed: no answer within 10s.", listed: true},
+			"the Supervisor says nothing": {running: true, want: "Fleet was not told this host is being removed: the Supervisor did not say, as it stopped.", listed: true},
+			"not running":                 {notice: "told", listed: true},
+		} {
+			t.Run(platform+"/"+name, func(t *testing.T) {
+				config, state, tools, invoke := uninstallFixture(t, platform)
+				t.Setenv("NOTICE", c.notice)
+				// What the Supervisor does as it stops: take the request, write the notice.
+				supervisor := `for request in "` + state + `"/uninstall-requested-$PPID*; do
+	[ -d "$request" ] || continue
+	rmdir "$request"
+	[ -z "$NOTICE" ] || printf '%s\n' "$NOTICE" >"` + state + `/uninstall-notice"
+done`
+				active := "exit 0"
+				if !c.running {
+					active = "exit 3"
+				}
+				gone := filepath.Join(filepath.Dir(state), "stopped")
+				launchctl := `echo "launchctl $*" >>"$LOG"
+case "$1" in
+print) if [ -e "` + gone + `" ]; then exit 113; fi; ` + map[bool]string{true: "exit 0", false: "exit 113"}[c.running] + ` ;;
+bootout) ` + supervisor + `
+	touch "` + gone + `" ;;
+esac`
+				systemctl := `echo "systemctl $*" >>"$LOG"
+case "$1" in
+show) echo loaded ;;
+is-active) ` + active + ` ;;
+disable) ` + supervisor + ` ;;
+esac`
+				for name, body := range map[string]string{"systemctl": systemctl, "launchctl": launchctl} {
+					if err := os.WriteFile(filepath.Join(tools, name), []byte("#!/bin/sh\n"+body+"\n"), 0755); err != nil {
+						t.Fatal(err)
+					}
+				}
+				if out, err := invoke("--dry-run"); err != nil || strings.Contains(out, "Fleet was") {
+					t.Fatalf("dry run: %v: %s", err, out)
+				}
+				if out, err := invoke("--help"); err != nil || strings.Contains(out, "Fleet was") {
+					t.Fatalf("help: %v: %s", err, out)
+				}
+				if len(uninstallLeft(t, state)) != 0 {
+					t.Fatal("--help or --dry-run asked for the notice")
+				}
+				out, err := invoke()
+				if err != nil {
+					t.Fatalf("%v: %s", err, out)
+				}
+				if c.want != "" && !strings.Contains(out, c.want) {
+					t.Fatalf("want %q in %s", c.want, out)
+				}
+				if c.want == "" && strings.Contains(out, "Fleet was") {
+					t.Fatalf("a line about Fleet for a service that wasn't running: %s", out)
+				}
+				if got := strings.Contains(out, "still lists this host"); got != c.listed {
+					t.Fatalf("still listed line: %v, want %v: %s", got, c.listed, out)
+				}
+				if left := uninstallLeft(t, state); len(left) != 0 {
+					t.Fatalf("left behind: %v", left)
+				}
+				if strings.Contains(out, "is not removed") {
+					t.Fatalf("removed, and said not to be: %s", out)
+				}
+				if got := strings.Contains(out, "A reinstall enrolls as a new host"); got != c.gone {
+					t.Fatalf("new host line: %v, want %v: %s", got, c.gone, out)
+				}
+				_ = config
+			})
+		}
+	}
+}
+
+// uninstallLeft is what the uninstaller and the Supervisor left of the notice in the storage directory.
+func uninstallLeft(t *testing.T, state string) []string {
+	t.Helper()
+	left, err := filepath.Glob(filepath.Join(state, "*uninstall-*"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	return left
+}
+
+// plant has the service user put something at the request's path as the script makes it.
+func plant(t *testing.T, tools, state, how string) {
+	t.Helper()
+	mkdir, err := exec.LookPath("mkdir")
+	if err != nil {
+		t.Fatal(err)
+	}
+	body := `#!/bin/sh
+for path; do :; done
+case $path in "` + state + `"/uninstall-requested-*) ` + how + ` ;; esac
+exec ` + mkdir + ` "$@"
+`
+	if err := os.WriteFile(filepath.Join(tools, "mkdir"), []byte(body), 0755); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// The storage directory is the service user's: whatever is planted there, root neither follows,
+// truncates, opens nor waits on it, and the removal goes on. A stop that fails leaves no request,
+// so a later ordinary stop of the Supervisor doesn't tell the server.
+func TestUninstallRequestIsSafeInTheServiceUsersDirectory(t *testing.T) {
+	for _, platform := range []string{"Linux", "Darwin"} {
+		stubs := func(t *testing.T, tools, stop string) {
+			t.Helper()
+			for name, body := range map[string]string{
+				"systemctl": `echo "systemctl $*" >>"$LOG"; case "$1" in show) echo loaded ;; disable) ` + stop + ` ;; esac`,
+				"launchctl": `echo "launchctl $*" >>"$LOG"; case "$1" in print) if [ -e "$GONE" ]; then exit 113; fi; exit 0 ;; bootout) ` + stop + `; touch "$GONE" ;; esac`,
+			} {
+				if err := os.WriteFile(filepath.Join(tools, name), []byte("#!/bin/sh\n"+body+"\n"), 0755); err != nil {
+					t.Fatal(err)
+				}
+			}
+			t.Setenv("GONE", filepath.Join(tools, "gone"))
+		}
+		t.Run(platform+"/a link at the request", func(t *testing.T) {
+			_, state, tools, invoke := uninstallFixture(t, platform)
+			stubs(t, tools, ":")
+			victim := filepath.Join(t.TempDir(), "victim")
+			if err := os.WriteFile(victim, []byte("keep me"), 0600); err != nil {
+				t.Fatal(err)
+			}
+			// At the request's own path, as the script is about to make it.
+			plant(t, tools, state, `ln -s "`+victim+`" "$path"`)
+			if err := os.Symlink(victim, filepath.Join(state, "uninstall-notice")); err != nil {
+				t.Fatal(err)
+			}
+			out, err := invoke()
+			if err != nil {
+				t.Fatalf("%v: %s", err, out)
+			}
+			if b, err := os.ReadFile(victim); err != nil || string(b) != "keep me" {
+				t.Fatalf("the link was followed: %q %v", b, err)
+			}
+			if strings.Contains(out, "keep me") {
+				t.Fatal("a linked notice was read: " + out)
+			}
+		})
+		t.Run(platform+"/a linked notice planted as the service stops", func(t *testing.T) {
+			_, state, tools, invoke := uninstallFixture(t, platform)
+			victim := filepath.Join(t.TempDir(), "victim")
+			if err := os.WriteFile(victim, []byte("told\n"), 0600); err != nil {
+				t.Fatal(err)
+			}
+			stubs(t, tools, `ln -sf "`+victim+`" "`+state+`/uninstall-notice"`)
+			out, err := invoke()
+			if err != nil {
+				t.Fatalf("%v: %s", err, out)
+			}
+			if strings.Contains(out, "Fleet was told") || !strings.Contains(out, "the Supervisor did not say") {
+				t.Fatal("a linked notice was read: " + out)
+			}
+			if b, err := os.ReadFile(victim); err != nil || string(b) != "told\n" {
+				t.Fatalf("the link was followed: %q %v", b, err)
+			}
+		})
+		// The notice turns into a FIFO just before it is taken: after any check of its path.
+		t.Run(platform+"/a notice swapped for a fifo as it is read", func(t *testing.T) {
+			_, state, tools, invoke := uninstallFixture(t, platform)
+			stubs(t, tools, `printf 'told\n' >"`+state+`/uninstall-notice"`)
+			mv, err := exec.LookPath("mv")
+			if err != nil {
+				t.Fatal(err)
+			}
+			swap := `case "$*" in *uninstall-notice*) rm -f "` + state + `/uninstall-notice"; mkfifo "` + state + `/uninstall-notice" ;; esac
+exec ` + mv + ` "$@"`
+			if err := os.WriteFile(filepath.Join(tools, "mv"), []byte("#!/bin/sh\n"+swap+"\n"), 0755); err != nil {
+				t.Fatal(err)
+			}
+			out, err := invoke()
+			if err != nil || !strings.Contains(out, "the Supervisor did not say") {
+				t.Fatalf("%v: %s", err, out)
+			}
+			left, err := filepath.Glob(filepath.Join(state, ".uninstall-notice*"))
+			if err != nil || len(left) != 0 {
+				t.Fatalf("left behind: %v %v", left, err)
+			}
+		})
+		t.Run(platform+"/a fifo at the request", func(t *testing.T) {
+			_, state, tools, invoke := uninstallFixture(t, platform)
+			stubs(t, tools, ":")
+			plant(t, tools, state, `mkfifo "$path"`)
+			if out, err := invoke(); err != nil {
+				t.Fatalf("%v: %s", err, out)
+			}
+		})
+		t.Run(platform+"/a storage directory that can't be written", func(t *testing.T) {
+			if os.Getuid() == 0 {
+				t.Skip("root writes anywhere")
+			}
+			_, state, tools, invoke := uninstallFixture(t, platform)
+			stubs(t, tools, ":")
+			if err := os.Chmod(state, 0500); err != nil {
+				t.Fatal(err)
+			}
+			defer os.Chmod(state, 0700)
+			out, err := invoke()
+			if err != nil || !strings.Contains(out, "Removed the Collector service") {
+				t.Fatalf("%v: %s", err, out)
+			}
+		})
+		t.Run(platform+"/a stop that fails leaves no request", func(t *testing.T) {
+			_, state, tools, invoke := uninstallFixture(t, platform)
+			stubs(t, tools, "exit 1")
+			if out, err := invoke(); err == nil {
+				t.Fatalf("the stop failed and the removal didn't: %s", out)
+			}
+			if left := uninstallLeft(t, state); len(left) != 0 {
+				t.Fatalf("the request was left: a later stop would tell the server: %v", left)
+			}
+		})
+		// Not every shell runs an EXIT trap on a signal.
+		for _, shell := range []string{"/bin/sh", "/bin/dash", "/bin/bash"} {
+			for _, signal := range []string{"HUP", "INT", "TERM"} {
+				t.Run(platform+"/"+shell+"/a "+signal+" leaves no request", func(t *testing.T) {
+					if _, err := os.Stat(shell); err != nil {
+						t.Skip(err)
+					}
+					_, state, tools, _ := uninstallFixture(t, platform)
+					asked := filepath.Join(tools, "asked")
+					stubs(t, tools, `ls -d "`+state+`"/uninstall-requested-* >"`+asked+`"; kill -`+signal+` $PPID; sleep 1`)
+					cmd := exec.Command(shell, "./pydantic-opamp-uninstall")
+					root := strings.TrimSuffix(strings.TrimSuffix(state, "/var/lib/pydantic-opamp"), "/opt/pydantic-opamp/var")
+					cmd.Env = append(os.Environ(), "OPAMP_UNINSTALL_ROOT="+root, "OPAMP_UNINSTALL_OS="+platform, "PATH="+tools+":"+os.Getenv("PATH"), "LOG="+filepath.Join(tools, "calls"))
+					if out, err := cmd.CombinedOutput(); err == nil || strings.Contains(string(out), "Removed the") {
+						t.Fatalf("%v: %s", err, out)
+					}
+					if b, err := os.ReadFile(asked); err != nil || len(b) == 0 {
+						t.Fatalf("nothing was asked: %v", err)
+					}
+					if left := uninstallLeft(t, state); len(left) != 0 {
+						t.Fatalf("the request was left: %v", left)
+					}
+				})
+			}
+		}
+		// Told, and then the package isn't removed: it says what is gone.
+		t.Run(platform+"/told and not removed", func(t *testing.T) {
+			_, state, tools, invoke := uninstallFixture(t, platform)
+			stubs(t, tools, `printf 'told\n' >"`+state+`/uninstall-notice"`)
+			for _, program := range []string{"dpkg", "pkgutil"} {
+				if err := os.WriteFile(filepath.Join(tools, program), []byte("#!/bin/sh\nexit 9\n"), 0755); err != nil {
+					t.Fatal(err)
+				}
+			}
+			out, err := invoke()
+			if err == nil || !strings.Contains(out, "Fleet was told it is: its identity and credentials are gone. Run this again") {
+				t.Fatalf("%v: %s", err, out)
+			}
+		})
+	}
+}
+
 // A purge takes what enrolling with a telemetry token put outside the package's directories: the
 // unit's drop-in names a credential that goes with the configuration, and the next start failed on
 // it (243/CREDENTIALS). Another drop-in of the unit's stays, and without --purge both do.

@@ -38,6 +38,48 @@ function Remove-OwnedTree([string]$path) {
     }
 }
 
+# Fleet hears of the uninstall from the Supervisor itself, as it stops: the request asks it to
+# tell its server, with the credentials it connects with (this script never reads them), and it
+# writes what came of it to the notice file. Best effort, bounded by the Supervisor (10 seconds):
+# the uninstall goes on whatever came of it. The request stands while this process runs: it is named
+# for it.
+$script:fleetTold = $false
+$script:fleetRefused = $false
+function Request-Notice([string]$storage) {
+    try {
+        if (-not (Test-Path -LiteralPath $storage -PathType Container)) { return $false }
+        Remove-Item -LiteralPath (Join-Path $storage 'uninstall-notice') -Force -ErrorAction SilentlyContinue
+        $request = Join-Path $storage "uninstall-requested-$PID"
+        $null = [IO.Directory]::CreateDirectory($request)
+        [IO.Directory]::SetLastWriteTimeUtc($request, [DateTime]::UtcNow)
+        return $true
+    } catch { return $false }
+}
+function Clear-Request([string]$storage) {
+    try { [IO.Directory]::Delete((Join-Path $storage "uninstall-requested-$PID")) } catch { }
+}
+# Saying what came of it must not fail the removal: the files are read and removed if they can be.
+function Write-Notice([string]$storage) {
+    try {
+        $line = ''
+        $notice = Join-Path $storage 'uninstall-notice'
+        if (Test-Path -LiteralPath $notice) { $line = ([IO.File]::ReadAllText($notice)).Trim() }
+        if ($line -eq 'told') {
+            $script:fleetTold = $true
+            Write-Output 'Fleet was told this host is being removed.'
+        } elseif ($line -eq 'refused') {
+            $script:fleetRefused = $true
+            Write-Output "Fleet refused this host's credentials (HTTP 401), as it does once they are revoked there."
+        } elseif ($line -like 'not told: *') {
+            Write-Output "Fleet was not told this host is being removed: $($line.Substring(10))."
+        } else {
+            Write-Output 'Fleet was not told this host is being removed: the Supervisor did not say, as it stopped.'
+        }
+        Remove-Item -LiteralPath $notice -Force -ErrorAction SilentlyContinue
+    } catch { }
+    Clear-Request $storage
+}
+
 function Uninstall-Collector {
     if ($DryRun) {
         Write-Output "Stop $service and remove its MSI package."
@@ -68,8 +110,17 @@ function Uninstall-Collector {
         throw 'The service has no registered MSI package. If an upgrade failed, install the new .msi again. Retained data has not been deleted.'
     }
     if ($running) {
-        Stop-Service -Name $service -ErrorAction Stop
-        $running.WaitForStatus('Stopped', [TimeSpan]::FromSeconds(30))
+        $storage = Join-Path $root 'var'
+        $requested = $false
+        try {
+            $requested = $running.Status -eq 'Running' -and (Request-Notice $storage)
+            Stop-Service -Name $service -ErrorAction Stop
+            $running.WaitForStatus('Stopped', [TimeSpan]::FromSeconds(30))
+        } finally {
+            # A stop that fails leaves no request: the Supervisor that goes on running must not
+            # tell the server at a later stop.
+            if ($requested) { Write-Notice $storage } else { Clear-Request $storage }
+        }
     }
     # Keep executable recovery code under Program Files, separate from retained data.
     New-Item -ItemType Directory -Force -Path $programs | Out-Null
@@ -90,7 +141,12 @@ function Uninstall-Collector {
         if (-not @(Get-ChildItem -Force -LiteralPath $programs).Count) { [IO.Directory]::Delete($programs) }
     }
 }
-Uninstall-Collector
+try { Uninstall-Collector } catch {
+    if ($script:fleetTold) {
+        try { [Console]::Error.WriteLine('pydantic-opamp-uninstall: the host is not removed, and Fleet was told it is: its identity and credentials are gone. Run this again to finish.') } catch { }
+    }
+    throw
+}
 # What is left, and why, as the Linux and macOS script says it: the copy of this script under
 # Program Files is what deletes the kept data later, once the package (and its copy) is gone.
 if (-not $DryRun) {
@@ -100,5 +156,6 @@ if (-not $DryRun) {
         Write-Output "Removed the Collector service and the Pydantic OpAMP Supervisor package. Kept $root for a reinstall."
         Write-Output "To delete it too, run: & '$recovery' -Purge"
     }
-    Write-Output 'The OpAMP server still lists this host until its credentials are revoked there.'
+    if ($script:fleetTold -and -not $Purge) { Write-Output "A reinstall enrolls as a new host, with a new enrollment token: this host's identity and credentials went with its enrollment." }
+    if (-not $script:fleetTold -and -not $script:fleetRefused) { Write-Output 'The OpAMP server still lists this host until its credentials are revoked there.' }
 }

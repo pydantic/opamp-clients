@@ -33,6 +33,7 @@
 // (log_sampling.go). The agent description carries a key
 // derived from the host's machine ID (host_key.go), which the Collector is given as the
 // pydantic.fleet.host_key resource attribute in OTEL_RESOURCE_ATTRIBUTES (host_key_env.go).
+// An uninstall tells the server this host is being removed (uninstall_notice.go).
 
 package supervisor
 
@@ -2696,6 +2697,8 @@ func (s *Supervisor) Shutdown() {
 
 	s.telemetrySettings.Logger.Debug("Supervisor shutting down...")
 
+	waitNotice := s.noticeUninstall() // Changed here: an uninstall tells the server, while the collector stops.
+
 	close(s.doneChan)
 
 	// Shutdown in order from producer to consumer (agent -> customMessageForwarder -> local OpAMP server -> client to remote OpAMP server).
@@ -2730,6 +2733,7 @@ func (s *Supervisor) Shutdown() {
 		}
 	}
 
+	told := waitNotice() // Changed here: the uninstall notice ends before the client does (uninstall_notice.go).
 	if s.opampClient != nil {
 		err := s.SetHealth(
 			&protobufs.ComponentHealth{
@@ -2746,6 +2750,10 @@ func (s *Supervisor) Shutdown() {
 		}
 	}
 	s.closeOpenedClient() // Changed here: one opened to read its state, and never started.
+	// Changed here: a host the server ended enrolls as a new one (uninstall_notice.go).
+	if told {
+		s.forgetClient()
+	}
 
 	// Stop extensions after the OpAMP client (which may use their HeaderFunc)
 	// and before self-telemetry shuts down (extensions may log on shutdown).

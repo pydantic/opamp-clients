@@ -56,9 +56,9 @@ type executor struct {
 	// stopped before, say) can touch them.
 	instance string
 	lastSave chan struct{} // closed when the last save asked for has ended
-	// used is the URL of the OpAMP request or connection whose outcome came last (platform mode only:
-	// in core mode the core makes them itself).
-	used atomic.Pointer[string]
+	// used is the OpAMP request or connection whose outcome came last: its URL and headers (platform
+	// mode only: in core mode the core makes them itself).
+	used atomic.Pointer[usedRequest]
 	// configured are the configured headers, and usedIssued whether the last one was made with others.
 	configured http.Header
 	usedIssued atomic.Bool
@@ -96,16 +96,22 @@ func (x *executor) configure(header http.Header) {
 	}
 }
 
-// tried records url as the one the latest request or connection went to, and whether with headers
+// tried records url as the one the latest request or connection went to, its headers, and whether they are
 // other than the configured ones, before its outcome reaches the core: a notification of that outcome
 // finds it in place.
 func (x *executor) tried(url string, headers []*corepb.Header) {
-	x.used.Store(&url)
 	sent, issued := toHTTP(headers), false
+	x.used.Store(&usedRequest{url: url, header: sent})
 	for name := range x.configured {
 		issued = issued || !slices.Equal(sent.Values(name), x.configured.Values(name))
 	}
 	x.usedIssued.Store(issued)
+}
+
+// usedRequest is where an OpAMP request or connection went, with the headers it sent.
+type usedRequest struct {
+	url    string
+	header http.Header
 }
 
 // newExecutor carries out effects over conn. (Compression is off: the core asks for identity, and

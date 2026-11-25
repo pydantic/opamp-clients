@@ -77,12 +77,81 @@ for directory in "$@"; do
     done
 done
 
+# Fleet hears of the uninstall from the Supervisor itself, as it stops: the request asks it to tell
+# its server, with the credentials it connects with (this script never reads them), and it writes
+# what came of it to the notice file. Best effort, bounded by the Supervisor (10 seconds): the
+# uninstall goes on whatever came of it. The request stands while this script runs: it is named for
+# the script's process. The storage directory is the service user's, so nothing
+# of theirs is followed or opened as root: the request is made with mkdir (it follows no link, and
+# neither blocks nor truncates), and removed by rmdir; a notice that is a link is not read.
+notice_requested=
+fleet_told=
+fleet_refused=
+removed=
+request=
+ended() {
+    [ -z "$request" ] || rmdir "$request" 2>/dev/null || :
+    [ -z "$fleet_told" ] || [ -n "$removed" ] ||
+        echo 'pydantic-opamp-uninstall: the host is not removed, and Fleet was told it is: its identity and credentials are gone. Run this again to finish.' >&2
+}
+request_notice() {
+    rm -f "$state/uninstall-notice" 2>/dev/null || :
+    # When this process started, as /proc has it, so another with its ID since isn't taken for it.
+    mark=$(sed 's/.*) //' "/proc/$$/stat" 2>/dev/null | cut -d ' ' -f 20) || mark=
+    request=$state/uninstall-requested-$$${mark:+.$mark}
+    # A stop that fails (or this script ending) leaves no request: the Supervisor that goes on
+    # running must not tell the server at a later stop. Not every shell runs EXIT's on a signal.
+    trap ended EXIT
+    trap 'exit 129' HUP
+    trap 'exit 130' INT
+    trap 'exit 143' TERM
+    rmdir "$request" 2>/dev/null || :
+    if [ -d "$state" ] && [ ! -L "$state" ] && mkdir "$request" 2>/dev/null; then
+        notice_requested=yes
+    else
+        request=
+    fi
+}
+# The notice's first line. The service user can put anything at its path at any time (a link, a
+# FIFO that blocks whoever opens it), so a check of the path says nothing about what is opened. It
+# is moved, by a rename that follows and opens nothing, into a directory only this script's user can
+# enter, and checked and read there. In a subshell, which stands in that directory: the service
+# user can move the directory, but not what is in it.
+read_notice() (
+    box=$state/.uninstall-notice.$$
+    mkdir -m 0700 "$box" 2>/dev/null || exit 0
+    here=$(cd -P "$state" 2>/dev/null && pwd -P) || exit 0
+    if cd -P "$box" 2>/dev/null && [ "$(pwd -P)" = "$here/.uninstall-notice.$$" ] && [ -O . ]; then
+        mv -f "$state/uninstall-notice" ./notice 2>/dev/null || :
+        if [ -f notice ] && [ ! -L notice ]; then
+            head -c 512 notice | head -n 1 || :
+        fi
+        rm -f notice 2>/dev/null || :
+        cd / || :
+    fi
+    rmdir "$box" 2>/dev/null || :
+)
+say_notice() {
+    [ -n "$notice_requested" ] || return 0
+    line=$(read_notice) || line=
+    case $line in
+        told) fleet_told=yes; echo 'Fleet was told this host is being removed.' ;;
+        refused) fleet_refused=yes; echo "Fleet refused this host's credentials (HTTP 401), as it does once they are revoked there." ;;
+        'not told: '*) printf '%s\n' "Fleet was not told this host is being removed: ${line#not told: }." ;;
+        *) echo 'Fleet was not told this host is being removed: the Supervisor did not say, as it stopped.' ;;
+    esac
+    rmdir "$request" 2>/dev/null || :
+    request=
+    rm -f "$state/uninstall-notice" 2>/dev/null || :
+    notice_requested=
+}
+
 stop_macos() {
     label=system/dev.pydantic.opamp-supervisor
     code=0
     launchctl print "$label" >/dev/null 2>&1 || code=$?
     case $code in
-        0) launchctl bootout "$label" ;;
+        0) request_notice; launchctl bootout "$label" ;;
         113) return ;;
         *) fail "cannot inspect the Collector service (launchctl $code)" ;;
     esac
@@ -107,10 +176,14 @@ uninstall() {
         for unit in pydantic-opamp-supervisor.service pydantic-otelcol.service; do
             load=$(systemctl show --property=LoadState --value "$unit")
             if [ "$load" != not-found ]; then
+                if [ "$unit" = pydantic-opamp-supervisor.service ] && systemctl is-active --quiet "$unit"; then
+                    request_notice
+                fi
                 systemctl disable --now "$unit"
             fi
         done
     fi
+    say_notice
     # The package manager removes the installed helper. Keep a root-only copy for repeat calls.
     mkdir -p "$config"
     [ ! -L "$recovery" ] || fail "refusing symbolic link: $recovery"
@@ -181,6 +254,7 @@ uninstall() {
 }
 # Parse the function before it removes this script from the package.
 uninstall
+removed=yes
 if [ -n "$purge" ]; then
     echo "Removed the Collector service, the $package package and its data."
 else
@@ -188,4 +262,7 @@ else
     # As root: the kept helper, like the kept data, is root's alone.
     echo "To delete them too, run: sudo $recovery --purge"
 fi
-echo "The OpAMP server still lists this host until its credentials are revoked there."
+if [ -n "$fleet_told" ] && [ -z "$purge" ]; then
+    echo "A reinstall enrolls as a new host, with a new enrollment token: this host's identity and credentials went with its enrollment."
+fi
+[ -n "$fleet_told$fleet_refused" ] || echo "The OpAMP server still lists this host until its credentials are revoked there."

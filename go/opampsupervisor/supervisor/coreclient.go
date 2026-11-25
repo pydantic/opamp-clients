@@ -475,6 +475,16 @@ func (c *coreClient) onNotification(cl *collector.Client, n collector.Notificati
 	}
 }
 
+// uninstallSender is the started client, for the uninstall notice; nil before Start.
+func (c *coreClient) uninstallSender() uninstallSender {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if c.client == nil {
+		return nil
+	}
+	return c.client
+}
+
 // running is the started client, or nil; with c.mu held.
 func (c *coreClient) running() *collector.Client { return c.client }
 

@@ -685,7 +685,24 @@ Run `pydantic-opamp-uninstall` as root on Linux, or
 `/opt/pydantic-opamp/bin/pydantic-opamp-uninstall` as root on macOS.
 On Windows, run `pydantic-opamp-uninstall.ps1` from the installed program directory
 in an Administrator terminal. These helpers stop the service and remove the native
-package. They do not contact the OpAMP server or revoke any remote credentials.
+package.
+
+They tell Fleet first, so it can tell an uninstalled host from one that is down. The helper asks the
+running Supervisor, with a request in the default storage directory, and prints one line for what
+came of it; the request counts while the helper runs. The Supervisor, stopping, sends `POST /v1/fleet/installations/self/uninstall/` to its
+server's origin with the credentials it connects with (the helper never reads them). Best effort: a
+server that refuses or doesn't answer within 10 seconds, a Supervisor that isn't running, or a
+custom storage directory, means Fleet isn't told, and the removal goes on. One that refuses the
+host's credentials (HTTP 401) has usually revoked them already, and the helper says so. Told (HTTP
+204, and no other answer), the server ends the
+host's credentials, and the Supervisor removes the saved state that holds its identity and them, so
+a reinstall enrolls as a new host: run `pydantic-opamp-enroll` with a new enrollment token (the one
+the host used may be spent). When Fleet isn't told, the saved state stays, and a reinstall over the
+kept data goes on as the same host. Fleet is told before the package is removed, so a removal that
+then fails leaves an installed host that Fleet lists as uninstalled, without its identity and
+credentials; the helper says so, and running it again finishes. A later `--purge` finds no Supervisor running and makes no call,
+and neither do other ways of removing the package (`apt remove`, `rpm --erase`, uninstalling the
+`.msi` directly).
 
 Use `--dry-run` (`-DryRun` on Windows) to preview the operation. The default keeps
 configuration, credentials, downloaded packages, and log read positions for a

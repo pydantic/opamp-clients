@@ -137,6 +137,7 @@ import (
 	"fmt"
 	"io/fs"
 	"net/http"
+	"net/url"
 	"os"
 	"strings"
 	"sync"
@@ -269,8 +270,10 @@ type Client struct {
 	// loopG is the id of the client's goroutine, the one the callback runs on (0 until it runs):
 	// Stop called there is a stop asked for from the callback, which can't wait for the client.
 	loopG atomic.Uint64
-	// used is where the latest OpAMP request or connection went (the executor's).
-	used *atomic.Pointer[string]
+	// used is where the latest OpAMP request or connection went, and its headers (the executor's).
+	used *atomic.Pointer[usedRequest]
+	// http is the connection's HTTP transport (TLS, proxy), platform mode only.
+	http http.RoundTripper
 	// usedIssued is whether it was made with headers other than the configured ones (the executor's).
 	usedIssued *atomic.Bool
 	// saveError is how the last save ended, and saves says that one did (the executor's).
@@ -455,6 +458,9 @@ func (o *Opened) start(status Status, first []*corepb.Input, notify func(*Client
 		x.standing.configure(cfg.Endpoint, cfg.Header, cfg.AcceptConnectionSettings)
 		x.standing.keepUnreached, x.standing.keepSaved = cfg.KeepUnreached || cfg.KeepUnreachedSaved, cfg.KeepUnreachedSaved
 		cl.standing = x.standing
+		if o.conn != nil {
+			cl.http = o.conn.http
+		}
 	}
 	if cfg.fs != nil {
 		x.fs = cfg.fs
@@ -508,7 +514,7 @@ func (c *Client) Endpoint() string {
 		return ""
 	}
 	if u := c.used.Load(); u != nil {
-		return *u
+		return u.url
 	}
 	return ""
 }
@@ -557,6 +563,73 @@ func (c *Client) StandingChanged() <-chan struct{} {
 		return nil
 	}
 	return c.standing.changed
+}
+
+// closeBody closes a request's body that won't be sent, as a RoundTripper does.
+func closeBody(req *http.Request) {
+	if req.Body != nil {
+		_ = req.Body.Close()
+	}
+}
+
+// describesMessage is whether a header is of the OpAMP message it went with (its type, length,
+// encoding, the WebSocket handshake), not of the sender: one of those is not for another request.
+func describesMessage(name string) bool {
+	n := strings.ToLower(name)
+	return strings.HasPrefix(n, "content-") || strings.HasPrefix(n, "accept") || strings.HasPrefix(n, "sec-websocket-") ||
+		n == "connection" || n == "upgrade" || n == "transfer-encoding" || n == "expect" || n == "te" || n == "trailer"
+}
+
+// ErrNoServer is Do's error before the client has sent its server anything (and in core mode).
+var ErrNoServer = errors.New("the client hasn't reached its server yet")
+
+// Do sends req to the server the client uses now, as the client itself would: over its connection
+// (its TLS settings, proxy and CONNECT headers), with the headers its latest OpAMP request or
+// WebSocket connection sent (the credentials the server issued it, say) set over req's. req must
+// be for that endpoint's origin: its scheme (http for a ws endpoint, https for wss), host and port.
+// An application tells its server something outside OpAMP this way (that it is being removed,
+// say) without holding the credentials itself. The response is the caller's to close.
+// Platform mode only: in core mode, and before any request or connection, it is ErrNoServer.
+func (c *Client) Do(req *http.Request) (*http.Response, error) {
+	if c.used == nil || c.http == nil {
+		closeBody(req)
+		return nil, ErrNoServer
+	}
+	u := c.used.Load()
+	if u == nil {
+		closeBody(req)
+		return nil, ErrNoServer
+	}
+	if req.URL == nil {
+		closeBody(req)
+		return nil, errors.New("the request has no URL")
+	}
+	at, err := url.Parse(u.url)
+	if err != nil {
+		closeBody(req)
+		return nil, err
+	}
+	scheme := strings.ToLower(at.Scheme)
+	switch scheme {
+	case "ws":
+		scheme = "http"
+	case "wss":
+		scheme = "https"
+	}
+	if !strings.EqualFold(req.URL.Scheme, scheme) || !strings.EqualFold(req.URL.Host, at.Host) {
+		closeBody(req)
+		return nil, fmt.Errorf("%s://%s is not the server's origin", req.URL.Scheme, req.URL.Host)
+	}
+	req = req.Clone(req.Context())
+	if req.Header == nil {
+		req.Header = http.Header{}
+	}
+	for name, values := range u.header {
+		if !describesMessage(name) {
+			req.Header[http.CanonicalHeaderKey(name)] = append([]string(nil), values...)
+		}
+	}
+	return c.http.RoundTrip(req)
 }
 
 func (c *Client) setUID(uid []byte) {

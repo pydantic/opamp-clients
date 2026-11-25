@@ -85,6 +85,16 @@ and date. Tests, CI and docs alone don't need a line.
   `Client.Saves()`, why the last save of the state failed (#150).
 - Supervisor: `opampsupervisor status` says when the client's state can't be saved (`save_error` in
   `--json`), and exits 1: a restart would lose the host's credentials (#150).
+- Supervisor installers: the uninstall helpers (Linux, macOS, Windows) tell the server the host is
+  being removed, so it can tell an uninstalled host from one that is down. The running Supervisor
+  sends it, with the credentials it connects with, as the helper stops it; the helper prints whether
+  the server was told, and the removal goes on either way. Told, the host's saved identity and
+  credentials go, and a reinstall enrolls it as a new host. It needs a server with
+  `POST /v1/fleet/installations/self/uninstall/` (#157).
+- Go: `opamp.Client.Do` sends a request to the server's origin with the client's connection (TLS,
+  proxy) and the headers it sends the server, so an application can tell the server something
+  outside OpAMP without holding the credentials; `opamp.ErrNoServer` before the client has
+  reached it (platform mode only) (#157).
 - Supervisor: the agent description reports `pydantic.fleet.host_key`, a UUID derived from the
   host's machine ID as systemd derives an application-specific one (on Linux,
   `systemd-id128 machine-id --app-specific=c8fe2a9e-5d40-4615-8f88-fd606391a0ca --uuid`; the
