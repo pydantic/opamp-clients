@@ -263,6 +263,9 @@ and date. Tests, CI and docs alone don't need a line.
 
 ### Security
 
+- Go: `github.com/gorilla/websocket` goes to the commit the Supervisor already used
+  (v1.5.4-0.20250319132907-e064f32e3674), past the fix for GO-2026-6278, in `go`,
+  `go/opampextension`, `go/opampotel`, the examples and the conformance drivers (#164).
 - Go, Python, Node.js, Java, .NET (platform mode): the client certificate configured for the OpAMP
   server is presented only when a package file is at the server's own origin; a file anywhere else
   is fetched without it (and, in Go, without skipping verification). It was presented to every

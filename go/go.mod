@@ -6,7 +6,7 @@ go 1.25.0
 retract v0.1.0
 
 require (
-	github.com/gorilla/websocket v1.5.3
+	github.com/gorilla/websocket v1.5.4-0.20250319132907-e064f32e3674
 	github.com/open-telemetry/opamp-go v0.24.0
 	github.com/tetratelabs/wazero v1.12.0
 	google.golang.org/protobuf v1.36.11
@@ -14,3 +14,5 @@ require (
 )
 
 require golang.org/x/sys v0.44.0
+
+require golang.org/x/net v0.26.0 // indirect
