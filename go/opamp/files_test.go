@@ -48,6 +48,18 @@ type tapRec struct {
 
 func readTapFile(t *testing.T, path string) []tapRec {
 	t.Helper()
+	return readTapRecords(t, path, false)
+}
+
+// readLiveTapFile reads the complete records visible while the client is appending to the tap.
+// After stopping the client, readTapFile checks the whole file for truncation.
+func readLiveTapFile(t *testing.T, path string) []tapRec {
+	t.Helper()
+	return readTapRecords(t, path, true)
+}
+
+func readTapRecords(t *testing.T, path string, live bool) []tapRec {
+	t.Helper()
 	b, err := os.ReadFile(path)
 	if err != nil {
 		t.Fatal(err)
@@ -55,10 +67,16 @@ func readTapFile(t *testing.T, path string) []tapRec {
 	var recs []tapRec
 	for len(b) > 0 {
 		if len(b) < 13 {
+			if live {
+				break
+			}
 			t.Fatalf("%s: a torn header", path)
 		}
 		n := binary.LittleEndian.Uint32(b[1:])
 		if uint32(len(b)-13) < n {
+			if live {
+				break
+			}
 			t.Fatalf("%s: a torn record", path)
 		}
 		recs = append(recs, tapRec{kind: b[0], data: b[13 : 13+n]})
@@ -595,7 +613,7 @@ func saveFaultRun(t *testing.T, seed uint64) error {
 		if len(srv.messages()) < configs+3 {
 			return false
 		}
-		l := savesOf(t, readTapFile(t, aTap))
+		l := savesOf(t, readLiveTapFile(t, aTap))
 		for _, s := range l.stores {
 			if len(l.answers[s.Id]) == 0 {
 				return false
@@ -604,7 +622,7 @@ func saveFaultRun(t *testing.T, seed uint64) error {
 		return len(l.stores) > 0
 	})
 	if !settled {
-		l := savesOf(t, readTapFile(t, aTap))
+		l := savesOf(t, readLiveTapFile(t, aTap))
 		return fmt.Errorf("the saves never all ended: %d stores, answers %v, injected %v", len(l.stores), l.answers, fsys.injected)
 	}
 	// Alive: still heartbeating.
@@ -684,7 +702,7 @@ func saveFaultRun(t *testing.T, seed uint64) error {
 		return err
 	}
 	ok := eventually(10*time.Second, func() bool {
-		lb := savesOf(t, readTapFile(t, bTap))
+		lb := savesOf(t, readLiveTapFile(t, bTap))
 		if len(srvB.messages()) < 2 || len(lb.stores) == 0 {
 			return false
 		}

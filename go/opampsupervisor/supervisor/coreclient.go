@@ -76,8 +76,12 @@ type coreClient struct {
 	reach *reachability
 	// report keeps the status file `opampsupervisor status` reads (set in newCoreClient).
 	report *statusReport
-	// quit is closed by Stop: the wait for the server's first answer ends.
+	// last is the status the last run left, until the client opens.
+	last *Status
+	// quit is closed by Stop: what watches the server's answers, or holds the client, ends.
 	quit chan struct{}
+	// enroll is how the Supervisor's enrollment goes (enrollment.go).
+	enroll enrollment
 }
 
 var _ client.OpAMPClient = (*coreClient)(nil)
@@ -86,7 +90,11 @@ var _ client.OpAMPClient = (*coreClient)(nil)
 // directory: two clients on one state file would overwrite each other's), sealed with sealer
 // unless it is nil.
 func newCoreClient(logger *zap.Logger, stateFile string, sealer opamp.StateSealer) *coreClient {
-	return &coreClient{logger: logger, stateFile: stateFile, sealer: sealer, report: newStatusReport(filepath.Dir(stateFile))}
+	c := &coreClient{logger: logger, stateFile: stateFile, sealer: sealer, report: newStatusReport(filepath.Dir(stateFile))}
+	if last, err := ReadStatus(filepath.Dir(stateFile)); err == nil {
+		c.last = last
+	}
+	return c
 }
 
 // errNotRunning: a call that needs the client running, before Start or after Stop.
@@ -109,6 +117,14 @@ func (c *coreClient) Open(ctx context.Context, settings types.StartSettings) err
 		return fmt.Errorf("parse server endpoint: %w", err)
 	}
 
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return c.openLocked(ctx, settings)
+}
+
+// openLocked is Open, with c.mu held.
+func (c *coreClient) openLocked(ctx context.Context, settings types.StartSettings) error {
+	c.carryUnreached(settings.OpAMPServerURL)
 	header := settings.Header.Clone()
 	if header == nil {
 		header = http.Header{}
@@ -122,8 +138,6 @@ func (c *coreClient) Open(ctx context.Context, settings types.StartSettings) err
 		auth = func() http.Header { return headerFunc(http.Header{}) }
 	}
 
-	c.mu.Lock()
-	defer c.mu.Unlock()
 	if c.opened != nil || c.client != nil || c.stopped {
 		return errors.New("the OpAMP client was started already")
 	}
@@ -145,6 +159,8 @@ func (c *coreClient) Open(ctx context.Context, settings types.StartSettings) err
 			StateSealer: c.sealer,
 			// The capability is the switch: the core declares it, and the status bit, itself.
 			AcceptConnectionSettings: caps&protobufs.AgentCapabilities_AgentCapabilities_AcceptsOpAMPConnectionSettings != 0,
+			KeepUnreached:            true,
+			KeepUnreachedSaved:       c.enroll.holds > 0,
 		},
 		AuthHeader:     auth,
 		AcceptPackages: caps&protobufs.AgentCapabilities_AgentCapabilities_AcceptsPackages != 0 && c.installPackage != nil,
@@ -170,6 +186,9 @@ func (c *coreClient) InstanceUID() [16]byte {
 	}
 	if c.opened != nil {
 		return c.opened.InstanceUID()
+	}
+	if c.enroll.held != nil {
+		return c.enroll.uid
 	}
 	return [16]byte{}
 }
@@ -208,6 +227,19 @@ func (c *coreClient) Start(ctx context.Context, settings types.StartSettings) er
 		settings.RemoteConfigStatus = status
 	}
 	c.callbacks = settings.Callbacks
+	c.settings = settings
+	c.quit = make(chan struct{})
+	if err := c.startLocked(ctx); err != nil {
+		c.quit = nil
+		return err
+	}
+	return nil
+}
+
+// startLocked starts the opened client with c.settings, with c.mu held: at Start, and after a hold
+// (enrollment.go).
+func (c *coreClient) startLocked(ctx context.Context) error {
+	settings := c.settings
 	initial := c.status
 	if settings.RemoteConfigStatus != nil && initial.RemoteConfigStatus == nil {
 		initial.RemoteConfigStatus = settings.RemoteConfigStatus
@@ -241,44 +273,53 @@ func (c *coreClient) Start(ctx context.Context, settings types.StartSettings) er
 		return err
 	}
 	c.client = started
-	// The status says once the server has answered (it took this Supervisor), until Stop.
-	c.quit = make(chan struct{})
+	// The status says how the server takes this Supervisor, until Stop or a hold, which ends this run.
+	run := make(chan struct{})
 	go func(quit <-chan struct{}) {
-		failed := ""
-		for {
-			select {
-			case <-started.Saves():
-				if e := started.SaveError(); e != failed {
-					failed = e
-					c.report.saved(c.logger, e)
-				}
-			case <-quit:
-				return
-			}
-		}
+		defer close(run)
+		c.watchStanding(started, quit)
 	}(c.quit)
-	if answered := started.Answered(); answered != nil {
-		go func(quit <-chan struct{}) {
-			select {
-			case <-answered:
-				c.report.accepted(c.logger)
-			case <-quit:
-			}
-		}(c.quit)
-	}
+	go c.watchSaves(started, run)
 	return nil
+}
+
+// watchSaves keeps the status's save error, the client's last, until run ends: Stop, or a hold
+// (enrollment.go), after which the next start watches its own client.
+func (c *coreClient) watchSaves(started *collector.Client, run <-chan struct{}) {
+	failed := ""
+	for {
+		select {
+		case <-started.Saves():
+			if e := started.SaveError(); e != failed {
+				failed = e
+				c.ifCurrent(started, func() { c.report.saved(c.logger, e) })
+			}
+		case <-run:
+			return
+		}
+	}
 }
 
 // Stop stops the client; one opened but not started is let go.
 func (c *coreClient) Stop(ctx context.Context) error {
 	c.mu.Lock()
-	started, opened := c.client, c.opened
+	started, opened, held := c.client, c.opened, c.enroll.held
 	c.client, c.stopped = nil, true
 	if c.quit != nil {
 		close(c.quit)
 		c.quit = nil
 	}
 	c.mu.Unlock()
+	if started == nil && held != nil {
+		// Held (enrollment.go): the client is stopped, or stopping.
+		c.report.close(c.logger)
+		select {
+		case <-held:
+			return nil
+		case <-ctx.Done():
+			return ctx.Err()
+		}
+	}
 	if started == nil {
 		if opened != nil {
 			opened.Close()
@@ -304,15 +345,19 @@ func (c *coreClient) onNotification(cl *collector.Client, n collector.Notificati
 	}
 	switch n.Kind {
 	case opamp.Connected:
+		if !c.ifCurrent(cl, func() { c.report.connected(c.logger) }) {
+			return // held meanwhile (enrollment.go): the status says so
+		}
 		c.reach.connected()
-		c.report.connected(c.logger)
 		if cb.OnConnect != nil {
 			cb.OnConnect(ctx)
 		}
 	case opamp.ConnectFailed:
 		// Changed here: the Supervisor hears the first failure of a run, with what to check in its
 		// config; the retries that follow go at debug, not an error each (reachability).
-		c.report.connectFailed(c.logger, n.Status, n.Detail, cl != nil && cl.UsedIssued())
+		if !c.ifCurrent(cl, func() { c.report.connectFailed(c.logger, n.Status, n.Detail, cl != nil && cl.UsedIssued()) }) {
+			return
+		}
 		if err := c.reach.failed(n.Status, n.Detail); err != nil && cb.OnConnectFailed != nil {
 			cb.OnConnectFailed(ctx, err)
 		}
@@ -417,6 +462,9 @@ func (c *coreClient) onNotification(cl *collector.Client, n collector.Notificati
 		c.logger.Warn("The saved OpAMP state was written by a newer version, which this one can't read: "+
 			"it is kept as it is, and this run saves nothing", zap.Uint32("state_format", n.StateVersion))
 	case opamp.Stopped:
+		if n.Err == nil && c.holding() {
+			return // stopped for a while only (enrollment.go)
+		}
 		c.report.stopped(c.logger)
 		if n.Err != nil {
 			c.logger.Error("The OpAMP client stopped", zap.Error(n.Err))

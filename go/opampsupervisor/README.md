@@ -207,14 +207,17 @@ agent:
   policy refused it, say), the Supervisor's report about the config the collector still runs, at
   a restart or a retarget, doesn't hide it; the status says what runs instead
   (`running_config`).
-  The status also says whether the server has answered this Supervisor since it started
-  (`accepted`: its first message that isn't an error response). A server answers at once a host
-  whose credentials it takes, while one that takes the connection but not the credentials (a
-  used-up enrollment key, say) closes it unanswered: that host reads as connected and not
-  accepted. (A server that over WebSocket sends nothing until it has something to say reads as
-  not accepted too.) `--require-accepted` makes `status` exit 1 without it, and
-  `--wait` wait for it; without the flag, `--wait` still returns 0 on the connection, after giving
-  the server up to 10 seconds to answer so that what it prints says whether it did.
+  The status also says whether the server has taken this Supervisor since it started (`accepted`):
+  it has answered, offering no credential (a message that isn't an error response), or answered on a
+  credential it issued. A server answers at once a host whose credentials it takes, while
+  one that takes the connection but not the credentials (a used-up enrollment key, say) closes it
+  unanswered: that host reads as connected and not accepted. A host the server issues a credential
+  of its own is accepted once the server has answered it on that credential, not when it is offered
+  it. (A server that over WebSocket sends nothing until it has something to say reads as not
+  accepted too.) `--require-accepted` makes `status` exit 1 without it, and `--wait` wait for it and
+  for it to last 3 seconds (a server may still answer a host it has just deleted); without the flag,
+  `--wait` still returns 0 on the connection, after giving the server up to 10 seconds to answer so
+  that what it prints says whether it did.
   The status also says what became of the server's own telemetry settings (`own_telemetry`:
   APPLIED, REFUSED by `agent::remote_config_policy` (an endpoint it doesn't allow, say) or FAILED,
   and why, its URLs without user info, query or fragment), from the server or, at a start, from
@@ -239,6 +242,27 @@ agent:
   the configured credentials, as a new host. Nothing puts one set aside back, replaces it or removes it
   but a person, or a purge. `opampsupervisor status` lists them (`set_aside` in `--json`), and says when
   the client's state can't be saved (`save_error`; it exits 1 then): a restart would lose it.
+- **A host the server offers credentials and doesn't take stops trying for a while** (a new file,
+  `enrollment.go`). A server that enrolls hosts answers the enrollment token with a credential and
+  closes the connection; a host it then doesn't take on that credential goes back to its token, is
+  offered another, and so on, a connection or more a second until the server says it has too many.
+  The Supervisor stops its OpAMP client after such a round or two, and starts it again later, the
+  saved credential first: in an hour if the server said the host's identity is already bound to
+  another installation (a Close of 1008 with that reason, matched to the letter: it needs a server
+  that keeps the text); else, since servers close with 1008 for what passes too, in a minute, or 5
+  seconds when the connection was lost, doubling to an hour. One whose offered endpoint can't be
+  reached (its name doesn't resolve, say) keeps the credential it was offered, takes no other, and
+  tries it again in a minute, doubling to an hour (go/opamp's `KeepUnreached`); a restart of the
+  Supervisor tries it at once, and takes no other either. One whose server offered a wrong endpoint doesn't
+  learn of the right one: its data is to be removed, and the host enrolled again. A host the server serves (it answers its
+  token's connection with more than offers), or that is on a credential it issued before, isn't
+  stopped. The Collector runs on meanwhile; a custom message
+  for the server is dropped. A restart of the Supervisor tries at once. A server's "come back later"
+  is the core's: it waits as the server said, an hour at most. `opampsupervisor status` says how
+  many credentials were offered, why none is in use and when the host tries again (`enrollment` in
+  `--json`, in the "Accepted" lines), and exits 1, as it does for a host whose enrollment token the
+  server closes the connection for unanswered; `--wait --require-accepted` doesn't wait for a try
+  that comes after it, and the enrollment helpers fail with it.
 - **On macOS the Collector's own log is sampled by default.** Upstream's macOS unified log
   receiver logs "Running log command" at info for each poll, and polls again 100 ms after any poll
   that found logs: about one line a second on a busy Mac, into `agent.log` and the Collector's own
@@ -304,12 +328,15 @@ agent:
   heartbeat), and a config that collects that log ships them. Here it logs at the config's level,
   info unless set, and its lines carry no time of their own, where each began with the seconds
   since 1970 (`supervisor/service_log.go`).
+- **The binary may be 42 MiB.** Upstream's test of its size (linux/amd64, stripped) allows 40 MiB.
+  With the shared core and what is listed here it needs a little more than that, so the limit
+  is 42 MiB (`e2e_test.go`), and growth past it still fails the test.
 
 Every file from upstream keeps its license header (Apache-2.0, [LICENSE](LICENSE)); the import
 paths were rewritten to this module's. The files changed beyond that say what changed in their
 header. These files are new, and are this repository's:
 
-- `supervisor/coreclient.go`, `agent_update.go`, `apply_step.go`, `client_state.go`, `startup.go`, `sealed_storage.go`, `telemetry_env.go`, `idle_telemetry.go`, `reachability.go`, `status.go`, `uninstall_notice.go`, `set_aside.go`, `set_aside_darwin.go`, `set_aside_linux.go`, `set_aside_other.go`, `set_aside_windows.go`, `own_telemetry_status.go`, `instance_uid_change.go`, `log_sampling.go`, `host_key.go`, `host_key_env.go`,
+- `supervisor/coreclient.go`, `agent_update.go`, `apply_step.go`, `client_state.go`, `startup.go`, `sealed_storage.go`, `telemetry_env.go`, `idle_telemetry.go`, `reachability.go`, `status.go`, `uninstall_notice.go`, `enrollment.go`, `set_aside.go`, `set_aside_darwin.go`, `set_aside_linux.go`, `set_aside_other.go`, `set_aside_windows.go`, `own_telemetry_status.go`, `instance_uid_change.go`, `log_sampling.go`, `host_key.go`, `host_key_env.go`,
   `localserver.go`, `service_log.go`, `config/remote_config_policy.go`, `commander/collector_env.go`,
   `commander/agent_log.go` and `verifier/cosign.go`, and the tests
   beside them (with `supervisor/remote_config_refusal_test.go`, `restart_command_test.go` and

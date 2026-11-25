@@ -15,6 +15,7 @@ import (
 	"io"
 	"math"
 	"net/http"
+	"net/http/httptrace"
 	"net/url"
 	"os"
 	"path/filepath"
@@ -28,9 +29,6 @@ import (
 	"unicode/utf8"
 
 	"github.com/gorilla/websocket"
-	"github.com/open-telemetry/opamp-go/protobufs"
-	"google.golang.org/protobuf/encoding/protowire"
-	"google.golang.org/protobuf/proto"
 
 	"github.com/pydantic/opamp-clients/go/opamp/internal/corepb"
 )
@@ -67,40 +65,9 @@ type executor struct {
 	// saveError is how the last save ended ("" if it was saved), and saves says that one did.
 	saveError atomic.Pointer[string]
 	saves     chan struct{}
-	// answered is closed when the first answer from the server arrives (heard; platform mode
-	// only, as used).
-	answered   chan struct{}
-	answerOnce sync.Once
-}
-
-// heard records that an answer from the server arrived.
-func (x *executor) heard() { x.answerOnce.Do(func() { close(x.answered) }) }
-
-// isAnswer is whether msg (a ServerToAgent's encoding) is an answer from an OpAMP server that
-// took the agent: it decodes, and it isn't an error response. A server's error (a refusal, or
-// "unavailable, try later") is not taking the agent.
-func isAnswer(msg []byte) bool {
-	m := &protobufs.ServerToAgent{}
-	return proto.Unmarshal(msg, m) == nil && m.ErrorResponse == nil
-}
-
-// isOpAMPBody is whether an HTTP response is such an answer: a success, with the protobuf content
-// type the spec has the server send (or none), and a body that is one. A page that something on
-// the way serves (a proxy's, a portal's) isn't.
-func isOpAMPBody(resp *http.Response, body []byte) bool {
-	if resp.StatusCode/100 != 2 || len(body) == 0 {
-		return false
-	}
-	ct, _, _ := strings.Cut(resp.Header.Get("Content-Type"), ";")
-	ct = strings.TrimSpace(ct)
-	return (ct == "" || strings.EqualFold(ct, "application/x-protobuf")) && isAnswer(body)
-}
-
-// isWSAnswer is whether a binary WebSocket message is such an answer: OpAMP's header (a varint,
-// 0), then a ServerToAgent.
-func isWSAnswer(data []byte) bool {
-	header, n := protowire.ConsumeVarint(data)
-	return n > 0 && header == 0 && isAnswer(data[n:])
+	// standing is how the agent stands with the server (platform mode only, as used; nil in core
+	// mode).
+	standing *standing
 }
 
 // saved records how a save ended, before it reaches the core.
@@ -153,8 +120,7 @@ func newExecutor(conn *connection) *executor {
 	b := make([]byte, 8)
 	_, _ = rand.Read(b)
 	return &executor{conn: conn, out: make(chan report, 16), done: make(chan struct{}), fl: newInFlight(),
-		instance: hex.EncodeToString(b), fs: osFS{}, answered: make(chan struct{}),
-		saves: make(chan struct{}, 1)}
+		instance: hex.EncodeToString(b), fs: osFS{}, saves: make(chan struct{}, 1)}
 }
 
 func (x *executor) reports() <-chan report { return x.out }
@@ -600,6 +566,7 @@ func (x *executor) post(ctx context.Context, r *corepb.HttpRequest) *corepb.Inpu
 	fail := func(err error) *corepb.Input {
 		return &corepb.Input{Kind: &corepb.Input_HttpFailed{HttpFailed: failed(r.Id, err)}}
 	}
+	asked := ctx // cancelled by the core; ctx also by the time
 	ctx, cancel := bounded(ctx, r.TimeoutMs)
 	defer cancel()
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, r.Url, bytes.NewReader(r.Body))
@@ -607,31 +574,68 @@ func (x *executor) post(ctx context.Context, r *corepb.HttpRequest) *corepb.Inpu
 		return fail(err)
 	}
 	req.Header = toHTTP(r.Headers)
-	resp, err := x.conn.http.RoundTrip(req)
+	via := x.standing.on(false, r.Url, req.Header.Clone())
+	if via.heldBack() {
+		<-asked.Done()
+		return fail(errHeldBack)
+	}
+	connected := false
+	resp, err := x.conn.http.RoundTrip(req.WithContext(httptrace.WithClientTrace(ctx, &httptrace.ClientTrace{
+		GotConn: func(httptrace.GotConnInfo) { connected = true }})))
 	if err != nil {
+		switch {
+		case asked.Err() != nil:
+		case connected:
+			via.lost(err.Error())
+		default:
+			via.failedToConnect(err.Error())
+		}
 		return fail(err)
 	}
 	defer resp.Body.Close()
 	body, err := io.ReadAll(overLimit(resp.Body, r.MaxResponseBytes))
 	if err != nil {
+		if asked.Err() == nil {
+			via.lost(err.Error())
+		}
 		return fail(err)
 	}
 	if uint64(len(body)) > r.MaxResponseBytes {
+		via.lost("a response too large")
 		return fail(fmt.Errorf("response over %d bytes", r.MaxResponseBytes))
 	}
-	if isOpAMPBody(resp, body) {
-		x.heard()
+	if m := httpMessage(resp, body); m != nil {
+		via.message(m)
+	} else {
+		via.status(resp.StatusCode, resp.Header)
 	}
 	return &corepb.Input{Kind: &corepb.Input_HttpResponse{HttpResponse: &corepb.HttpResponse{
 		Id: r.Id, Status: uint32(resp.StatusCode), Headers: fromHTTP(resp.Header), Body: body, UnixMs: unixMs()}}}
 }
 
+// errHeldBack: a connection that isn't made (Config.KeepUnreached).
+var errHeldBack = errors.New("not made: the credential the server offered was never tried")
+
 // connect opens connection e, then carries out its sends and close until it ends. A cancel, at
 // any point, drops it: the dial is aborted, or the connection closed without a word.
 func (x *executor) connect(e *effect, o *corepb.WsOpen) {
-	conn, resp, err := x.conn.dialWebSocket(e.ctx, o.Url, toHTTP(o.Headers))
+	header := toHTTP(o.Headers)
+	via := x.standing.on(true, o.Url, header.Clone())
+	if via.heldBack() {
+		<-e.ctx.Done()
+		x.emit(report{e: e, in: &corepb.Input{Kind: &corepb.Input_WsFailed{WsFailed: &corepb.WsFailed{
+			Id: o.Id, Detail: errHeldBack.Error(), UnixMs: unixMs()}}}, last: true})
+		return
+	}
+	conn, resp, err := x.conn.dialWebSocket(e.ctx, o.Url, header)
 	x.tried(o.Url, o.Headers)
 	if err != nil {
+		switch {
+		case resp != nil:
+			via.status(resp.StatusCode, resp.Header)
+		case e.ctx.Err() == nil:
+			via.failedToConnect(err.Error())
+		}
 		f := &corepb.WsFailed{Id: o.Id, Detail: lossy(err.Error()), UnixMs: unixMs()}
 		if resp != nil {
 			s := uint32(resp.StatusCode)
@@ -645,6 +649,7 @@ func (x *executor) connect(e *effect, o *corepb.WsOpen) {
 	stop := context.AfterFunc(e.ctx, func() { _ = conn.Close() })
 	defer stop()
 	defer conn.Close()
+	defer via.opened()()
 	// Over the limit, gorilla closes with 1009 (message too big) and the read fails. Its limit 0
 	// is none, so drive checks every message too; a limit past an int64 is none.
 	if o.MaxMessageBytes > 0 && o.MaxMessageBytes <= math.MaxInt64 {
@@ -653,7 +658,7 @@ func (x *executor) connect(e *effect, o *corepb.WsOpen) {
 	// The server's Close is answered when the core says (ws_close), not by gorilla.
 	conn.SetCloseHandler(func(int, string) error { return nil })
 	x.emit(report{e: e, in: &corepb.Input{Kind: &corepb.Input_WsOpened{WsOpened: &corepb.Id{Id: o.Id}}}, last: false})
-	x.drive(e, conn, o.MaxMessageBytes)
+	x.drive(e, conn, via, o.MaxMessageBytes)
 }
 
 // wsRead is what the reader got: a binary message, or why reading ended.
@@ -666,7 +671,7 @@ type wsRead struct {
 // given. After the close (ours, or the answer to the server's) it reports the connection closed
 // when the closing handshake is done, or lost if it fails; if the connection goes first, lost.
 // covers: OPAMP-CONN-06, OPAMP-CONN-07
-func (x *executor) drive(e *effect, conn *websocket.Conn, maxMessage uint64) {
+func (x *executor) drive(e *effect, conn *websocket.Conn, via *attempt, maxMessage uint64) {
 	id := e.id
 	quit := make(chan struct{})
 	defer close(quit)
@@ -700,17 +705,19 @@ func (x *executor) drive(e *effect, conn *websocket.Conn, maxMessage uint64) {
 			return
 		case r := <-reads:
 			if r.err == nil {
-				if isWSAnswer(r.data) {
-					x.heard()
+				if m := wsMessage(r.data); m != nil {
+					via.message(m)
 				}
 				x.emit(report{e: e, in: &corepb.Input{Kind: &corepb.Input_WsMessage{WsMessage: &corepb.WsMessage{Id: id, Data: r.data}}}, last: false})
 				continue
 			}
 			code, ok := closeCode(r.err)
 			if !ok {
+				via.lost(r.err.Error())
 				x.emit(report{e: e, in: wsLost(id, r.err), last: true})
 				return
 			}
+			via.closed(code, closeReason(r.err))
 			// Nothing more is read; the core answers it (ws_close).
 			serverClose, reads = code, nil
 			x.emit(report{e: e, in: wsClosed(id, code), last: false})
@@ -724,6 +731,16 @@ func (x *executor) drive(e *effect, conn *websocket.Conn, maxMessage uint64) {
 					continue
 				}
 				// The close: ours, or the answer to the server's.
+				if serverClose < 0 {
+					code, err := x.awaitClose(e, via, reads)
+					if err != nil {
+						x.emit(report{e: e, in: wsLost(id, err), last: true})
+						return
+					}
+					if code >= 0 {
+						serverClose, reads = code, nil
+					}
+				}
 				msg := websocket.FormatCloseMessage(websocket.CloseNormalClosure, "")
 				if err := conn.WriteControl(websocket.CloseMessage, msg, time.Time{}); err != nil {
 					x.emit(report{e: e, in: wsLost(id, err), last: true})
@@ -755,6 +772,40 @@ func (x *executor) drive(e *effect, conn *websocket.Conn, maxMessage uint64) {
 	}
 }
 
+// awaitClose waits for the server's Close (its code; -1 if none came) before ours, if via awaits it: a server
+// that enrolls agents closes the connection it offered a credential on, and which of the two closed it first is
+// all that tells it from one that serves the agent there (standing.heldBack).
+func (x *executor) awaitClose(e *effect, via *attempt, reads <-chan wsRead) (int, error) {
+	if !via.settles() {
+		return -1, nil
+	}
+	defer via.settled()
+	t := time.NewTimer(settleFor)
+	defer t.Stop()
+	for {
+		select {
+		case <-e.ctx.Done():
+			return -1, nil
+		case <-t.C:
+			return -1, nil
+		case r := <-reads:
+			if r.err == nil {
+				if m := wsMessage(r.data); m != nil {
+					via.message(m)
+				}
+				continue
+			}
+			code, ok := closeCode(r.err)
+			if !ok {
+				via.lost(r.err.Error())
+				return -1, r.err
+			}
+			via.closed(code, closeReason(r.err))
+			return code, nil
+		}
+	}
+}
+
 // closeCode is the code of the server's Close frame, if err is that the reader got one. gorilla
 // reports a connection gone without one as a CloseError too, with 1006 (abnormal closure, never
 // sent on the wire): that is a loss.
@@ -764,6 +815,15 @@ func closeCode(err error) (int, bool) {
 		return ce.Code, true
 	}
 	return 0, false
+}
+
+// closeReason is what the server's Close frame says, if err is that the reader got one.
+func closeReason(err error) string {
+	var ce *websocket.CloseError
+	if errors.As(err, &ce) {
+		return ce.Text
+	}
+	return ""
 }
 
 // mailbox holds values in order until their taker takes them. Putting never blocks.

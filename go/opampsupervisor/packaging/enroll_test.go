@@ -99,6 +99,15 @@ const revokedJSON = "{\n  \"server\": {\n    \"connected\": false,\n    \"since\
 // answered: a refused token.
 const refusedJSON = "{\n  \"server\": {\n    \"connected\": true,\n    \"since\": \"2026-11-21T12:00:00Z\"\n  }\n}\n"
 
+// spentJSON is `status --json` for a Supervisor whose enrollment token the server closes the
+// connection for.
+const spentJSON = "{\n  \"server\": {\n    \"connected\": false\n  },\n  \"enrollment\": {\n    \"offers\": 0,\n    \"error\": \"closed\",\n    \"token_refused\": true\n  }\n}\n"
+
+// notTakenJSON is `status --json` for a Supervisor the server offered credentials and doesn't take
+// with one.
+const notTakenJSON = "{\n  \"server\": {\n    \"connected\": false,\n    \"since\": \"2026-11-21T12:00:00Z\"\n  },\n  \"enrollment\": {\n    \"offers\": 2,\n" +
+	"    \"error\": \"the server says this host's identity is already bound to another installation: HTTP 409\",\n    \"identity_taken\": true\n  }\n}\n"
+
 type enrollment struct {
 	root, tools string
 	creds       string
@@ -523,6 +532,38 @@ func TestEnrollWaitsForTheConnection(t *testing.T) {
 	require.Error(t, err)
 	assert.Contains(t, out, "took the connection and not the enrollment token: it may be used up, expired or revoked")
 	assert.NotContains(t, out, "keeps retrying")
+	require.NoError(t, os.Remove(filepath.Join(e.tools, "json")))
+
+	// It said so as it closed the connection.
+	require.NoError(t, os.WriteFile(filepath.Join(e.tools, "json"), []byte(spentJSON), 0o600))
+	out, err = e.run(t, "bootstrap-token", "--endpoint", "wss://opamp.example.com/v1/opamp")
+	require.Error(t, err)
+	assert.Contains(t, out, "took the connection and not the enrollment token: it may be used up, expired or revoked")
+	assert.NotContains(t, out, "not enrolled: the server")
+
+	// The server offered the host credentials and doesn't take it with one.
+	require.NoError(t, os.WriteFile(filepath.Join(e.tools, "json"), []byte(notTakenJSON), 0o600))
+	out, err = e.run(t, "bootstrap-token", "--endpoint", "wss://opamp.example.com/v1/opamp")
+	require.Error(t, err)
+	assert.Contains(t, out, "not enrolled: the server at wss://opamp.example.com/v1/opamp holds this host's identity for another installation")
+	assert.Contains(t, out, "sudo pydantic-opamp-uninstall --purge")
+	assert.NotContains(t, out, "keeps retrying")
+	assert.NotContains(t, out, "Enrolled with")
+	// For another reason, with no advice to remove anything.
+	require.NoError(t, os.WriteFile(filepath.Join(e.tools, "json"), []byte(strings.Replace(notTakenJSON, "identity_taken", "other", 1)), 0o600))
+	out, err = e.run(t, "bootstrap-token", "--endpoint", "wss://opamp.example.com/v1/opamp")
+	require.Error(t, err)
+	assert.Contains(t, out, "not enrolled: the server at wss://opamp.example.com/v1/opamp answered this host and hasn't taken it")
+	assert.NotContains(t, out, "--purge")
+	assert.NotContains(t, out, "keeps retrying")
+	// It offered one for an endpoint that can't be reached.
+	require.NoError(t, os.WriteFile(filepath.Join(e.tools, "json"), []byte(strings.Replace(notTakenJSON, "\"identity_taken\": true", "\"unreachable\": \"other.example.com:8443\"", 1)), 0o600))
+	out, err = e.run(t, "bootstrap-token", "--endpoint", "wss://opamp.example.com/v1/opamp")
+	require.Error(t, err)
+	assert.Contains(t, out, "not enrolled: the server at wss://opamp.example.com/v1/opamp tells this host to connect to other.example.com:8443, which can't be reached from here")
+	assert.Contains(t, out, "If the server was wrong to, once it is corrected there: Remove this host's data (sudo ")
+	assert.Contains(t, out, "pydantic-opamp-uninstall --purge)")
+	assert.NotContains(t, out, "hasn't taken it")
 	require.NoError(t, os.Remove(filepath.Join(e.tools, "json")))
 
 	// Enrolled again with the same token after the server revoked the host's own credentials (it

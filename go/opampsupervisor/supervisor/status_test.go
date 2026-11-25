@@ -153,14 +153,20 @@ func TestTheStatusSaysWhenTheServerTookTheSupervisor(t *testing.T) {
 	assert.Contains(t, out.String(), "enrollment key")
 
 	clock = clock.Add(time.Minute)
-	c.report.accepted(c.logger)
+	c.report.accepted(c.logger, 1)
 	clock = clock.Add(time.Minute)
-	c.report.accepted(c.logger)
+	c.report.accepted(c.logger, 1)
 	st, err = ReadStatus(dir)
 	require.NoError(t, err)
 	require.NotNil(t, st.Accepted)
 	assert.Equal(t, clock.Add(-time.Minute), st.Accepted.Since, "the first answer is kept")
 	out.Reset()
 	st.Print(&out, clock)
-	assert.Contains(t, out.String(), "Accepted       yes: the server answered this host at")
+	assert.Contains(t, out.String(), "Accepted       yes: the server took this host at")
+
+	c.report.noEnrollment(c.logger)
+	st, err = ReadStatus(dir)
+	require.NoError(t, err)
+	assert.Nil(t, st.Accepted, "no longer taken, with nothing known against it")
+	assert.Nil(t, st.Enrollment)
 }

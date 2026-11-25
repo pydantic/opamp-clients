@@ -174,12 +174,41 @@ func TestStatusCommandRequireAccepted(t *testing.T) {
 	}()
 	code, out, _ = run("--wait", "5s", "--since", since, "--require-accepted")
 	assert.Equal(t, 0, code, out)
-	assert.Contains(t, out, "the server answered this host")
+	assert.Contains(t, out, "the server took this host")
 	code, out, _ = run("--require-accepted", "--json")
 	assert.Equal(t, 0, code, out)
 	var st supervisor.Status
 	require.NoError(t, json.Unmarshal([]byte(out), &st))
 	require.NotNil(t, st.Accepted)
+
+	// The server refused the credential it had offered, and the host tries again only after the
+	// wait is up: the command doesn't wait for it, and says so.
+	held := refused
+	held.Server = &supervisor.ServerStatus{Since: now, Error: "not connecting for now"}
+	held.Enrollment = &supervisor.EnrollmentState{Offers: 2, Since: now, Error: "the server says this host's identity is already bound to another installation: no", IdentityTaken: true, RetryAt: now.Add(time.Hour)}
+	writeStatusFile(t, dir, held)
+	began := time.Now()
+	code, out, _ = run("--wait", "20s", "--since", since, "--require-accepted")
+	assert.Equal(t, 1, code)
+	assert.Less(t, time.Since(began), 10*time.Second)
+	assert.Contains(t, out, "no: the server offered this host 2 credentials of its own, none of them in use")
+	assert.Contains(t, out, "already bound to another installation: no")
+	assert.Contains(t, out, "Not trying again before")
+	code, out, _ = run()
+	assert.Equal(t, 1, code)
+	assert.NotContains(t, out, "can't reach it")
+	// It tries again before the wait is up: worth waiting for.
+	soon := held
+	soon.Enrollment = &supervisor.EnrollmentState{Offers: 3, Since: now, Error: "lost", RetryAt: now.Add(time.Second)}
+	writeStatusFile(t, dir, soon)
+	go func() {
+		time.Sleep(500 * time.Millisecond)
+		taken := refused
+		taken.Accepted = &supervisor.AcceptedState{Since: time.Now()}
+		writeStatusFile(t, dir, taken)
+	}()
+	code, out, _ = run("--wait", "20s", "--since", since, "--require-accepted")
+	assert.Equal(t, 0, code, out)
 
 	// Accepted doesn't make an unwell Supervisor well.
 	unwell := refused
@@ -189,6 +218,90 @@ func TestStatusCommandRequireAccepted(t *testing.T) {
 	code, out, _ = run("--require-accepted")
 	assert.Equal(t, 1, code)
 	assert.Contains(t, out, "can't reach it")
+}
+
+// --wait --require-accepted returns 0 once the host has been accepted and connected for a few
+// seconds: a server may answer a host on credentials it has just ended (it deleted the host, and
+// not every part of it has heard), and refuse it a moment later.
+func TestStatusCommandRequireAcceptedWaitsForItToLast(t *testing.T) {
+	dir := t.TempDir()
+	now := time.Now()
+	run := func(wait string) (int, string) {
+		var out, errOut bytes.Buffer
+		code := statusCommand([]string{"--storage", dir, "--wait", wait, "--since", fmt.Sprint(now.Unix()), "--require-accepted"}, &out, &errOut)
+		return code, out.String()
+	}
+	at := func(accepted, connected time.Time) supervisor.Status {
+		return supervisor.Status{PID: os.Getpid(), Started: now, Updated: now, Endpoint: "wss://opamp.example.com/v1/opamp",
+			Server:    &supervisor.ServerStatus{Connected: true, Since: connected},
+			Accepted:  &supervisor.AcceptedState{Since: accepted},
+			Collector: &supervisor.CollectorStatus{Healthy: true, Since: now}}
+	}
+	// Accepted, and refused a second later.
+	began := time.Now()
+	writeStatusFile(t, dir, at(began, began))
+	go func() {
+		time.Sleep(time.Second)
+		refused := at(began, began)
+		refused.Server = &supervisor.ServerStatus{Since: time.Now(), HTTPStatus: 401}
+		writeStatusFile(t, dir, refused)
+	}()
+	code, out := run("5s")
+	assert.Equal(t, 1, code)
+	assert.Contains(t, out, "can't reach it")
+	assert.Less(t, time.Since(began), 8*time.Second)
+
+	// It lasts: 0, once it has, though the wait is up before.
+	began = time.Now()
+	writeStatusFile(t, dir, at(began, began))
+	code, out = run("1s")
+	assert.Equal(t, 0, code, out)
+	assert.GreaterOrEqual(t, time.Since(began), acceptedFor)
+	assert.Less(t, time.Since(began), acceptedFor+2*time.Second)
+
+	// Connected again only now, though accepted before: not long enough.
+	began = time.Now()
+	writeStatusFile(t, dir, at(began.Add(-time.Minute), began))
+	code, out = run("10s")
+	assert.Equal(t, 0, code, out)
+	assert.GreaterOrEqual(t, time.Since(began), acceptedFor)
+
+	// For long already: at once.
+	began = time.Now()
+	writeStatusFile(t, dir, at(began.Add(-time.Minute), began.Add(-time.Minute)))
+	code, out = run("10s")
+	assert.Equal(t, 0, code, out)
+	assert.Less(t, time.Since(began), time.Second)
+
+	// Dropped and taken again in turn, never for that long, and taken whenever it is read, past the
+	// wait and that: not enrolled.
+	began = time.Now()
+	writeStatusFile(t, dir, at(began, began))
+	stop, flapped := make(chan struct{}), make(chan struct{})
+	go func() {
+		defer close(flapped)
+		for {
+			select {
+			case <-stop:
+				return
+			case <-time.After(700 * time.Millisecond):
+			}
+			// The connection reads as it did; the host is accepted anew, dropped between two reads.
+			writeStatusFile(t, dir, at(time.Now(), began))
+		}
+	}()
+	code, out = run("2s")
+	close(stop)
+	<-flapped
+	assert.Equal(t, 1, code, out)
+	assert.Less(t, time.Since(began), 2*time.Second+acceptedFor+2*time.Second)
+
+	// A clock that went back doesn't hold it past the wait and that.
+	began = time.Now()
+	writeStatusFile(t, dir, at(began.Add(time.Hour), began.Add(time.Hour)))
+	code, out = run("1s")
+	assert.Equal(t, 0, code, out)
+	assert.Less(t, time.Since(began), 1*time.Second+acceptedFor+2*time.Second)
 }
 
 // Once connected, `status --wait` gives the server its grace to take the Supervisor before it

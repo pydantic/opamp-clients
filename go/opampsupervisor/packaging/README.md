@@ -62,7 +62,8 @@ echo "$ENROLLMENT_TOKEN" | sudo pydantic-opamp-enroll --endpoint wss://opamp.exa
 `pydantic-opamp-enroll` does four things:
 
 - **Seals the token.** It encrypts the token to the host with `systemd-creds`, into
-  `/etc/pydantic-opamp/enroll-token.cred`. That uses the TPM if the host has one.
+  `/etc/pydantic-opamp/enroll-token.cred`. That uses the TPM if the host has one. The token stays
+  there after enrollment ([why](#the-enrollment-token-after-enrollment)).
 - **Makes the state key, once.** It writes `state-key.cred`, the key the Supervisor seals its
   state file with. Running the command again keeps it, since a new key couldn't open the old
   state.
@@ -99,6 +100,13 @@ Once the server issues the agent its own credentials, the Supervisor uses them f
 - it uses them after every restart.
 
 The enrollment token in the config is then only a fallback.
+
+A host its server takes can be enrolled again with another token or server. The helper (on every platform)
+stops the Supervisor and keeps the enrollment it had, until the server takes the host with the new one. If it
+doesn't (it refuses the token, can't be reached, offers a credential and doesn't take it), or the run is
+interrupted, the host goes back to the enrollment it had, once, and the helper exits 1. A run that was killed
+leaves the copies in `enrollment-before-` and the time, beside the config, for root (an administrator) alone:
+the next run says so, with the command that puts them back, and leaves them.
 
 If the server refuses those credentials three times or more in a row (it deleted the host, say),
 enrolling again with the same token has the Supervisor set them aside, in `opamp-state.refused-` and the time beside `opamp-state`, and enrolls
@@ -285,7 +293,8 @@ echo "$ENROLLMENT_TOKEN" | sudo /opt/pydantic-opamp/bin/pydantic-opamp-enroll --
 
 `pydantic-opamp-enroll` takes the Linux one's options. macOS has no systemd credentials, so
 there are two differences:
-- the enrollment token is kept in `etc/enroll-token`, readable by root alone;
+- the enrollment token is kept in `etc/enroll-token`, readable by root alone, and stays there after
+  enrollment ([why](#the-enrollment-token-after-enrollment));
 - the Supervisor seals its state with a key it keeps in the System Keychain (`state_key: keychain`).
 
 Build it on a Mac with `VERSION=0.1.0 ARCH=arm64 go/opampsupervisor/packaging/macos/build.sh`
@@ -402,6 +411,42 @@ reader, including the default one on `localhost:8888` when `service::telemetry::
 readers, fails every scrape when a processor or exporter is in more than one pipeline: Prometheus
 labels don't carry the scope attributes, so the series collide. OTLP readers, which Logfire's
 policies use, are not affected.
+
+## The enrollment token after enrollment
+
+The enrollment token stays on the host after the host has enrolled. The Supervisor's config sends it as
+`server.headers.Authorization`, read from that file at every start:
+
+| System | Where | Who can read it |
+|---|---|---|
+| Linux | `/etc/pydantic-opamp/enroll-token.cred`, sealed with `systemd-creds` (with the TPM if the host has one); systemd decrypts it for the service alone, at `/run/credentials/pydantic-opamp-supervisor.service/opamp-enroll-token` | root (the file is 0600); the decrypted copy, the service |
+| macOS | `/opt/pydantic-opamp/etc/enroll-token`, in plain text | root (the file is 0600, in a 0700 directory) |
+| Windows | `ProgramData\pydantic-opamp\enroll-token`, in plain text | SYSTEM and Administrators (the directory's ACL, not inherited) |
+
+Why it stays:
+- **It is the configured credential.** Once the server issues the host its own credentials, the
+  Supervisor connects with those, kept sealed in its state file, and the token is only a fallback.
+  But the token is what the state belongs to: the client keeps issued credentials only for the
+  endpoint and headers they were issued for, and drops them when either changes. Removing the
+  token from the config would change the headers, and so throw the issued credentials away.
+- **Every start reads it.** A config whose `${file:...}` names a missing file doesn't load, so the
+  Supervisor wouldn't start.
+- **It is how a host enrolls again.** A host whose state was lost while its configuration stayed
+  (its storage directory deleted, say) enrolls with it again. `pydantic-opamp-enroll --refresh`
+  (`-Refresh` on Windows), which rewrites the config without a token, needs it too.
+
+What that means for a token that could enroll more hosts (a key for many hosts, or one that hasn't
+expired): anyone who can read it as root, or as an administrator on Windows, could enroll another
+host with it. To limit that:
+- use a key for one host, which the server takes only once, or one that expires soon;
+- revoke or delete the key in Fleet once its hosts have enrolled. The Supervisor connects with the
+  credentials the server issued it, not the key; a host that lost its state then needs a new key;
+- enroll again with a new key (`pydantic-opamp-enroll` with the token on standard input), which
+  replaces the file.
+
+An uninstall keeps the token with the rest of the configuration, for a reinstall. An uninstall
+with `--purge` (`-Purge` on Windows) deletes the configuration directory, the token with it
+([Remove the installed Collector](#remove-the-installed-collector)).
 
 ## What the server can do to this host
 

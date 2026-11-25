@@ -45,7 +45,7 @@ func TestARefusedConfigStaysFailedWhileTheLastOneRuns(t *testing.T) {
 		c.reach = newReachability(c.logger, "wss://opamp.example.com/v1/opamp")
 		c.report.started(c.logger, c.reach.endpoint, [16]byte{1})
 		c.onNotification(nil, collector.Notification{Notification: opamp.Notification{Kind: opamp.Connected}})
-		c.report.accepted(c.logger)
+		c.report.accepted(c.logger, 1)
 		require.NoError(t, c.SetHealth(&protobufs.ComponentHealth{Healthy: true}))
 		return c, dir
 	}
