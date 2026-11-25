@@ -10,7 +10,7 @@
 // installed, with a rollback if the new one isn't healthy, and removed when no longer offered
 // (agent_update.go). A remote config
 // agent::remote_config_policy refuses is FAILED, and is neither run nor kept; without a policy,
-// the start says the remote config is unrestricted. The Supervisor's state (persistentState, and
+// the start says, at info, that the remote config is unrestricted. The Supervisor's state (persistentState, and
 // the remote configs and own-telemetry settings it saved) is the OpAMP client's, read before the
 // bootstrap (client_state.go): it writes no files of its own, and a remote config the collector
 // refused isn't run again at the next start. The client's state file is sealed with
@@ -25,7 +25,14 @@
 // fails is tried again on the restart backoff. Health counts only while its connection is the
 // collector's. A remote config holding the Logfire SDK policy (logfire-sdk-policy.json), which SDKs
 // take, is FAILED: the collector takes YAML. The Collector run without a remote config has its internal
-// metrics off unless a config sets them (idle_telemetry.go).
+// metrics off unless a config sets them (idle_telemetry.go). The own telemetry settings' outcome
+// is in the status, and their refusal is logged at error once per reason
+// (own_telemetry_status.go). A new instance UID from the server is said once, and the
+// collector's messages with the replaced one are expected until it starts again
+// (instance_uid_change.go). On macOS the collector's own log is sampled by default
+// (log_sampling.go). The agent description carries a key
+// derived from the host's machine ID (host_key.go), which the Collector is given as the
+// pydantic.fleet.host_key resource attribute in OTEL_RESOURCE_ATTRIBUTES (host_key_env.go).
 
 package supervisor
 
@@ -177,6 +184,11 @@ type Supervisor struct {
 	// of the remote config the collector starts on (client_state.go).
 	openedClient *coreClient
 	resumed      opamp.Resumed
+	// Changed here: refusals of the own telemetry settings are logged once per reason
+	// (own_telemetry_status.go).
+	ownTelemetryRefusals ownTelemetryRefusals
+	// Changed here: the instance UID the server replaced in this run (instance_uid_change.go).
+	previousInstanceID atomic.Pointer[uuid.UUID]
 
 	noopPipelineTemplate         *template.Template
 	opampextensionTemplate       *template.Template
@@ -364,10 +376,11 @@ func NewSupervisor(ctx context.Context, logger *zap.Logger, cfg config.Superviso
 
 	s.configApplyTimeout = s.config.Agent.ConfigApplyTimeout
 
-	// Changed here: say so, in the local log, when the server's remote config is unlimited.
+	// Changed here: say so once, in the local log, when the server's remote config is unlimited. It is
+	// the default, so a note, not a warning.
 	if logger != nil && s.config.Capabilities.AcceptsRemoteConfig && !s.config.Agent.RemoteConfigPolicy.Enabled() {
-		logger.Warn("The remote config is unrestricted (no agent::remote_config_policy): " +
-			"the server may have the collector read any file it can and send it anywhere")
+		logger.Info("The remote config is unrestricted (no agent::remote_config_policy): the server's configs " +
+			"run as sent. To limit them, set agent::remote_config_policy (the enrollment helpers' --restricted)")
 	}
 
 	return s, nil
@@ -529,12 +542,7 @@ func (s *Supervisor) Start(ctx context.Context) error {
 		return err
 	}
 	s.commander.SetPassthroughLogHook(s.appendPassthroughLogLine)
-	s.commander.SetEnvironmentProvider(func() map[string]string {
-		if env := s.connectionEnv.Load(); env != nil {
-			return *env
-		}
-		return nil
-	})
+	s.commander.SetEnvironmentProvider(s.collectorEnv) // the credentials and the host key (host_key_env.go)
 
 	s.agentWG.Go(func() {
 		s.runAgentProcess()
@@ -1057,9 +1065,7 @@ func (s *Supervisor) handleAgentOpAMPMessage(conn serverTypes.Connection, messag
 	// Changed here: the collector's messages are taken with the Supervisor's instance UID only;
 	// it was checked at bootstrap alone.
 	if id := s.persistentState.instanceID(); !slices.Equal(message.GetInstanceUid(), id[:]) {
-		s.telemetrySettings.Logger.Warn("Ignoring a message to the local OpAMP server with another instance UID",
-			zap.String("instance_uid", hex.EncodeToString(message.GetInstanceUid())),
-			zap.String("expected_instance_uid", id.String()))
+		s.ignoreOtherInstanceUID(message, id) // the replaced UID at debug (instance_uid_change.go)
 		return &protobufs.ServerToAgent{}
 	}
 
@@ -1161,6 +1167,8 @@ func (s *Supervisor) forwardCustomMessagesToServerLoop() {
 func (s *Supervisor) setAgentDescription(ad *protobufs.AgentDescription) {
 	ad.IdentifyingAttributes = applyKeyValueOverrides(s.config.Agent.Description.IdentifyingAttributes, ad.IdentifyingAttributes)
 	ad.NonIdentifyingAttributes = applyKeyValueOverrides(s.config.Agent.Description.NonIdentifyingAttributes, ad.NonIdentifyingAttributes)
+	// Changed here: with this host's key (host_key.go).
+	ad.NonIdentifyingAttributes = withHostKey(ad.NonIdentifyingAttributes)
 	s.agentDescription.Store(ad)
 }
 
@@ -1169,7 +1177,7 @@ func (s *Supervisor) setAgentDescription(ad *protobufs.AgentDescription) {
 func (s *Supervisor) configuredAgentDescription() *protobufs.AgentDescription {
 	return &protobufs.AgentDescription{
 		IdentifyingAttributes:    applyKeyValueOverrides(s.config.Agent.Description.IdentifyingAttributes, nil),
-		NonIdentifyingAttributes: applyKeyValueOverrides(s.config.Agent.Description.NonIdentifyingAttributes, nil),
+		NonIdentifyingAttributes: withHostKey(applyKeyValueOverrides(s.config.Agent.Description.NonIdentifyingAttributes, nil)), // Changed here: with this host's key (host_key.go).
 	}
 }
 
@@ -1486,7 +1494,8 @@ func (s *Supervisor) composeAgentConfigFiles(incomingConfig *protobufs.AgentRemo
 	conf := confmap.New()
 
 	specialConfigComposers := map[config.SpecialConfigFile][]configComposer{
-		config.SpecialConfigFileOwnTelemetry:   {s.composeOwnTelemetryConfig, s.composeExtraTelemetryConfig},
+		// Changed here: on macOS, a default for the collector's log sampling (log_sampling.go).
+		config.SpecialConfigFileOwnTelemetry:   {s.composeOwnTelemetryConfig, s.composeExtraTelemetryConfig, s.composeLogSamplingDefault},
 		config.SpecialConfigFileOpAMPExtension: {s.composeOpAMPExtensionConfig},
 		config.SpecialConfigFileRemoteConfig:   s.createRemoteConfigComposers(incomingConfig),
 	}
@@ -1776,7 +1785,8 @@ func (s *Supervisor) loadLastReceivedOwnTelemetryConfig() {
 		if err != nil {
 			s.telemetrySettings.Logger.Error("Cannot parse last received own telemetry config", zap.Error(err))
 		} else {
-			_, _ = s.setupOwnTelemetry(s.runCtx, set)
+			_, err := s.setupOwnTelemetry(s.runCtx, set)
+			s.noteOwnTelemetry(err) // Changed here: the status says it (own_telemetry_status.go).
 		}
 	}
 }
@@ -1831,8 +1841,8 @@ func (s *Supervisor) setupOwnTelemetry(_ context.Context, settings *protobufs.Co
 	// Changed here: the server's own telemetry destinations are held to the remote config
 	// policy too. They went around it.
 	if err := s.config.Agent.RemoteConfigPolicy.Check(string(config.SpecialConfigFileOwnTelemetry), cfg.Bytes()); err != nil {
-		s.telemetrySettings.Logger.Error("Refusing the own telemetry settings", zap.Error(err))
-		return false, err
+		s.refuseOwnTelemetry(err) // Changed here: once per reason (own_telemetry_status.go).
+		return false, ownTelemetryPolicyError{err}
 	}
 	previous := s.agentConfigOwnTelemetrySection.Load()
 	s.agentConfigOwnTelemetrySection.Store(cfg.String())
@@ -2902,6 +2912,7 @@ func (s *Supervisor) onMessage(ctx context.Context, msg *types.MessageData) {
 			OwnLogs:    msg.OwnLogsConnSettings,
 		})
 		configChanged = ownChanged || configChanged
+		s.noteOwnTelemetry(ownErr) // Changed here: the status says it (own_telemetry_status.go).
 	}
 
 	// Changed here: the connection settings are answered once the collector runs with them, or
@@ -3036,7 +3047,7 @@ func (s *Supervisor) processRemoteConfigMessage(ctx context.Context, msg *protob
 // Changed here: settings it can't apply are refused, and neither saved nor applied.
 func (s *Supervisor) processOwnTelemetryConnSettingsMessage(ctx context.Context, msg *protobufs.ConnectionSettingsOffers) (bool, error) {
 	if err := unsupportedOwnTelemetry(msg); err != nil {
-		s.telemetrySettings.Logger.Error("Refusing the own telemetry settings", zap.Error(err))
+		s.refuseOwnTelemetry(err) // Changed here: once per reason (own_telemetry_status.go).
 		return false, err
 	}
 	changed, err := s.setupOwnTelemetry(ctx, msg)
@@ -3060,11 +3071,15 @@ func (s *Supervisor) processAgentIdentificationMessage(msg *protobufs.AgentIdent
 	s.telemetrySettings.Logger.Debug("Agent identity is changing",
 		zap.String("old_id", s.persistentState.InstanceID.String()),
 		zap.String("new_id", newInstanceID.String()))
+	previous := s.persistentState.instanceID() // Changed here: for notePreviousInstanceID below.
 
 	err = s.persistentState.SetInstanceID(newInstanceID)
 	if err != nil {
 		s.telemetrySettings.Logger.Error("Failed to persist new instance ID, instance ID will revert on restart.", zap.String("new_id", newInstanceID.String()), zap.Error(err))
 	}
+	// Changed here: the change is said once, and the collector's messages with the replaced UID
+	// are expected until it starts again (instance_uid_change.go).
+	s.notePreviousInstanceID(previous, newInstanceID)
 
 	err = s.opampClient.SetAgentDescription(s.agentDescription.Load().(*protobufs.AgentDescription))
 	if err != nil {

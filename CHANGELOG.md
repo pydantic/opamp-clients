@@ -61,6 +61,34 @@ and date. Tests, CI and docs alone don't need a line.
 
 ### Added
 
+- Supervisor: `opampsupervisor status` says whether the server has answered this host since it
+  started (`accepted` in `--json`, an "Accepted" line in the text). A server that takes the
+  connection but not the credentials (a used-up enrollment key, say) closes it unanswered, and
+  the host read as connected and healthy; it now reads "not yet", and `--require-accepted` makes
+  `status` exit 1 and `--wait` wait for it. Without the flag `--wait` exits as before, but gives
+  the server up to 10 seconds after connecting to answer before it prints (#150).
+- Supervisor: `opampsupervisor status` says what became of the server's own telemetry settings
+  (`own_telemetry` in `--json`, an "Own telemetry" line: APPLIED, or REFUSED and why). With
+  `--restricted`, settings that send the Collector's own telemetry to an endpoint the policy
+  doesn't allow were refused with an error line at each connection and nothing else said so; the
+  status says it now, and the same refusal is logged at error once, then at debug (#150).
+- Go: `Client.Answered()`, closed once the server's first answer reaches a platform-mode client
+  (a ServerToAgent that isn't an error response, over WebSocket or in an HTTP success): it tells a
+  server that took the agent from one that took the connection and closed it unanswered (#150).
+- Go: `Client.UsedIssued()`, whether the latest request or connection was made with credentials a
+  server issued rather than the configured ones (platform mode), and `Client.SaveError()` with
+  `Client.Saves()`, why the last save of the state failed (#150).
+- Supervisor: `opampsupervisor status` says when the client's state can't be saved (`save_error` in
+  `--json`), and exits 1: a restart would lose the host's credentials (#150).
+- Supervisor: the agent description reports `pydantic.fleet.host_key`, a UUID derived from the
+  host's machine ID as systemd derives an application-specific one (on Linux,
+  `systemd-id128 machine-id --app-specific=c8fe2a9e-5d40-4615-8f88-fd606391a0ca --uuid`; the
+  machine ID itself isn't reported), the same for as long as the host keeps its machine ID, so a server can tie a host
+  enrolled again to the one it replaces. Upgraded hosts report it once the new Supervisor runs (#151).
+- Supervisor: the Collector is given the host key as `pydantic.fleet.host_key` in
+  `OTEL_RESOURCE_ATTRIBUTES`, so a config whose `resourcedetection` processor lists the `env`
+  detector stamps it on the host's data, which a server can then match to the host it enrolled.
+  It needs no environment reference in the config, so restricted hosts take it too (#151).
 - Supervisor installers and container image: the Collector runs with
   `--feature-gates=telemetry.newPipelineTelemetry`, so its own metrics count the items every
   receiver, processor (`batch` too) and exporter takes in and passes on. A Prometheus reader of
@@ -74,6 +102,9 @@ and date. Tests, CI and docs alone don't need a line.
 
 ### Changed
 
+- Supervisor: a Supervisor without `agent::remote_config_policy` says once at start, at info,
+  that the remote config is unrestricted, and how to limit it (`--restricted` on the enrollment
+  helpers). It was a warning at each start, though it is the default and nothing is wrong (#163).
 - Supervisor Windows installer: a build with `-CertificateThumbprint` also signs
   `pydantic-opamp-enroll.ps1` and `pydantic-opamp-uninstall.ps1`, so a host whose execution policy
   is `AllSigned` runs them. `signtool` now takes the certificate from the machine's store, as the
@@ -106,6 +137,63 @@ and date. Tests, CI and docs alone don't need a line.
 
 ### Fixed
 
+- Supervisor installers (Linux): `pydantic-opamp-uninstall --purge` left the unit's
+  `telemetry.conf` drop-in, which names the telemetry credential the purge deletes, so a later
+  enrollment without a telemetry token failed to start the service (243/CREDENTIALS). The purge
+  removes it, and `pydantic-opamp-enroll` removes one an older package left, if it is as the package
+  writes it: another that an administrator wrote, or added to, stays, and enrolling with a
+  telemetry token doesn't write over it (#158).
+- Supervisor: `opampsupervisor status` keeps a remote config the policy refused as FAILED, and
+  says which config runs instead (`running_config` in `--json`). It showed the config still
+  running as APPLIED once the Supervisor reported it again, at a restart or a retarget, so a
+  refused config read as applied. The server's view was right (#150).
+
+- Supervisor installers: a host deleted on the server and enrolled again over its kept data with
+  the same token could never connect: the client kept the host's own issued credentials, which
+  the delete revoked, and doesn't fall back from them to the token. `pydantic-opamp-enroll` (not
+  `--refresh`) now asks the Supervisor, when the server refuses them as not valid three times or more
+  in a row (HTTP 401; not a 403, which can mean a missing permission, nor a refusal of another token),
+  to set them aside, and the instance UID kept with them, and start again from the token, once, as a new
+  host. They stay on the host, under a name of their own, until its data is removed:
+  `opampsupervisor status` lists them, and when the new enrollment fails the helper says the command
+  that puts them back (a server that refused them for a while only). A new token already worked: it is
+  used in their place (#150).
+- Supervisor installers: `pydantic-opamp-enroll` (Linux, macOS, Windows) fails an install whose
+  enrollment token the server refuses (used up, expired, revoked), saying so, where it reported
+  "running and connected" and exited 0: it waits with `opampsupervisor status --require-accepted`.
+  On Windows a service that fails at once (a config it can't load) gives the "failed to start"
+  message and its log, where `Restart-Service` failed with its own error (#150).
+- Supervisor on Windows: `opampsupervisor status --wait`, which the enrollment helper runs, ended
+  with "can't connect" (exit 1) when it read the status file just as the Supervisor replaced it (a
+  sharing violation), though the host connected a second later. Such a read is now tried again
+  until the wait is up, and for 2 seconds by the plain `status` (#150).
+- Supervisor installers and container image: with `--restricted` (`-Restricted`, the restricted image config), a remote config may use the
+  `transform` processor, so a policy can make records readable (the macOS unified log's JSON
+  bodies, say). It changes only the records passing through: OTTL reads no file, environment or
+  network. An upgrade brings it to enrolled hosts through `--refresh` (#150).
+- Supervisor on macOS: the Collector's own log is sampled by default (in each minute the first 5
+  lines with the same level and message, then one in 500), as upstream's unified log receiver logs
+  "Running log command" at info for each poll, about once a second on a busy Mac. A remote config
+  that sets `service::telemetry::logs::sampling` keeps its own (#150).
+- Supervisor: a reinstall with a new enrollment key over kept data logged a warning ("Ignoring a
+  message to the local OpAMP server with another instance UID") for each message of the
+  Collector still running with the previous instance UID. The server's new UID is now said once at
+  info, with the previous one, and those messages go at debug (#150).
+- Supervisor on Linux: with `--restricted`, `pydantic-opamp-enroll --host-logs` also lets the
+  server's configs read the journal, with a `journald` receiver (not its `journalctl_path`,
+  `root_path`, `directory`, `files` or `merge`, which stay the local config's). On RHEL-family
+  hosts the syslog files are root's alone, so a restricted host could send none of its system
+  logs (#152).
+- Supervisor: `opampsupervisor status` names each file the Collector's log receivers couldn't
+  open (a file receiver that can't read its files is healthy and sends nothing), and says to read
+  the journal where the syslog files are root's alone (#152).
+- Supervisor: a Windows upgrade from 0.10.3 or older no longer shuts down programs that have one
+  of the package's files open (an antivirus or a log viewer, say) and no longer fails with 1601,
+  leaving the Supervisor stopped. The `.msi` installs its files before it removes the old version.
+  After such a failure, installing the new `.msi` again finishes the upgrade (#162).
+- Supervisor on macOS: `pydantic-opamp-enroll` (`--refresh` too), ended by a signal (Ctrl-C, a lost
+  ssh connection) while it restarts the service, starts it again before it ends. It left the
+  service unloaded until the Mac started again (#159).
 - Supervisor: `pydantic-opamp-enroll` (Linux, macOS, Windows) says when the Supervisor service
   failed to start, and gives the command that shows its log. It used to say the Supervisor can't
   connect yet and keeps retrying, as for a running service that can't reach its server (#147).

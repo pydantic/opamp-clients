@@ -13,7 +13,15 @@
 <Wix xmlns="http://wixtoolset.org/schemas/v4/wxs">
   <Package Name="Pydantic OpAMP Supervisor" Manufacturer="Pydantic" Version="$(var.Version)"
            UpgradeCode="a7c976d2-a6db-4393-86bc-e59b0fb90c66" Scope="perMachine">
-    <MajorUpgrade DowngradeErrorMessage="A newer version of the Pydantic OpAMP Supervisor is already installed." />
+    <!-- An upgrade installs this version's files first and removes the old version after
+         (afterInstallExecute): the old version's components are this version's too (the same files,
+         so the same component GUIDs), so its removal deletes no file, stops no service and has no
+         file in use. Removed first, as by default, it ran with the old package's own settings, and
+         a package before 0.10.4 has no MSIRESTARTMANAGERCONTROL: its removal shut down every program
+         holding one of its files open, whatever the upgrade's command line said, and then failed
+         (1601), leaving the old files and service with no package registered. -->
+    <MajorUpgrade Schedule="afterInstallExecute"
+                  DowngradeErrorMessage="A newer version of the Pydantic OpAMP Supervisor is already installed." />
     <MediaTemplate EmbedCab="yes" />
     <!-- A quiet install, upgrade or removal never shuts down other programs. By default the Restart
          Manager closes any program holding one of the package's files open, even one that only
@@ -68,7 +76,7 @@
       </Component>
     </ComponentGroup>
 
-    <!-- After an upgrade (the old version is removed first, its service with it), the enroll script
+    <!-- After an upgrade (its service installed again, as on demand), the enroll script
          writes the config again with this version's settings and the last enrollment's options,
          and starts the service again unless it was enrolled with -NoStart. A failure leaves the
          upgrade installed: the script says what to check. -->

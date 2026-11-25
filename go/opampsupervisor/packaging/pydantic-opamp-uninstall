@@ -30,20 +30,30 @@ case $os in
         state=$root/var/lib/pydantic-opamp
         extra_state=$root/var/lib/pydantic-otelcol
         programs=$root/usr/lib/pydantic-opamp
+        dropins=$root/etc/systemd/system/pydantic-opamp-supervisor.service.d
         ;;
     Darwin)
         config=$root/opt/pydantic-opamp/etc
         state=$root/opt/pydantic-opamp/var
         extra_state=
         programs=$root/opt/pydantic-opamp/bin
+        dropins=
         ;;
     *) fail "unsupported operating system: $os" ;;
 esac
 recovery=$config/uninstall
+# The unit's drop-in that enrolling with a telemetry token writes: the package's if it holds that and no more.
+dropin=${dropins:+$dropins/telemetry.conf}
+own_dropin() {
+    [ -n "$dropin" ] && [ -f "$dropin" ] && [ ! -L "$dropin" ] || return 1
+    [ "$(cat "$dropin")" = '[Service]
+LoadCredentialEncrypted=opamp-telemetry-token:/etc/pydantic-opamp/telemetry-token.cred' ]
+}
 if [ -n "$dry_run" ]; then
     echo "Stop the Collector service and remove the $package package and programs."
     if [ -n "$purge" ]; then
         echo "Delete $config, $state${extra_state:+, $extra_state} and this installation's state key."
+        if own_dropin; then echo "Delete $dropin."; elif [ -n "$dropin" ] && [ -e "$dropin" ]; then echo "Keep $dropin: it isn't as this package writes it."; fi
     else
         echo "Keep $config, $state${extra_state:+, $extra_state} and the state key for reinstall."
         echo "Keep $recovery to allow a later purge."
@@ -57,6 +67,7 @@ if [ "$os" = Darwin ]; then
     set -- "$@" "$root/opt/pydantic-opamp/share/doc" "$root/Library/LaunchDaemons/dev.pydantic.opamp-supervisor.plist"
 else
     set -- "$@" "$extra_state"
+    [ -z "$purge" ] || set -- "$@" "$dropins"
 fi
 for directory in "$@"; do
     parent=$directory
@@ -147,6 +158,17 @@ uninstall() {
             security delete-generic-password -s opamp-state-key -a /opt/pydantic-opamp/var/opamp-state \
                 /Library/Keychains/System.keychain >/dev/null 2>&1 || code=$?
             case $code in 0|44) ;; *) fail "could not delete the installation state key (security $code)" ;; esac
+        fi
+        # Enrolled with a telemetry token, the unit has a drop-in that names its credential, which goes
+        # with the configuration: the next start would fail on it. Before the recovery helper there goes.
+        if own_dropin; then
+            rm -f "$dropin"
+            rmdir "$dropins" 2>/dev/null || :
+            if [ -d "$root/run/systemd/system" ]; then
+                systemctl daemon-reload || echo 'pydantic-opamp-uninstall: systemctl daemon-reload failed' >&2
+            fi
+        elif [ -n "$dropin" ] && [ -e "$dropin" ]; then
+            echo "pydantic-opamp-uninstall: $dropin isn't as this package writes it, and is kept" >&2
         fi
         rm -rf "$config" "$state"
         if [ -n "$extra_state" ]; then rm -rf "$extra_state"; fi
