@@ -10,7 +10,7 @@
 // installed, with a rollback if the new one isn't healthy, and removed when no longer offered
 // (agent_update.go). A remote config
 // agent::remote_config_policy refuses is FAILED, and is neither run nor kept; without a policy,
-// the start says the remote config is unrestricted. The Supervisor's state (persistentState, and
+// the start says, at info, that the remote config is unrestricted. The Supervisor's state (persistentState, and
 // the remote configs and own-telemetry settings it saved) is the OpAMP client's, read before the
 // bootstrap (client_state.go): it writes no files of its own, and a remote config the collector
 // refused isn't run again at the next start. The client's state file is sealed with
@@ -30,8 +30,10 @@
 // (own_telemetry_status.go). A new instance UID from the server is said once, and the
 // collector's messages with the replaced one are expected until it starts again
 // (instance_uid_change.go). On macOS the collector's own log is sampled by default
-// (log_sampling.go). An uninstall tells the server this
-// host is being removed (uninstall_notice.go).
+// (log_sampling.go). The agent description carries a key
+// derived from the host's machine ID (host_key.go), which the Collector is given as the
+// pydantic.fleet.host_key resource attribute in OTEL_RESOURCE_ATTRIBUTES (host_key_env.go).
+// An uninstall tells the server this host is being removed (uninstall_notice.go).
 
 package supervisor
 
@@ -375,10 +377,11 @@ func NewSupervisor(ctx context.Context, logger *zap.Logger, cfg config.Superviso
 
 	s.configApplyTimeout = s.config.Agent.ConfigApplyTimeout
 
-	// Changed here: say so, in the local log, when the server's remote config is unlimited.
+	// Changed here: say so once, in the local log, when the server's remote config is unlimited. It is
+	// the default, so a note, not a warning.
 	if logger != nil && s.config.Capabilities.AcceptsRemoteConfig && !s.config.Agent.RemoteConfigPolicy.Enabled() {
-		logger.Warn("The remote config is unrestricted (no agent::remote_config_policy): " +
-			"the server may have the collector read any file it can and send it anywhere")
+		logger.Info("The remote config is unrestricted (no agent::remote_config_policy): the server's configs " +
+			"run as sent. To limit them, set agent::remote_config_policy (the enrollment helpers' --restricted)")
 	}
 
 	return s, nil
@@ -540,12 +543,7 @@ func (s *Supervisor) Start(ctx context.Context) error {
 		return err
 	}
 	s.commander.SetPassthroughLogHook(s.appendPassthroughLogLine)
-	s.commander.SetEnvironmentProvider(func() map[string]string {
-		if env := s.connectionEnv.Load(); env != nil {
-			return *env
-		}
-		return nil
-	})
+	s.commander.SetEnvironmentProvider(s.collectorEnv) // the credentials and the host key (host_key_env.go)
 
 	s.agentWG.Go(func() {
 		s.runAgentProcess()
@@ -1170,6 +1168,8 @@ func (s *Supervisor) forwardCustomMessagesToServerLoop() {
 func (s *Supervisor) setAgentDescription(ad *protobufs.AgentDescription) {
 	ad.IdentifyingAttributes = applyKeyValueOverrides(s.config.Agent.Description.IdentifyingAttributes, ad.IdentifyingAttributes)
 	ad.NonIdentifyingAttributes = applyKeyValueOverrides(s.config.Agent.Description.NonIdentifyingAttributes, ad.NonIdentifyingAttributes)
+	// Changed here: with this host's key (host_key.go).
+	ad.NonIdentifyingAttributes = withHostKey(ad.NonIdentifyingAttributes)
 	s.agentDescription.Store(ad)
 }
 
@@ -1178,7 +1178,7 @@ func (s *Supervisor) setAgentDescription(ad *protobufs.AgentDescription) {
 func (s *Supervisor) configuredAgentDescription() *protobufs.AgentDescription {
 	return &protobufs.AgentDescription{
 		IdentifyingAttributes:    applyKeyValueOverrides(s.config.Agent.Description.IdentifyingAttributes, nil),
-		NonIdentifyingAttributes: applyKeyValueOverrides(s.config.Agent.Description.NonIdentifyingAttributes, nil),
+		NonIdentifyingAttributes: withHostKey(applyKeyValueOverrides(s.config.Agent.Description.NonIdentifyingAttributes, nil)), // Changed here: with this host's key (host_key.go).
 	}
 }
 
