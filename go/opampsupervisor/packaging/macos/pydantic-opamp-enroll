@@ -143,8 +143,15 @@ unload() {
 # load loads the daemon that unload unloaded, and then ends on a signal that came meanwhile.
 load() {
 	unsignaled "$launchctl" bootstrap system "$plist"
-	trap - HUP INT TERM
-	[ -z "$ended" ] || exit "$ended"
+	resume_interrupts
+}
+
+# Once a restart is safe to interrupt again, exit through the enrollment's cleanup trap.
+resume_interrupts() {
+	trap 'exit 129' HUP
+	trap 'exit 130' INT
+	trap 'exit 143' TERM
+	[ -z "${ended:-}" ] || exit "$ended"
 }
 
 # unsignaled runs a command that the signals (a Ctrl-C reaches the commands here too) don't end.
@@ -171,6 +178,11 @@ start=yes
 telemetry_stdin=
 refresh=
 restarted_fresh=
+kept=
+kept_tmp=
+stopped=
+old_pid=
+started=0
 saved=
 if [ "${1:-}" = --refresh ]; then
 	[ $# -eq 1 ] || fail "--refresh takes no other options: it uses the last enrollment's"
@@ -315,6 +327,154 @@ fi
 umask 077
 mkdir -p "$etc"
 chmod 0700 "$etc"
+
+# An enrollment that another run was cut short in (killed, or the host lost power) is a person's to put back:
+# this run neither does it nor removes it.
+copies() {
+	for d in "$etc"/enrollment-before-*; do
+		case ${d#"$etc"/enrollment-before-} in
+		*[!0-9TZ-]*) continue ;;
+		[0-9]*T[0-9]*Z-[0-9]*) ;;
+		*) continue ;;
+		esac
+		if [ -f "$d/put-back" ] && [ ! -L "$d" ]; then echo "$d"; fi
+	done
+}
+for d in $(copies); do
+	echo "an earlier pydantic-opamp-enroll was cut short: the enrollment this host had before it (token, config and credentials) is kept in $d. Put it back with: sudo sh $d/put-back    Or, if this host works as it is, remove it with: sudo rm -r $d" >&2
+done
+
+# now_json is the Supervisor's status.
+now_json() {
+	"$supervisor" status --storage "$storage" --json 2>/dev/null || :
+}
+
+# keep_enrollment keeps the enrollment of a host its server takes, until the server takes the new one: the core
+# uses the credentials the server issued only with the token they were issued for, and one offered for another
+# token takes their place. The Supervisor is stopped for it, and root alone reads the copies.
+keep_enrollment() {
+	[ -z "$refresh" ] && [ -n "$start" ] && [ -f "$etc/enroll-token" ] && [ -f "$etc/supervisor.yaml" ] &&
+		[ -f "$storage/opamp-state" ] && [ ! -L "$storage/opamp-state" ] && "$launchctl" print "system/$label" >/dev/null 2>&1 || return 0
+	st=$(now_json)
+	case $st in *'"accepted": {'*) ;; *) return 0 ;; esac
+	old_pid=$(printf '%s\n' "$st" | sed -n 's/^  "pid": \([0-9]*\),*$/\1/p')
+	stopped=yes
+	unload
+	resume_interrupts
+	to=$etc/enrollment-before-$(date -u +%Y%m%dT%H%M%SZ)-$$
+	kept_tmp=$to.tmp
+	# What a run that was killed while it copied left: nothing was changed then. (Not of one that still runs.)
+	for d in "$etc"/enrollment-before-*.tmp; do
+		pid=${d##*-}
+		case ${pid%.tmp} in '' | *[!0-9]*) continue ;; esac
+		kill -0 "${pid%.tmp}" 2>/dev/null || rm -rf "$d"
+	done
+	mkdir "$kept_tmp"
+	for f in enroll-token telemetry-token supervisor.yaml enroll.options supervisor.yaml.sha256; do
+		# A link as a link.
+		{ [ ! -e "$etc/$f" ] && [ ! -L "$etc/$f" ]; } || cp -P -p "$etc/$f" "$kept_tmp/$f"
+	done
+	cp -P -p "$storage/opamp-state" "$kept_tmp/opamp-state"
+	if [ ! -f "$kept_tmp/opamp-state" ] || [ -L "$kept_tmp/opamp-state" ]; then fail "$storage/opamp-state is not a file: nothing is changed"; fi
+	cat >"$kept_tmp/put-back" <<EOF
+# Puts this host back on the enrollment it had before pydantic-opamp-enroll was run: run it as root.
+set -eu
+kept=$to etc=$etc storage=$storage label=$label plist=$plist launchctl=$launchctl
+EOF
+	cat >>"$kept_tmp/put-back" <<'EOF'
+umask 077
+[ -f "$kept/opamp-state" ] || { echo "nothing is put back: $kept is not there" >&2; exit 1; }
+"$launchctl" bootout "system/$label" 2>/dev/null || :
+n=0
+while "$launchctl" print "system/$label" >/dev/null 2>&1; do
+	[ "$n" -lt 30 ] || { echo "the Supervisor ($label) is still stopping: nothing is put back; run this again" >&2; exit 1; }
+	sleep 1
+	n=$((n + 1))
+done
+trap '"$launchctl" bootstrap system "$plist"' EXIT
+# Whole again if it is cut short: the copies go last. (A file that wasn't there goes.)
+one() {
+	if [ -e "$kept/$1" ] || [ -L "$kept/$1" ]; then
+		rm -f "$2/$1.put-back"
+		cp -P -p "$kept/$1" "$2/$1.put-back"
+		mv -f "$2/$1.put-back" "$2/$1"
+	else
+		rm -f "$2/$1"
+	fi
+}
+for f in enroll-token telemetry-token supervisor.yaml enroll.options supervisor.yaml.sha256; do one "$f" "$etc"; done
+new=$storage/opamp-state.put-back
+rm -f "$new"
+cp -p "$kept/opamp-state" "$new"
+# What the server offered since, if this isn't the run that tried it.
+if [ "${1:-}" != replace ] && [ -e "$storage/opamp-state" ]; then
+	mv "$storage/opamp-state" "$storage/opamp-state.replaced-$(date -u +%Y%m%dT%H%M%SZ)-$$"
+fi
+[ ! -d "$storage/opamp-state" ]
+mv -f "$new" "$storage/opamp-state"
+rm -rf "$kept"
+EOF
+	mv "$kept_tmp" "$to"
+	kept=$to
+	kept_tmp=
+}
+
+# put_back ends the run: if it failed, however it did, with the host back on the enrollment it had. Once, and
+# only with the Supervisor stopped and the server not having taken the host meanwhile.
+put_back() {
+	code=$?
+	trap - EXIT
+	trap '' HUP INT QUIT PIPE TERM
+	set +e
+	if [ -z "$kept" ]; then
+		[ -z "$kept_tmp" ] || rm -rf "$kept_tmp"
+		[ -z "$stopped" ] || "$launchctl" print "system/$label" >/dev/null 2>&1 || "$launchctl" bootstrap system "$plist"
+		exit "$code"
+	fi
+	if [ "$code" -eq 0 ] || [ -n "$restarted_fresh" ]; then
+		rm -rf "$kept"
+		exit "$code"
+	fi
+	# In a subshell: unload fails the run if it can't.
+	if ! (unload); then
+		echo "not enrolled with this token, and the Supervisor ($label) can't be stopped to put the earlier enrollment back. It is kept in $kept; put it back with: sudo sh $kept/put-back" >&2
+		exit 1
+	fi
+	st=$(now_json)
+	pid=$(printf '%s\n' "$st" | sed -n 's/^  "pid": \([0-9]*\),*$/\1/p')
+	started=$(date +%s)
+	case $st in
+	*'"accepted": {'*)
+		# Of the Supervisor this run started, not of the one before.
+		if [ -n "$pid" ] && [ "$pid" != "$old_pid" ]; then
+			rm -rf "$kept"
+			"$launchctl" bootstrap system "$plist"
+			if "$supervisor" status --storage "$storage" --wait 30s --since "$started" --require-accepted; then
+				echo "Enrolled with $endpoint, late. The Supervisor is running and connected ($label)."
+				exit 0
+			fi
+			echo "the server at $endpoint took this host with this token, and the Supervisor isn't connected now: it keeps retrying; check with: sudo $supervisor status --storage $storage" >&2
+			exit 1
+		fi
+		;;
+	esac
+	if ! sh "$kept/put-back" replace; then
+		echo "not enrolled with this token, and the earlier enrollment could not be put back (why is above). It is kept in $kept; put it back with: sudo sh $kept/put-back" >&2
+		exit 1
+	fi
+	if "$supervisor" status --storage "$storage" --wait 30s --since "$started" --require-accepted >/dev/null; then
+		echo "not enrolled with this token: this host is back on the enrollment it had, and connected" >&2
+	else
+		echo "not enrolled with this token, and with the enrollment it had, which is back, this host isn't accepted now either; check with: sudo $supervisor status --storage $storage" >&2
+	fi
+	exit 1
+}
+trap put_back EXIT
+trap 'exit 131' QUIT
+trap 'exit 141' PIPE
+resume_interrupts
+keep_enrollment
+
 if [ -z "$refresh" ]; then
 	printf '%s' "$token" >"$etc/enroll-token.tmp"
 	mv -f "$etc/enroll-token.tmp" "$etc/enroll-token"
@@ -518,16 +678,50 @@ fail_wait() {
 	exit 1
 }
 
-# not_accepted fails the install when the Supervisor is connected but the server never answered
-# it: a server that takes the connection but not the credentials (a used-up, expired or revoked
+# not_accepted fails the install when the server didn't take the host: it offered it credentials
+# that aren't in use, or the Supervisor is connected but the server never answered it. A server that
+# takes the connection but not the credentials (a used-up, expired or revoked
 # enrollment token) closes it unanswered.
 not_accepted() {
 	st=$("$supervisor" status --storage "$storage" --json 2>/dev/null) || :
-	if printf '%s\n' "$st" | grep -q '"connected": true' && ! printf '%s\n' "$st" | grep -q '"accepted": {'; then
-		deleted=", or the server deleted this host, which keeps its identity"
-		purge=", or for a deleted host remove its data first (sudo /opt/pydantic-opamp/bin/pydantic-opamp-uninstall --purge)"
-		# Not with credentials set aside: a purge removes them.
-		[ -z "$restarted_fresh$(states_aside)$(ls "$storage" | grep '^opamp-state\.replaced-')" ] || deleted= purge=
+	deleted=", or the server deleted this host, which keeps its identity"
+	purge=", or for a deleted host remove its data first (sudo /opt/pydantic-opamp/bin/pydantic-opamp-uninstall --purge)"
+	taken="Remove this host's data (sudo /opt/pydantic-opamp/bin/pydantic-opamp-uninstall --purge), then enroll it again with a new token"
+	# Not with credentials set aside: a purge removes them.
+	if [ -n "$restarted_fresh$(states_aside)$(ls "$storage" | grep '^opamp-state\.replaced-')$(copies)" ]; then
+		deleted= purge=
+		copied=$(copies)
+		taken="Copy what is set aside in $storage${copied:+ and $etc} elsewhere, remove this host's data (sudo /opt/pydantic-opamp/bin/pydantic-opamp-uninstall --purge), then enroll it again with a new token"
+	fi
+	# The host goes back to the enrollment it had (put_back): nothing more is to be done with this one.
+	if [ -n "$kept" ]; then
+		host=$(printf '%s\n' "$st" | sed -n 's/.*"unreachable": "\([^"]*\)".*/\1/p')
+		case $st in
+		*'"identity_taken": true'*) echo "not enrolled: the server at $endpoint holds this host's identity for another installation" >&2 ;;
+		*'"unreachable": "'*) echo "not enrolled: the server at $endpoint tells this host to connect to $host, which can't be reached from here (its name, a firewall, a proxy or its certificate)" >&2 ;;
+		*'"token_refused": true'*) echo "not enrolled: the server at $endpoint took the connection and not the enrollment token: it may be used up, expired or revoked. Enroll again with a new token" >&2 ;;
+		*'"enrollment": {'*) echo "not enrolled: the server at $endpoint answered this host and hasn't taken it. Why is above" >&2 ;;
+		*'"connected": true'*) echo "not enrolled: the server at $endpoint took the connection and not the enrollment token: it may be used up, expired or revoked. Enroll again with a new token" >&2 ;;
+		*) return 0 ;;
+		esac
+		fail_wait
+	fi
+	# The server answered the host and didn't take it ("enrollment" in the status, gone once it
+	# does). A refused token is told below.
+	if printf '%s\n' "$st" | grep -q '"identity_taken": true'; then
+		echo "not enrolled: the server at $endpoint holds this host's identity for another installation (a host it deleted, say). $taken; check with: sudo $supervisor status --storage $storage" >&2
+		fail_wait
+	fi
+	host=$(printf '%s\n' "$st" | sed -n 's/.*"unreachable": "\([^"]*\)".*/\1/p')
+	if [ -n "$host" ]; then
+		echo "not enrolled: the server at $endpoint tells this host to connect to $host, which can't be reached from here (its name, a firewall, a proxy or its certificate). Once it can, the host enrolls by itself, or at once after a restart of the Supervisor; when it tries again is above. If the server was wrong to, once it is corrected there: $taken; check with: sudo $supervisor status --storage $storage" >&2
+		fail_wait
+	fi
+	if printf '%s\n' "$st" | grep -q '"enrollment": {' && ! printf '%s\n' "$st" | grep -q '"token_refused": true'; then
+		echo "not enrolled: the server at $endpoint answered this host and hasn't taken it. Why, how many credentials it offered, and when the host tries again are above; check with: sudo $supervisor status --storage $storage" >&2
+		fail_wait
+	fi
+	if printf '%s\n' "$st" | grep -q '"token_refused": true' || { printf '%s\n' "$st" | grep -q '"connected": true' && ! printf '%s\n' "$st" | grep -q '"accepted": {'; }; then
 		echo "enrolled, but the server at $endpoint took the connection and not the enrollment token: it may be used up, expired or revoked$deleted. Enroll again with a new token$purge; check with: sudo $supervisor status --storage $storage" >&2
 		fail_wait
 	fi
@@ -551,7 +745,7 @@ refused_saved() {
 }
 
 # wait_connected waits up to 30 seconds for the Supervisor started at $1 (Unix seconds) to connect
-# and the server to answer it (--require-accepted).
+# and the server to take it (--require-accepted).
 # An install that can't reach its server (an untrusted certificate, a refused key) fails here,
 # with what to check, instead of reporting success; the service keeps retrying.
 wait_connected() {
@@ -602,6 +796,10 @@ wait_connected() {
 		fail_wait
 	fi
 	not_accepted
+	if [ -n "$kept" ]; then
+		echo "not enrolled: the Supervisor can't connect to $endpoint. Fix what is above, then enroll again" >&2
+		fail_wait
+	fi
 	echo "enrolled, but the Supervisor can't connect to $endpoint yet; it keeps retrying. Fix what is above, then check with: sudo $supervisor status --storage $storage" >&2
 	fail_wait
 }

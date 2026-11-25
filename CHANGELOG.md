@@ -61,7 +61,7 @@ and date. Tests, CI and docs alone don't need a line.
 
 ### Added
 
-- Supervisor: `opampsupervisor status` says whether the server has answered this host since it
+- Supervisor: `opampsupervisor status` says whether the server has taken this host since it
   started (`accepted` in `--json`, an "Accepted" line in the text). A server that takes the
   connection but not the credentials (a used-up enrollment key, say) closes it unanswered, and
   the host read as connected and healthy; it now reads "not yet", and `--require-accepted` makes
@@ -72,9 +72,14 @@ and date. Tests, CI and docs alone don't need a line.
   `--restricted`, settings that send the Collector's own telemetry to an endpoint the policy
   doesn't allow were refused with an error line at each connection and nothing else said so; the
   status says it now, and the same refusal is logged at error once, then at debug (#150).
-- Go: `Client.Answered()`, closed once the server's first answer reaches a platform-mode client
-  (a ServerToAgent that isn't an error response, over WebSocket or in an HTTP success): it tells a
-  server that took the agent from one that took the connection and closed it unanswered (#150).
+- Go: `Client.Standing()` and `Client.StandingChanged()`: in platform mode, whether the server took
+  the agent, the credentials it offered it and why none is in use, and its last error response and
+  wait. `Config.KeepUnreached` keeps an agent on an offered credential whose endpoint couldn't be
+  reached. It tells a server that took the agent from one that took the connection and closed it
+  unanswered, or that only offers credentials it then refuses (#160).
+- Supervisor: `opampsupervisor status` says how the enrollment of a host the server doesn't take
+  goes (`enrollment` in `--json`): the credentials offered, why none is in use, and when the host
+  tries again. It exits 1 then, and `--wait --require-accepted` doesn't wait past it (#160).
 - Go: `Client.UsedIssued()`, whether the latest request or connection was made with credentials a
   server issued rather than the configured ones (platform mode), and `Client.SaveError()` with
   `Client.Saves()`, why the last save of the state failed (#150).
@@ -133,6 +138,24 @@ and date. Tests, CI and docs alone don't need a line.
 
 ### Fixed
 
+- Supervisor: a host whose own credential the server offers and then refuses (it keeps the host's
+  identity for another enrollment, say) went back to its enrollment token at once and every time,
+  was offered another credential each time (18 connections in 14 seconds, to the server's limit of
+  16), and read as accepted; `pydantic-opamp-enroll` said "Enrolled" and exited 0. A host is
+  accepted once the server has answered it on the credential it issued. One the server doesn't
+  take stops trying: for an hour if its identity is bound to another installation, else for a
+  minute (5 seconds after a lost connection), doubling to an hour. One whose offered endpoint can't
+  be reached keeps that credential and tries it again, in a minute and then less often, and takes no
+  other, a restart or not (it took 16 in under 40 seconds); the status and the helper name the endpoint's
+  host. A host the server took and then closed for policy isn't accepted any more, and one whose enrollment key is used up or revoked
+  isn't well (`status` exits 1). The status says why, `--wait --require-accepted` has the host
+  accepted and connected for 3 seconds (every enrollment takes that much longer), and
+  `pydantic-opamp-enroll` (Linux, macOS, Windows) fails with it (#160).
+- Supervisor installers: `pydantic-opamp-enroll` (Linux, macOS, Windows) run on an enrolled host with a
+  token the server doesn't take (a used-up one, say) replaced the one the host was enrolled with, and
+  the credentials the server issued for it were not used any more: the host stayed off the server. It
+  now keeps the enrollment the host had until the server takes the new one, and otherwise goes back to
+  it and exits 1 (#160).
 - Supervisor installers (Linux): `pydantic-opamp-uninstall --purge` left the unit's
   `telemetry.conf` drop-in, which names the telemetry credential the purge deletes, so a later
   enrollment without a telemetry token failed to start the service (243/CREDENTIALS). The purge
@@ -143,7 +166,6 @@ and date. Tests, CI and docs alone don't need a line.
   says which config runs instead (`running_config` in `--json`). It showed the config still
   running as APPLIED once the Supervisor reported it again, at a restart or a retarget, so a
   refused config read as applied. The server's view was right (#150).
-
 - Supervisor installers: a host deleted on the server and enrolled again over its kept data with
   the same token could never connect: the client kept the host's own issued credentials, which
   the delete revoked, and doesn't fall back from them to the token. `pydantic-opamp-enroll` (not

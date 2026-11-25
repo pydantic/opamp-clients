@@ -94,8 +94,8 @@ func TestSetStateAside(t *testing.T) {
 			require.NoError(t, os.WriteFile(filepath.Join(dir, setAsideRequest+strconv.Itoa(me)), nil, 0o600))
 		}, refuse, false},
 		"no run":                 {func(t *testing.T, dir string) { askAside(t, dir, me, 0) }, nil, false},
-		"accepted":               {func(t *testing.T, dir string) { askAside(t, dir, me, 0) }, func(r *statusReport) { r.connected(nil); r.accepted(nil) }, false},
-		"accepted before":        {func(t *testing.T, dir string) { askAside(t, dir, me, 0) }, func(r *statusReport) { r.accepted(nil); refuse(r) }, false},
+		"accepted":               {func(t *testing.T, dir string) { askAside(t, dir, me, 0) }, func(r *statusReport) { r.connected(nil); r.accepted(nil, 1) }, false},
+		"accepted before":        {func(t *testing.T, dir string) { askAside(t, dir, me, 0) }, func(r *statusReport) { r.accepted(nil, 1); refuse(r) }, false},
 		"unreachable":            {func(t *testing.T, dir string) { askAside(t, dir, me, 0) }, func(r *statusReport) { refuse(r); r.connectFailed(nil, 0, "", true) }, false},
 		"not allowed":            {func(t *testing.T, dir string) { askAside(t, dir, me, 0) }, func(r *statusReport) { refuse(r); r.connectFailed(nil, 403, "", true) }, false},
 		"refused, then not":      {func(t *testing.T, dir string) { askAside(t, dir, me, 0) }, func(r *statusReport) { refuse(r); r.connected(nil) }, false},

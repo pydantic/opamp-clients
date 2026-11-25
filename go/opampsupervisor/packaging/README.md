@@ -101,6 +101,13 @@ Once the server issues the agent its own credentials, the Supervisor uses them f
 
 The enrollment token in the config is then only a fallback.
 
+A host its server takes can be enrolled again with another token or server. The helper (on every platform)
+stops the Supervisor and keeps the enrollment it had, until the server takes the host with the new one. If it
+doesn't (it refuses the token, can't be reached, offers a credential and doesn't take it), or the run is
+interrupted, the host goes back to the enrollment it had, once, and the helper exits 1. A run that was killed
+leaves the copies in `enrollment-before-` and the time, beside the config, for root (an administrator) alone:
+the next run says so, with the command that puts them back, and leaves them.
+
 If the server refuses those credentials three times or more in a row (it deleted the host, say),
 enrolling again with the same token has the Supervisor set them aside, in `opamp-state.refused-` and the time beside `opamp-state`, and enrolls
 the host as a new one. They stay there until a purge removes the data, and `opampsupervisor status` lists

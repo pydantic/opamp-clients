@@ -207,6 +207,14 @@ type Config struct {
 	// (docs/connection-settings.md). Offers are refused without a StateFile: a restart would
 	// lose them.
 	AcceptConnectionSettings bool
+	// KeepUnreached keeps the agent on a credential that the server offered it and whose endpoint could
+	// not be reached, in platform mode: while it was never tried, the agent doesn't go back to the
+	// configured credential, for which a server that enrolls agents offers it another each time. It
+	// makes no further connection then: Standing.Unreached says so, for the application to stop the client
+	// and start it again later, the offered credential first. Only once the server offered one and
+	// closed the connection, in this run; or, KeepUnreachedSaved (for that later start), for one saved
+	// before it too. An agent the server serves on its configured credential is not kept from it.
+	KeepUnreached, KeepUnreachedSaved bool
 	// VerifyTimeout is how long offered settings have to prove themselves; 0: 60 s.
 	VerifyTimeout time.Duration
 	// RequestInstanceUID asks the server to assign the instance UID (the RequestInstanceUid
@@ -268,8 +276,8 @@ type Client struct {
 	// saveError is how the last save ended, and saves says that one did (the executor's).
 	saveError *atomic.Pointer[string]
 	saves     <-chan struct{}
-	// answered is the executor's, in platform mode; nil in core mode.
-	answered <-chan struct{}
+	// standing is the executor's, in platform mode; nil in core mode.
+	standing *standing
 }
 
 // Start starts a client. notify is called for every Notification, one at a time, on the client's
@@ -443,7 +451,10 @@ func (o *Opened) start(status Status, first []*corepb.Input, notify func(*Client
 	cl.saveError, cl.saves = &x.saveError, x.saves
 	x.configure(cfg.Header)
 	if !o.coreMode {
-		cl.answered = x.answered
+		x.standing = newStanding()
+		x.standing.configure(cfg.Endpoint, cfg.Header, cfg.AcceptConnectionSettings)
+		x.standing.keepUnreached, x.standing.keepSaved = cfg.KeepUnreached || cfg.KeepUnreachedSaved, cfg.KeepUnreachedSaved
+		cl.standing = x.standing
 	}
 	if cfg.fs != nil {
 		x.fs = cfg.fs
@@ -524,15 +535,29 @@ func (c *Client) SaveError() string {
 	return ""
 }
 
-// Answered is closed once an answer from the server has reached the client since Start: a
-// ServerToAgent that isn't an error response, in a WebSocket message or in an HTTP success (with
-// the protobuf content type, or none). It is how an application tells a server that took the
-// agent from one that took the connection and closed it unanswered (as one may for credentials
-// it refuses, while the connection reads connected); a server that answers HTTP requests always
-// answers, but over WebSocket one may send nothing until it has something to say (opamp-go's
-// server does so), so a server it never closes for may leave it open. It is never taken back.
-// Platform mode only, where the client makes the requests: nil in core mode.
-func (c *Client) Answered() <-chan struct{} { return c.answered }
+// Standing is how the agent stands with its server now: whether the server took it, and what
+// became of the credentials it offered. It is how an application tells a server that took the
+// agent from one that took the connection and closed it unanswered (as one may for credentials it
+// refuses, while the connection reads connected), or that only offers the agent credentials it
+// then refuses. A server that answers HTTP requests always answers, but over WebSocket one may
+// send nothing until it has something to say (opamp-go's server does so), so one that takes the
+// agent may leave it not accepted. Platform mode only, where the client makes the requests: the
+// zero Standing in core mode.
+func (c *Client) Standing() Standing {
+	if c.standing == nil {
+		return Standing{}
+	}
+	return c.standing.now()
+}
+
+// StandingChanged receives a value when Standing has changed since the last one received; it is
+// never closed. nil in core mode.
+func (c *Client) StandingChanged() <-chan struct{} {
+	if c.standing == nil {
+		return nil
+	}
+	return c.standing.changed
+}
 
 func (c *Client) setUID(uid []byte) {
 	if len(uid) != 16 {
@@ -647,6 +672,9 @@ func (cfg Config) platformModeOnly() error {
 
 // coreModeOnly refuses what core mode doesn't honour.
 func (cfg Config) coreModeOnly() error {
+	if cfg.KeepUnreached || cfg.KeepUnreachedSaved {
+		return errors.New("opamp: KeepUnreached in core mode: the core makes the connections itself; leave it unset, or set Mode to ModePlatform")
+	}
 	if cfg.TLS.Config != nil && cfg.TLS.Config.ServerName != "" {
 		return errors.New("opamp: TLS.Config.ServerName in core mode: the core names the host of each handshake (the server's, a download's, an https:// proxy's), so one name can't stand for all; leave it empty, or set Mode to ModePlatform, where net/http verifies every server by it")
 	}

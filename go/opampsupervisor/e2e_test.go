@@ -9,7 +9,7 @@
 // accepts_packages is refused is gone: the Supervisor installs packages now
 // (e2e_packages_test.go). The remote configs a test starts from are left in the OpAMP client's
 // state file (e2e_state_test.go), and checked as the server hears them: the Supervisor keeps no
-// .dat files.
+// .dat files. The binary's size limit is 42 MiB, where upstream's is 40.
 
 //go:build e2e
 
@@ -4183,8 +4183,10 @@ func enableExtensionsFeatureGate(t *testing.T) {
 }
 
 // supervisorBinarySizeLimitBytes is the size budget for the supervisor binary,
-// in bytes. 40 MiB.
-const supervisorBinarySizeLimitBytes = 40 * 1024 * 1024
+// in bytes. 42 MiB.
+// Changed here: upstream's is 40 MiB, which its code nearly fills with the shared core added
+// (README.md, "What changes").
+const supervisorBinarySizeLimitBytes = 42 * 1024 * 1024
 
 // TestSupervisorBinarySize guards against unintended growth of the supervisor
 // binary. It builds the supervisor with the same flags used for release
