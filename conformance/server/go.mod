@@ -3,7 +3,7 @@ module github.com/pydantic/opamp-clients/conformance/server
 go 1.26.0
 
 require (
-	github.com/gorilla/websocket v1.5.3
+	github.com/gorilla/websocket v1.5.4-0.20250319132907-e064f32e3674
 	github.com/open-telemetry/opamp-go v0.24.0
 	google.golang.org/protobuf v1.36.11
 )
